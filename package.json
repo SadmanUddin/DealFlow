@@ -1,0 +1,25 @@
+{
+  "name": "dealflow",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "node --watch src/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SadmanUddin/DealFlow.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type":"module",
+  "bugs": {
+    "url": "https://github.com/SadmanUddin/DealFlow/issues"
+  },
+  "homepage": "https://github.com/SadmanUddin/DealFlow#readme",
+  "dependencies": {
+    "dotenv": "^18.0.9",
+    "express": "^5.3.0"
+  }
+}
