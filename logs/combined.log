@@ -3,3 +3,16 @@
 {"level":"info","message":"Hello from DealFlow","service":"DealFlow-api"}
 {"level":"info","message":"::1 - - [04/Nov/2026:21:23:56 +0000] \"GET / HTTP/1.1\" 200 20 \"-\" \"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36\"","service":"DealFlow-api"}
 {"level":"info","message":"::1 - - [04/Nov/2026:21:23:57 +0000] \"GET /favicon.ico HTTP/1.1\" 404 150 \"-\" \"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36\"","service":"DealFlow-api"}
+{"level":"info","message":"Hello from DealFlow","service":"DealFlow-api"}
+{"level":"info","message":"::1 - - [09/Nov/2026:12:32:58 +0000] \"GET / HTTP/1.1\" 304 - \"-\" \"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36\"","service":"DealFlow-api"}
+{"level":"info","message":"::1 - - [09/Nov/2026:12:32:59 +0000] \"GET /favicon.ico HTTP/1.1\" 404 150 \"-\" \"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36\"","service":"DealFlow-api"}
+{"level":"info","message":"Hello from DealFlow","service":"DealFlow-api"}
+{"level":"info","message":"::1 - - [09/Nov/2026:12:43:05 +0000] \"GET / HTTP/1.1\" 200 20 \"-\" \"HTTPie\"","service":"DealFlow-api"}
+{"level":"info","message":"::1 - - [09/Nov/2026:12:43:28 +0000] \"GET /api HTTP/1.1\" 200 38 \"-\" \"HTTPie\"","service":"DealFlow-api"}
+{"level":"info","message":"::1 - - [09/Nov/2026:12:43:40 +0000] \"GET /api/health HTTP/1.1\" 404 149 \"-\" \"HTTPie\"","service":"DealFlow-api"}
+{"level":"info","message":"::1 - - [09/Nov/2026:12:43:48 +0000] \"GET /health HTTP/1.1\" 200 77 \"-\" \"HTTPie\"","service":"DealFlow-api"}
+{"level":"info","message":"::1 - - [09/Nov/2026:12:44:05 +0000] \"GET /api/auth/sign-in HTTP/1.1\" 404 155 \"-\" \"HTTPie\"","service":"DealFlow-api"}
+{"level":"info","message":"::1 - - [09/Nov/2026:12:44:41 +0000] \"GET /api/auth/sign-in HTTP/1.1\" 404 155 \"-\" \"HTTPie\"","service":"DealFlow-api"}
+{"level":"info","message":"::1 - - [09/Nov/2026:12:44:50 +0000] \"GET /api HTTP/1.1\" 200 38 \"-\" \"HTTPie\"","service":"DealFlow-api"}
+{"level":"info","message":"::1 - - [09/Nov/2026:12:45:01 +0000] \"GET /api/auth/sign-in HTTP/1.1\" 404 155 \"-\" \"HTTPie\"","service":"DealFlow-api"}
+{"level":"info","message":"::1 - - [09/Nov/2026:12:46:12 +0000] \"POST /api/auth/sign-in HTTP/1.1\" 200 31 \"-\" \"HTTPie\"","service":"DealFlow-api"}
