@@ -1,0 +1,210 @@
+const table = (name, fields) => {
+  const result = { __name: name };
+  for (const field of fields) result[field] = { table: name, field };
+  return result;
+};
+
+export const modelTables = {
+  users: table('users', [
+    'id',
+    'name',
+    'email',
+    'password',
+    'role',
+    'email_verified',
+    'is_active',
+    'created_at',
+    'updated_at',
+  ]),
+  authSessions: table('auth_sessions', [
+    'id',
+    'user_id',
+    'csrf_token_hash',
+    'expires_at',
+    'revoked_at',
+    'created_at',
+  ]),
+  authTokens: table('auth_tokens', [
+    'token_hash',
+    'user_id',
+    'type',
+    'expires_at',
+    'consumed_at',
+    'created_at',
+  ]),
+};
+
+export const databaseState = {
+  users: [],
+  auth_sessions: [],
+  auth_tokens: [],
+  nextUserId: 1,
+};
+
+export const resetDatabase = () => {
+  databaseState.users.length = 0;
+  databaseState.auth_sessions.length = 0;
+  databaseState.auth_tokens.length = 0;
+  databaseState.nextUserId = 1;
+};
+
+const condition = (operator, column, value) => ({ operator, column, value });
+export const drizzleOperators = {
+  eq: (column, value) => condition('eq', column, value),
+  gt: (column, value) => condition('gt', column, value),
+  isNull: column => condition('isNull', column),
+  and: (...conditions) => ({ operator: 'and', conditions }),
+};
+
+const tableRows = target => databaseState[target.__name];
+
+const valueFor = (rowSet, column) => rowSet[column.table]?.[column.field];
+
+const matches = (expression, rowSet) => {
+  if (!expression) return true;
+  if (expression.operator === 'and') {
+    return expression.conditions.every(entry => matches(entry, rowSet));
+  }
+  const value = valueFor(rowSet, expression.column);
+  if (expression.operator === 'eq') return value === expression.value;
+  if (expression.operator === 'isNull') return value == null;
+  if (expression.operator === 'gt') return value > expression.value;
+  return false;
+};
+
+const project = (projection, rowSet, fallback) => {
+  if (!projection) return { ...fallback };
+  return Object.fromEntries(
+    Object.entries(projection).map(([alias, column]) => [
+      alias,
+      valueFor(rowSet, column),
+    ])
+  );
+};
+
+class Query {
+  constructor(operation, projection, target) {
+    this.operation = operation;
+    this.projection = projection;
+    this.target = target;
+  }
+
+  from(target) {
+    this.target = target;
+    return this;
+  }
+
+  innerJoin(target, on) {
+    this.join = { target, on };
+    return this;
+  }
+
+  where(expression) {
+    this.expression = expression;
+    return this;
+  }
+
+  limit(limit) {
+    this.rowLimit = limit;
+    return this;
+  }
+
+  values(values) {
+    this.valuesToInsert = values;
+    return this;
+  }
+
+  set(values) {
+    this.valuesToSet = values;
+    return this;
+  }
+
+  returning(projection) {
+    this.projection = projection;
+    return this;
+  }
+
+  then(resolve, reject) {
+    try {
+      return Promise.resolve(this.execute()).then(resolve, reject);
+    } catch (error) {
+      return Promise.reject(error).then(resolve, reject);
+    }
+  }
+
+  execute() {
+    if (this.operation === 'select') return this.executeSelect();
+    if (this.operation === 'insert') return this.executeInsert();
+    return this.executeUpdate();
+  }
+
+  executeSelect() {
+    let rowSets = tableRows(this.target).map(row => ({
+      [this.target.__name]: row,
+    }));
+    if (this.join) {
+      rowSets = rowSets.flatMap(rowSet =>
+        tableRows(this.join.target).map(joined => ({
+          ...rowSet,
+          [this.join.target.__name]: joined,
+        }))
+      );
+    }
+    const selected = rowSets
+      .filter(rowSet => matches(this.expression, rowSet))
+      .slice(0, this.rowLimit)
+      .map(rowSet =>
+        project(this.projection, rowSet, rowSet[this.target.__name])
+      );
+    return selected;
+  }
+
+  executeInsert() {
+    const rows = tableRows(this.target);
+    if (
+      this.target.__name === 'users' &&
+      rows.some(user => user.email === this.valuesToInsert.email)
+    ) {
+      const error = new Error('Unique constraint violation');
+      error.code = '23505';
+      throw error;
+    }
+    const now = new Date();
+    const row = { ...this.valuesToInsert };
+    if (this.target.__name === 'users') {
+      row.id = databaseState.nextUserId++;
+      row.role ??= 'buyer';
+      row.email_verified ??= false;
+      row.is_active ??= true;
+      row.created_at = now;
+      row.updated_at = now;
+    } else {
+      row.created_at = now;
+      row.consumed_at ??= null;
+      row.revoked_at ??= null;
+    }
+    rows.push(row);
+    return this.projection
+      ? [project(this.projection, { [this.target.__name]: row }, row)]
+      : undefined;
+  }
+
+  executeUpdate() {
+    const rows = tableRows(this.target);
+    const updated = [];
+    for (const row of rows) {
+      const rowSet = { [this.target.__name]: row };
+      if (this.join) rowSet[this.join.target.__name] = this.join.row;
+      if (!matches(this.expression, rowSet)) continue;
+      Object.assign(row, this.valuesToSet);
+      updated.push(project(this.projection, rowSet, row));
+    }
+    return this.projection ? updated : undefined;
+  }
+}
+
+export const db = {
+  select: projection => new Query('select', projection),
+  insert: target => new Query('insert', null, target),
+  update: target => new Query('update', null, target),
+};

@@ -1,6 +1,22 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import request from 'supertest';
-import app from '../src/app.js';
+
+vi.mock('../src/config/logger.js', () => ({
+  default: {
+    error: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+  },
+}));
+
+process.env.NODE_ENV = 'test';
+process.env.PORT = '3000';
+process.env.DATABASE_URL =
+  'postgresql://test:test@localhost:5432/dealflow_test';
+process.env.JWT_SECRET = 'test-only-secret-that-is-at-least-32-chars';
+process.env.ARCJET_KEY = 'test-only-arcjet-key';
+
+const { default: app } = await import('../src/app.js');
 
 describe('Health Endpoint', () => {
   it('should return HTTP 200', async () => {

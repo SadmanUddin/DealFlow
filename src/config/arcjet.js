@@ -1,4 +1,5 @@
 import arcjet, { shield, detectBot, slidingWindow } from '@arcjet/node';
+import { getEnvironment } from '#config/env.js';
 // import { isSpoofedBot } from "@arcjet/inspect";
 // import express from "express";
 
@@ -6,7 +7,7 @@ import arcjet, { shield, detectBot, slidingWindow } from '@arcjet/node';
 // const port = 3000;
 
 const aj = arcjet({
-  key: process.env.ARCJET_KEY,
+  key: getEnvironment().ARCJET_KEY,
   rules: [
     shield({
       mode: 'LIVE',

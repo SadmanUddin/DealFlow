@@ -1,118 +1,86 @@
-import logger from '#config/logger.js';
-import { signupSchema, signInSchema } from '#validations/auth.validation.js';
-import { formatValidationError } from '#utils/format.js';
-import { createdUser, authenticateUser } from '#services/auth.service.js';
-import jwttoken from 'jsonwebtoken';
+import { getEnvironment } from '#config/env.js';
+import {
+  authenticateUser,
+  createEmailVerificationToken,
+  createSession,
+  csrfTokenForSession,
+  registerUser,
+  requestPasswordReset,
+  resetPassword,
+  revokeSession,
+  verifyEmail,
+} from '#services/auth.service.js';
 import { cookies } from '#utils/cookies.js';
+import {
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  signInSchema,
+  signupSchema,
+  tokenSchema,
+} from '#validations/auth.validation.js';
 
-export const signup = async (req, res, next) => {
-  try {
-    const validationResult = signupSchema.safeParse(req.body);
-    if (!validationResult.success) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        details: formatValidationError(validationResult.error),
-      });
-    }
-    const { name, email, password, role } = validationResult.data;
-
-    const user = await createdUser({
-      name,
-      email,
-      password,
-      role,
-    });
-    const token = jwttoken.sign(
-      {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-      },
-      process.env.JWT_SECRET,
-      {
-        expiresIn: '15m',
-      }
-    );
-    cookies.set(res, 'token', token);
-
-    logger.info(`User registered successfully:${email}`);
-    res.status(201).json({
-      message: 'User registered',
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
-    });
-  } catch (e) {
-    logger.error('Signup error', e);
-    if (e.message === 'User with this email already exists') {
-      return res.status(409).json({
-        error: 'Email already exists',
-      });
-    }
-    next(e);
-  }
+const startSession = async (user, res) => {
+  const session = await createSession(user);
+  cookies.setSession(res, session.accessToken);
+  return session;
 };
 
-export const signIn = async (req, res, next) => {
-  try {
-    const validationResult = signInSchema.safeParse(req.body);
-    if (!validationResult.success) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        details: formatValidationError(validationResult.error),
-      });
-    }
-    const { email, password } = validationResult.data;
-    const user = await authenticateUser({
-      email,
-      password,
-    });
-    const token = jwttoken.sign(
-      {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-      },
-      process.env.JWT_SECRET,
-      {
-        expiresIn: '15m',
-      }
-    );
-    cookies.set(res, 'token', token);
+export const signup = async (req, res) => {
+  const input = signupSchema.parse(req.body);
+  const user = await registerUser(input);
+  const session = await startSession(user, res);
+  const verificationToken = await createEmailVerificationToken(user.id);
+  const { NODE_ENV } = getEnvironment();
 
-    logger.info(`User signed in successfully:${email}`);
-    res.status(200).json({
-      message: 'User signed in',
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
-    });
-  } catch (e) {
-    logger.error('Sign-in error', e);
-    if (e.message === 'Invalid email or password') {
-      return res.status(401).json({
-        error: 'Invalid email or password',
-      });
-    }
-    next(e);
-  }
+  res.status(201).json({
+    message: 'Account created. Email verification is pending.',
+    user,
+    csrfToken: session.csrfToken,
+    ...(NODE_ENV !== 'production' ? { verificationToken } : {}),
+  });
 };
 
-export const signOut = (req, res, next) => {
-  try {
-    cookies.clear(res, 'token');
-    logger.info('User signed out successfully');
-    res.status(200).json({
-      message: 'User signed out',
-    });
-  } catch (e) {
-    logger.error('Sign-out error', e);
-    next(e);
-  }
+export const signIn = async (req, res) => {
+  const input = signInSchema.parse(req.body);
+  const user = await authenticateUser(input);
+  const session = await startSession(user, res);
+  res.status(200).json({ user, csrfToken: session.csrfToken });
+};
+
+export const signOut = async (req, res) => {
+  if (req.user && req.authSession) await revokeSession(req.authSession.id);
+  cookies.clearSession(res);
+  res.status(200).json({ message: 'Signed out' });
+};
+
+export const getCurrentUser = (req, res) => {
+  res.status(200).json({ user: req.user });
+};
+
+export const getCsrfToken = (req, res) => {
+  res.status(200).json({ csrfToken: csrfTokenForSession(req.authSession.id) });
+};
+
+export const verifyEmailAddress = async (req, res) => {
+  const { token } = tokenSchema.parse(req.body);
+  await verifyEmail(token);
+  res.status(200).json({ message: 'Email verified' });
+};
+
+export const forgotPassword = async (req, res) => {
+  const { email } = forgotPasswordSchema.parse(req.body);
+  const tokenResult = await requestPasswordReset(email);
+  const { NODE_ENV } = getEnvironment();
+  res.status(200).json({
+    message: 'Password reset request received.',
+    ...(NODE_ENV === 'test'
+      ? { resetToken: tokenResult.token ?? tokenResult.decoyToken }
+      : {}),
+  });
+};
+
+export const resetPasswordWithToken = async (req, res) => {
+  const input = resetPasswordSchema.parse(req.body);
+  await resetPassword(input.token, input.password);
+  res.status(200).json({ message: 'Password reset successfully' });
 };

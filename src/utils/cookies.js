@@ -1,23 +1,22 @@
+const ACCESS_COOKIE_MAX_AGE = 15 * 60 * 1000;
+const sameSite = () => (process.env.NODE_ENV === 'production' ? 'none' : 'lax');
+
 export const cookies = {
-  getOptions: () => ({
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'Strict',
-    maxAge: 15 * 60 * 1000,
-  }),
-  set: (res, name, value, options = {}) => {
-    res.cookie(name, value, {
-      ...cookies.getOptions(),
-      ...options,
-    });
+  setSession: (res, accessToken) => {
+    const sharedOptions = {
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: sameSite(),
+      path: '/',
+      maxAge: ACCESS_COOKIE_MAX_AGE,
+    };
+    res.cookie('token', accessToken, { ...sharedOptions, httpOnly: true });
   },
-  clear: (res, name, options = {}) => {
-    res.clearCookie(name, {
-      ...cookies.getOptions(),
-      ...options,
-    });
-  },
-  get: (req, name) => {
-    return req.cookies[name];
+  clearSession: res => {
+    const sharedOptions = {
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: sameSite(),
+      path: '/',
+    };
+    res.clearCookie('token', { ...sharedOptions, httpOnly: true });
   },
 };

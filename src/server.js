@@ -1,6 +1,7 @@
 import app from './app.js';
-const PORT = process.env.PORT || 3000;
+import { getEnvironment } from '#config/env.js';
 
+const { PORT } = getEnvironment();
 app.listen(PORT, () => {
-  console.log(`Listening on http://localhost:${PORT}`);
+  console.log(`DealFlow API listening on port ${PORT}`);
 });

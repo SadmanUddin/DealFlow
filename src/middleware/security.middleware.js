@@ -1,74 +1,59 @@
 import aj from '#config/arcjet.js';
 import logger from '#config/logger.js';
 import { slidingWindow } from '@arcjet/node';
+import { AppError } from '#utils/app-error.js';
 
-const securityMiddleware = async (req, res, next) => {
+const requestLimits = {
+  buyer: 10,
+  seller: 10,
+  admin: 20,
+  guest: 5,
+};
+
+const securityMiddleware = async (req, _res, next) => {
+  const role = req.user?.role || 'guest';
   try {
-    const role = req.user?.role || 'guest';
-    let limit;
-
-    switch (role) {
-      case 'admin':
-        limit = 20;
-        break;
-      case 'user':
-        limit = 10;
-        break;
-      case 'guest':
-        limit = 5;
-        break;
-    }
     const client = aj.withRule(
       slidingWindow({
         mode: 'LIVE',
         interval: '1m',
-        max: limit,
+        max: requestLimits[role] ?? requestLimits.guest,
         name: `${role}-rate-limit`,
       })
     );
     const decision = await client.protect(req);
-    if (decision.isDenied() && decision.reason.isBot()) {
-      logger.warn('Bot request blocked', {
+    if (decision.isDenied()) {
+      const rateLimited = decision.reason.isRateLimit();
+      logger.warn('Request denied by Arcjet', {
         ip: req.ip,
-        userAgent: req.get('User-agent'),
-        path: req.path,
-      });
-      return res.status(403).json({
-        error: 'Forbidden',
-        message: 'Automated requests are not allowed',
-      });
-    }
-    if (decision.isDenied() && decision.reason.isShield()) {
-      logger.warn('Shield request blocked', {
-        ip: req.ip,
-        userAgent: req.get('User-agent'),
         path: req.path,
         method: req.method,
+        reason: decision.reason.type,
       });
-      return res.status(403).json({
-        error: 'Forbidden',
-        message: 'request blocked by security policy',
-      });
-    }
-    if (decision.isDenied() && decision.reason.isRateLimit()) {
-      logger.warn('Rate limit exceeded', {
-        ip: req.ip,
-        userAgent: req.get('User-agent'),
-        path: req.path,
-        method: req.method,
-      });
-      return res.status(403).json({
-        error: 'Forbidden',
-        message: 'To many requests',
-      });
+      return next(
+        new AppError(
+          rateLimited ? 429 : 403,
+          rateLimited ? 'RATE_LIMITED' : 'REQUEST_BLOCKED',
+          rateLimited
+            ? 'Too many requests'
+            : 'Request blocked by security policy'
+        )
+      );
     }
     next();
-  } catch (e) {
-    console.error('arcjet middleware error:', e);
-    res.status(500).json({
-      error: 'Internal server error',
-      message: 'Something went wrong with security middleware',
+  } catch (error) {
+    logger.error('Arcjet request protection failed', {
+      error: error.message,
+      path: req.path,
+      method: req.method,
     });
+    next(
+      new AppError(
+        503,
+        'SECURITY_SERVICE_UNAVAILABLE',
+        'Security checks are temporarily unavailable'
+      )
+    );
   }
 };
 

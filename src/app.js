@@ -6,10 +6,35 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import authRoutes from './routes/auth.routes.js';
 import securityMiddleware from '#middleware/security.middleware.js';
+import userRoutes from './routes/user.routes.js';
+import { optionalAuthentication } from '#middleware/auth.middleware.js';
+import {
+  errorMiddleware,
+  notFoundMiddleware,
+} from '#middleware/error.middleware.js';
+import { getEnvironment } from '#config/env.js';
+import { AppError } from '#utils/app-error.js';
+
 const app = express();
+const allowedOrigins = getEnvironment()
+  .CORS_ORIGINS.split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean);
+
 app.use(helmet());
-app.use(cors());
-app.use(express.json());
+app.use(
+  cors({
+    credentials: true,
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin))
+        return callback(null, true);
+      return callback(
+        new AppError(403, 'CORS_ORIGIN_DENIED', 'Origin is not allowed')
+      );
+    },
+  })
+);
+app.use(express.json({ limit: '32kb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(
   morgan('combined', {
@@ -19,8 +44,7 @@ app.use(
   })
 );
 app.use(cookieParser());
-app.use(securityMiddleware);
-// const PORT = process.env.PORT || 3000;
+app.use(optionalAuthentication);
 
 app.get('/', (req, res) => {
   logger.info('Hello from DealFlow');
@@ -39,5 +63,10 @@ app.get('/api', (req, res) => {
   });
 });
 
+app.use(securityMiddleware);
 app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use(notFoundMiddleware);
+app.use(errorMiddleware);
+
 export default app;
