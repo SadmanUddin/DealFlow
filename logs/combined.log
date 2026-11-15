@@ -146,3 +146,9 @@
 {"level":"info","message":"::1 - - [14/Nov/2026:15:18:13 +0000] \"GET /health HTTP/1.1\" 403 50 \"-\" \"HTTPie\"","service":"DealFlow-api"}
 {"ip":"::1","level":"warn","message":"Rate limit exceeded","method":"GET","path":"/health","service":"DealFlow-api","userAgent":"HTTPie"}
 {"level":"info","message":"::1 - - [14/Nov/2026:15:18:13 +0000] \"GET /health HTTP/1.1\" 403 50 \"-\" \"HTTPie\"","service":"DealFlow-api"}
+{"level":"info","message":"127.0.0.1 - - [15/Nov/2026:12:42:43 +0000] \"GET /health HTTP/1.1\" 200 75 \"-\" \"-\"","service":"DealFlow-api"}
+{"level":"info","message":"127.0.0.1 - - [15/Nov/2026:12:42:43 +0000] \"GET /health HTTP/1.1\" 200 75 \"-\" \"-\"","service":"DealFlow-api"}
+{"level":"info","message":"127.0.0.1 - - [15/Nov/2026:12:46:33 +0000] \"GET /health HTTP/1.1\" 200 75 \"-\" \"-\"","service":"DealFlow-api"}
+{"level":"info","message":"127.0.0.1 - - [15/Nov/2026:12:46:33 +0000] \"GET /health HTTP/1.1\" 200 75 \"-\" \"-\"","service":"DealFlow-api"}
+{"level":"info","message":"127.0.0.1 - - [15/Nov/2026:12:48:43 +0000] \"GET /health HTTP/1.1\" 200 74 \"-\" \"DealFlow-test/1.0\"","service":"DealFlow-api"}
+{"level":"info","message":"127.0.0.1 - - [15/Nov/2026:12:48:43 +0000] \"GET /health HTTP/1.1\" 200 75 \"-\" \"DealFlow-test/1.0\"","service":"DealFlow-api"}
