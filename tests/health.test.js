@@ -11,8 +11,7 @@ vi.mock('../src/config/logger.js', () => ({
 
 process.env.NODE_ENV = 'test';
 process.env.PORT = '3000';
-process.env.TEST_DATABASE_URL =
-  'postgresql://localhost:5432/dealflow_test';
+process.env.TEST_DATABASE_URL = 'postgresql://localhost:5432/dealflow_test';
 process.env.JWT_SECRET = 'test-only-secret-that-is-at-least-32-chars';
 process.env.ARCJET_KEY = 'test-only-arcjet-key';
 

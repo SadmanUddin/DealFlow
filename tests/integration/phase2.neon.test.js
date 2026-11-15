@@ -1,10 +1,8 @@
-import dotenv from 'dotenv';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import { neon } from '@neondatabase/serverless';
 
-dotenv.config({ quiet: true });
 process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = 'phase2-neon-integration-secret-32-chars-minimum';
 process.env.ARCJET_KEY = 'phase2-neon-integration-key';
@@ -40,7 +38,7 @@ const emails = {
   buyer: `${emailPrefix}buyer@integration.test`,
   admin: `${emailPrefix}admin@integration.test`,
 };
-const password = 'Phase2-Neon-Integration-Password-42!';
+const password = `Phase2-${runId}-strong-Password!`;
 const trackedEmails = [];
 const createdListingIds = [];
 let sql;
@@ -155,7 +153,11 @@ const removeCreatedUsers = async () => {
   if (errors.length) throw new Error([...new Set(errors)].join(', '));
 };
 
-describe('Phase 2 real Neon integration', () => {
+const integrationDescribe = process.env.TEST_DATABASE_URL
+  ? describe
+  : describe.skip;
+
+integrationDescribe('Phase 2 real Neon integration', () => {
   beforeAll(async () => {
     const testUrl = process.env.TEST_DATABASE_URL;
     if (!testUrl) throw new Error('TEST_DATABASE_URL is required');
