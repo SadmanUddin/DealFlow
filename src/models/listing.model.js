@@ -1,0 +1,60 @@
+import {
+  check,
+  index,
+  integer,
+  numeric,
+  pgEnum,
+  pgTable,
+  serial,
+  text,
+  timestamp,
+  varchar,
+} from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { users } from '#models/user.model.js';
+
+export const listingStatus = pgEnum('listing_status', [
+  'draft',
+  'pending',
+  'published',
+  'rejected',
+  'archived',
+]);
+
+export const businessListings = pgTable(
+  'business_listings',
+  {
+    id: serial('id').primaryKey(),
+    seller_id: integer('seller_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    title: varchar('title', { length: 200 }).notNull(),
+    description: text('description').notNull(),
+    industry: varchar('industry', { length: 120 }),
+    location: varchar('location', { length: 160 }),
+    asking_price: numeric('asking_price', { precision: 18, scale: 2 }),
+    annual_revenue: numeric('annual_revenue', { precision: 18, scale: 2 }),
+    ebitda: numeric('ebitda', { precision: 18, scale: 2 }),
+    currency: varchar('currency', { length: 3 }).notNull().default('USD'),
+    status: listingStatus('status').notNull().default('draft'),
+    rejection_reason: text('rejection_reason'),
+    published_at: timestamp('published_at'),
+    created_at: timestamp('created_at').defaultNow().notNull(),
+    updated_at: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => [
+    index('business_listings_seller_id_idx').on(table.seller_id),
+    index('business_listings_status_created_at_idx').on(
+      table.status,
+      table.created_at
+    ),
+    check(
+      'business_listings_financials_nonnegative',
+      sql`(${table.asking_price} IS NULL OR ${table.asking_price} >= 0) AND (${table.annual_revenue} IS NULL OR ${table.annual_revenue} >= 0) AND (${table.ebitda} IS NULL OR ${table.ebitda} >= 0)`
+    ),
+    check(
+      'business_listings_currency_format',
+      sql`${table.currency} ~ '^[A-Z]{3}$'`
+    ),
+  ]
+);

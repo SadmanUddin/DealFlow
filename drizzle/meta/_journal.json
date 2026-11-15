@@ -15,6 +15,13 @@
       "when": 1794749410776,
       "tag": "0001_brainy_ink",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794763955729,
+      "tag": "0002_dashing_shard",
+      "breakpoints": true
     }
   ]
 }

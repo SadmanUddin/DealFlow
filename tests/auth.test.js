@@ -4,8 +4,8 @@ import jwt from 'jsonwebtoken';
 
 process.env.NODE_ENV = 'test';
 process.env.PORT = '3000';
-process.env.DATABASE_URL =
-  'postgresql://test:test@localhost:5432/dealflow_test';
+process.env.TEST_DATABASE_URL =
+  'postgresql://localhost:5432/dealflow_test';
 process.env.JWT_SECRET = 'test-only-secret-that-is-at-least-32-chars';
 process.env.ARCJET_KEY = 'test-only-arcjet-key';
 
@@ -17,6 +17,11 @@ vi.mock('../src/config/database.js', async () => {
 vi.mock('../src/models/user.model.js', async () => {
   const { modelTables } = await import('./helpers/mock-database.js');
   return modelTables;
+});
+
+vi.mock('../src/models/listing.model.js', async () => {
+  const { modelTables } = await import('./helpers/mock-database.js');
+  return { businessListings: modelTables.businessListings };
 });
 
 vi.mock('../src/config/arcjet.js', () => ({

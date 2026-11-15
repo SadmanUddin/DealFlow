@@ -3,7 +3,11 @@ import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 import { getEnvironment } from '#config/env.js';
 
-const { DATABASE_URL } = getEnvironment();
-const sql = neon(DATABASE_URL);
+const environment = getEnvironment();
+const connectionString =
+  environment.NODE_ENV === 'test'
+    ? environment.TEST_DATABASE_URL
+    : environment.DATABASE_URL;
+const sql = neon(connectionString);
 const db = drizzle(sql);
 export { db, sql };

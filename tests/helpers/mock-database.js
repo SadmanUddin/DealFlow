@@ -32,20 +32,43 @@ export const modelTables = {
     'consumed_at',
     'created_at',
   ]),
+  businessListings: table('business_listings', [
+    'id',
+    'seller_id',
+    'title',
+    'description',
+    'industry',
+    'location',
+    'asking_price',
+    'annual_revenue',
+    'ebitda',
+    'currency',
+    'status',
+    'rejection_reason',
+    'published_at',
+    'created_at',
+    'updated_at',
+  ]),
 };
 
 export const databaseState = {
   users: [],
   auth_sessions: [],
   auth_tokens: [],
+  business_listings: [],
   nextUserId: 1,
+  nextListingId: 1,
+  failNext: null,
 };
 
 export const resetDatabase = () => {
   databaseState.users.length = 0;
   databaseState.auth_sessions.length = 0;
   databaseState.auth_tokens.length = 0;
+  databaseState.business_listings.length = 0;
   databaseState.nextUserId = 1;
+  databaseState.nextListingId = 1;
+  databaseState.failNext = null;
 };
 
 const condition = (operator, column, value) => ({ operator, column, value });
@@ -54,6 +77,9 @@ export const drizzleOperators = {
   gt: (column, value) => condition('gt', column, value),
   isNull: column => condition('isNull', column),
   and: (...conditions) => ({ operator: 'and', conditions }),
+  or: (...conditions) => ({ operator: 'or', conditions }),
+  desc: column => ({ operator: 'desc', column }),
+  sql: (strings, ...values) => ({ __sql: strings.join('?'), values }),
 };
 
 const tableRows = target => databaseState[target.__name];
@@ -65,8 +91,16 @@ const matches = (expression, rowSet) => {
   if (expression.operator === 'and') {
     return expression.conditions.every(entry => matches(entry, rowSet));
   }
+  if (expression.operator === 'or') {
+    return expression.conditions.some(entry => matches(entry, rowSet));
+  }
   const value = valueFor(rowSet, expression.column);
-  if (expression.operator === 'eq') return value === expression.value;
+  if (expression.operator === 'eq') {
+    const expected = expression.value?.table
+      ? valueFor(rowSet, expression.value)
+      : expression.value;
+    return value === expected;
+  }
   if (expression.operator === 'isNull') return value == null;
   if (expression.operator === 'gt') return value > expression.value;
   return false;
@@ -109,6 +143,15 @@ class Query {
     return this;
   }
 
+  offset(offset) {
+    this.rowOffset = offset;
+    return this;
+  }
+
+  orderBy() {
+    return this;
+  }
+
   values(values) {
     this.valuesToInsert = values;
     return this;
@@ -124,6 +167,11 @@ class Query {
     return this;
   }
 
+  delete() {
+    this.operation = 'delete';
+    return this;
+  }
+
   then(resolve, reject) {
     try {
       return Promise.resolve(this.execute()).then(resolve, reject);
@@ -133,8 +181,14 @@ class Query {
   }
 
   execute() {
+    if (databaseState.failNext) {
+      const error = databaseState.failNext;
+      databaseState.failNext = null;
+      throw error;
+    }
     if (this.operation === 'select') return this.executeSelect();
     if (this.operation === 'insert') return this.executeInsert();
+    if (this.operation === 'delete') return this.executeDelete();
     return this.executeUpdate();
   }
 
@@ -144,17 +198,24 @@ class Query {
     }));
     if (this.join) {
       rowSets = rowSets.flatMap(rowSet =>
-        tableRows(this.join.target).map(joined => ({
-          ...rowSet,
-          [this.join.target.__name]: joined,
-        }))
+        tableRows(this.join.target)
+          .map(joined => ({
+            ...rowSet,
+            [this.join.target.__name]: joined,
+          }))
+          .filter(joined => matches(this.join.on, joined))
       );
     }
-    const selected = rowSets
-      .filter(rowSet => matches(this.expression, rowSet))
-      .slice(0, this.rowLimit)
+    const matching = rowSets.filter(rowSet => matches(this.expression, rowSet));
+    const selected = matching
+      .slice(
+        this.rowOffset ?? 0,
+        (this.rowOffset ?? 0) + (this.rowLimit ?? matching.length)
+      )
       .map(rowSet =>
-        project(this.projection, rowSet, rowSet[this.target.__name])
+        this.projection?.count
+          ? { count: matching.length }
+          : project(this.projection, rowSet, rowSet[this.target.__name])
       );
     return selected;
   }
@@ -178,6 +239,19 @@ class Query {
       row.is_active ??= true;
       row.created_at = now;
       row.updated_at = now;
+    } else if (this.target.__name === 'business_listings') {
+      row.id = databaseState.nextListingId++;
+      row.created_at = now;
+      row.updated_at = now;
+      row.status ??= 'draft';
+      row.currency ??= 'USD';
+      row.industry ??= null;
+      row.location ??= null;
+      row.asking_price ??= null;
+      row.annual_revenue ??= null;
+      row.ebitda ??= null;
+      row.rejection_reason ??= null;
+      row.published_at ??= null;
     } else {
       row.created_at = now;
       row.consumed_at ??= null;
@@ -201,10 +275,25 @@ class Query {
     }
     return this.projection ? updated : undefined;
   }
+
+  executeDelete() {
+    const rows = tableRows(this.target);
+    const removed = [];
+    for (let index = rows.length - 1; index >= 0; index -= 1) {
+      const row = rows[index];
+      if (!matches(this.expression, { [this.target.__name]: row })) continue;
+      rows.splice(index, 1);
+      removed.unshift(
+        project(this.projection, { [this.target.__name]: row }, row)
+      );
+    }
+    return this.projection ? removed : undefined;
+  }
 }
 
 export const db = {
   select: projection => new Query('select', projection),
   insert: target => new Query('insert', null, target),
   update: target => new Query('update', null, target),
+  delete: target => new Query('delete', null, target),
 };

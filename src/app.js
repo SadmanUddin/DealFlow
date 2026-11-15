@@ -7,6 +7,8 @@ import cookieParser from 'cookie-parser';
 import authRoutes from './routes/auth.routes.js';
 import securityMiddleware from '#middleware/security.middleware.js';
 import userRoutes from './routes/user.routes.js';
+import listingRoutes from './routes/listing.routes.js';
+import adminListingRoutes from './routes/admin-listing.routes.js';
 import { optionalAuthentication } from '#middleware/auth.middleware.js';
 import {
   errorMiddleware,
@@ -66,6 +68,8 @@ app.get('/api', (req, res) => {
 app.use(securityMiddleware);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/listings', listingRoutes);
+app.use('/api/admin/listings', adminListingRoutes);
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
 
