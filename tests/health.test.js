@@ -16,8 +16,6 @@ describe('Health Endpoint', () => {
       .get('/health')
       .set('User-Agent', 'DealFlow-test/1.0');
 
-    expect(response.headers['content-type']).toContain(
-      'application/json'
-    );
+    expect(response.headers['content-type']).toContain('application/json');
   });
 });
