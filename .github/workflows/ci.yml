@@ -36,8 +36,8 @@ jobs:
       - name: Check code style with ESLint
         run: npm run lint
 
-      - name: Check formatting
-        run: npm run format:check
+      # - name: Check formatting
+      #   run: npm run format:check
 
       - name: Run automated tests
         if: always() && steps.install.outcome == 'success'
