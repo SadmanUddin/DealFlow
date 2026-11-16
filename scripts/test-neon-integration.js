@@ -17,7 +17,14 @@ const vitestCli = fileURLToPath(
 const result = spawnSync(
   process.execPath,
   [vitestCli, 'run', 'tests/integration/phase2.neon.test.js'],
-  { stdio: 'inherit', env: process.env }
+  {
+    stdio: 'inherit',
+    env: {
+      ...process.env,
+      NODE_ENV: 'test',
+      TEST_DATABASE_URL: process.env.TEST_DATABASE_URL,
+    },
+  }
 );
 
 if (result.error) throw result.error;

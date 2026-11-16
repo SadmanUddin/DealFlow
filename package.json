@@ -21,8 +21,10 @@
     "format:check": "prettier --check .",
     "test": "vitest run --exclude '**/integration/**'",
     "test:integration": "node scripts/test-neon-integration.js",
+    "test:integration:phase4": "node scripts/test-phase4-neon-integration.js",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:migrate:test": "drizzle-kit migrate --config=drizzle.test.config.js",
     "db:studio": "drizzle-kit studio"
   },
   "repository": {

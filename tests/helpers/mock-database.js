@@ -49,6 +49,21 @@ export const modelTables = {
     'created_at',
     'updated_at',
   ]),
+  conversations: table('conversations', [
+    'id',
+    'listing_id',
+    'buyer_id',
+    'seller_id',
+    'created_at',
+  ]),
+  messages: table('messages', [
+    'id',
+    'conversation_id',
+    'sender_id',
+    'content',
+    'created_at',
+    'read_at',
+  ]),
 };
 
 export const databaseState = {
@@ -56,8 +71,12 @@ export const databaseState = {
   auth_sessions: [],
   auth_tokens: [],
   business_listings: [],
+  conversations: [],
+  messages: [],
   nextUserId: 1,
   nextListingId: 1,
+  nextConversationId: 1,
+  nextMessageId: 1,
   failNext: null,
 };
 
@@ -66,8 +85,12 @@ export const resetDatabase = () => {
   databaseState.auth_sessions.length = 0;
   databaseState.auth_tokens.length = 0;
   databaseState.business_listings.length = 0;
+  databaseState.conversations.length = 0;
+  databaseState.messages.length = 0;
   databaseState.nextUserId = 1;
   databaseState.nextListingId = 1;
+  databaseState.nextConversationId = 1;
+  databaseState.nextMessageId = 1;
   databaseState.failNext = null;
 };
 
@@ -75,6 +98,8 @@ const condition = (operator, column, value) => ({ operator, column, value });
 export const drizzleOperators = {
   eq: (column, value) => condition('eq', column, value),
   gt: (column, value) => condition('gt', column, value),
+  ne: (column, value) => condition('ne', column, value),
+  exists: query => ({ operator: 'exists', query }),
   gte: (column, value) => condition('gte', column, value),
   lte: (column, value) => condition('lte', column, value),
   ilike: (column, value) => condition('ilike', column, value),
@@ -98,15 +123,26 @@ const matches = (expression, rowSet) => {
   if (expression.operator === 'or') {
     return expression.conditions.some(entry => matches(entry, rowSet));
   }
+  if (expression.operator === 'exists') {
+    return tableRows(expression.query.target).some(row =>
+      matches(expression.query.expression, {
+        ...rowSet,
+        [expression.query.target.__name]: row,
+      })
+    );
+  }
   const value = valueFor(rowSet, expression.column);
   if (expression.operator === 'eq') {
     const expected = expression.value?.table
       ? valueFor(rowSet, expression.value)
       : expression.value;
+    if (value instanceof Date && expected instanceof Date)
+      return value.getTime() === expected.getTime();
     return value === expected;
   }
   if (expression.operator === 'isNull') return value == null;
   if (expression.operator === 'gt') return value > expression.value;
+  if (expression.operator === 'ne') return value !== expression.value;
   if (expression.operator === 'gte')
     return value != null && Number(value) >= Number(expression.value);
   if (expression.operator === 'lte')
@@ -127,7 +163,7 @@ const project = (projection, rowSet, fallback) => {
   return Object.fromEntries(
     Object.entries(projection).map(([alias, column]) => [
       alias,
-      valueFor(rowSet, column),
+      column?.__sql ? column.values?.[0] : valueFor(rowSet, column),
     ])
   );
 };
@@ -184,6 +220,16 @@ class Query {
     return this;
   }
 
+  select(source) {
+    this.source = source;
+    return this;
+  }
+
+  onConflictDoNothing() {
+    this.ignoreConflict = true;
+    return this;
+  }
+
   delete() {
     this.operation = 'delete';
     return this;
@@ -229,14 +275,16 @@ class Query {
         const a = valueFor(left, order.column);
         const b = valueFor(right, order.column);
         if (a == null || b == null) return a == null ? (b == null ? 0 : 1) : -1;
-        const comparison =
-          a instanceof Date && b instanceof Date
-            ? a.getTime() - b.getTime()
-            : typeof a === 'number' && typeof b === 'number'
-              ? a - b
-              : String(a).localeCompare(String(b), undefined, {
-                numeric: true,
-              });
+        let comparison;
+        if (a instanceof Date && b instanceof Date) {
+          comparison = a.getTime() - b.getTime();
+        } else if (typeof a === 'number' && typeof b === 'number') {
+          comparison = a - b;
+        } else {
+          comparison = String(a).localeCompare(String(b), undefined, {
+            numeric: true,
+          });
+        }
         return order.operator === 'desc' ? -comparison : comparison;
       });
     }
@@ -255,45 +303,74 @@ class Query {
 
   executeInsert() {
     const rows = tableRows(this.target);
-    if (
-      this.target.__name === 'users' &&
-      rows.some(user => user.email === this.valuesToInsert.email)
-    ) {
-      const error = new Error('Unique constraint violation');
-      error.code = '23505';
-      throw error;
+    if (this.source) {
+      this.valuesToInsert = this.source.executeSelect();
+      if (!Array.isArray(this.valuesToInsert))
+        this.valuesToInsert = [this.valuesToInsert];
     }
-    const now = new Date();
-    const row = { ...this.valuesToInsert };
-    if (this.target.__name === 'users') {
-      row.id = databaseState.nextUserId++;
-      row.role ??= 'buyer';
-      row.email_verified ??= false;
-      row.is_active ??= true;
-      row.created_at = now;
-      row.updated_at = now;
-    } else if (this.target.__name === 'business_listings') {
-      row.id = databaseState.nextListingId++;
-      row.created_at = now;
-      row.updated_at = now;
-      row.status ??= 'draft';
-      row.currency ??= 'USD';
-      row.industry ??= null;
-      row.location ??= null;
-      row.asking_price ??= null;
-      row.annual_revenue ??= null;
-      row.ebitda ??= null;
-      row.rejection_reason ??= null;
-      row.published_at ??= null;
-    } else {
-      row.created_at = now;
-      row.consumed_at ??= null;
-      row.revoked_at ??= null;
+    const inserts = Array.isArray(this.valuesToInsert)
+      ? this.valuesToInsert
+      : [this.valuesToInsert];
+    const inserted = [];
+    for (const values of inserts) {
+      if (!values) continue;
+      if (
+        this.ignoreConflict &&
+        this.target.__name === 'conversations' &&
+        rows.some(
+          row =>
+            row.listing_id === values.listing_id &&
+            row.buyer_id === values.buyer_id
+        )
+      ) {
+        continue;
+      }
+      const now = new Date();
+      const row = { ...values };
+      if (this.target.__name === 'users') {
+        if (rows.some(user => user.email === values.email)) {
+          const error = new Error('Unique constraint violation');
+          error.code = '23505';
+          throw error;
+        }
+        row.id = databaseState.nextUserId++;
+        row.role ??= 'buyer';
+        row.email_verified ??= false;
+        row.is_active ??= true;
+        row.created_at = now;
+        row.updated_at = now;
+      } else if (this.target.__name === 'business_listings') {
+        row.id = databaseState.nextListingId++;
+        row.created_at = now;
+        row.updated_at = now;
+        row.status ??= 'draft';
+        row.currency ??= 'USD';
+        row.industry ??= null;
+        row.location ??= null;
+        row.asking_price ??= null;
+        row.annual_revenue ??= null;
+        row.ebitda ??= null;
+        row.rejection_reason ??= null;
+        row.published_at ??= null;
+      } else if (this.target.__name === 'conversations') {
+        row.id = databaseState.nextConversationId++;
+        row.created_at = now;
+      } else if (this.target.__name === 'messages') {
+        row.id = databaseState.nextMessageId++;
+        row.created_at = now;
+        row.read_at ??= null;
+      } else {
+        row.created_at = now;
+        row.consumed_at ??= null;
+        row.revoked_at ??= null;
+      }
+      rows.push(row);
+      inserted.push(row);
     }
-    rows.push(row);
-    return this.projection
-      ? [project(this.projection, { [this.target.__name]: row }, row)]
-      : undefined;
+    if (!this.projection) return undefined;
+    return inserted.map(row =>
+      project(this.projection, { [this.target.__name]: row }, row)
+    );
   }
 
   executeUpdate() {

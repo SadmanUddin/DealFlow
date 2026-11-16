@@ -8,6 +8,7 @@ import {
   serial,
   text,
   timestamp,
+  uniqueIndex,
   varchar,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
@@ -44,6 +45,10 @@ export const businessListings = pgTable(
   },
   table => [
     index('business_listings_seller_id_idx').on(table.seller_id),
+    uniqueIndex('business_listings_id_seller_id_uidx').on(
+      table.id,
+      table.seller_id
+    ),
     index('business_listings_status_created_at_idx').on(
       table.status,
       table.created_at

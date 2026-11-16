@@ -36,6 +36,13 @@
       "when": 1794832660145,
       "tag": "0004_phase3_filter_trigram_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794838631851,
+      "tag": "0005_phase4_buyer_seller_interaction",
+      "breakpoints": true
     }
   ]
 }
