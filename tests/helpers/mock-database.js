@@ -235,8 +235,8 @@ class Query {
             : typeof a === 'number' && typeof b === 'number'
               ? a - b
               : String(a).localeCompare(String(b), undefined, {
-                  numeric: true,
-                });
+                numeric: true,
+              });
         return order.operator === 'desc' ? -comparison : comparison;
       });
     }
