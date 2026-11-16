@@ -22,6 +22,20 @@
       "when": 1794763955729,
       "tag": "0002_dashing_shard",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794832534232,
+      "tag": "0003_phase3_search_discovery",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794832660145,
+      "tag": "0004_phase3_filter_trigram_indexes",
+      "breakpoints": true
     }
   ]
 }

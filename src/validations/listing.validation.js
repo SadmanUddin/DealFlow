@@ -56,6 +56,47 @@ export const paginationSchema = z
   })
   .strict();
 
+const searchAmount = z
+  .string()
+  .regex(/^\d{1,16}(\.\d{1,2})?$/, 'Must be a non-negative amount')
+  .optional();
+
+export const publicListingQuerySchema = paginationSchema
+  .extend({
+    q: z.string().trim().min(1).max(200).optional(),
+    industry: z.string().trim().min(1).max(120).optional(),
+    location: z.string().trim().min(1).max(160).optional(),
+    minPrice: searchAmount,
+    maxPrice: searchAmount,
+    minRevenue: searchAmount,
+    maxRevenue: searchAmount,
+    minEbitda: searchAmount,
+    maxEbitda: searchAmount,
+    sort: z
+      .enum(['newest', 'oldest', 'price_asc', 'price_desc'])
+      .default('newest'),
+  })
+  .strict()
+  .superRefine((query, context) => {
+    for (const [minKey, maxKey] of [
+      ['minPrice', 'maxPrice'],
+      ['minRevenue', 'maxRevenue'],
+      ['minEbitda', 'maxEbitda'],
+    ]) {
+      if (
+        query[minKey] &&
+        query[maxKey] &&
+        Number(query[minKey]) > Number(query[maxKey])
+      ) {
+        context.addIssue({
+          code: 'custom',
+          path: [maxKey],
+          message: `${maxKey} must be greater than or equal to ${minKey}`,
+        });
+      }
+    }
+  });
+
 export const adminListingQuerySchema = paginationSchema
   .extend({
     status: z

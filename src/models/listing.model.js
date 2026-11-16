@@ -48,6 +48,44 @@ export const businessListings = pgTable(
       table.status,
       table.created_at
     ),
+    index('business_listings_status_published_at_idx').on(
+      table.status,
+      table.published_at,
+      table.id
+    ),
+    index('business_listings_status_industry_idx').on(
+      table.status,
+      table.industry
+    ),
+    index('business_listings_status_location_idx').on(
+      table.status,
+      table.location
+    ),
+    index('business_listings_status_asking_price_idx').on(
+      table.status,
+      table.asking_price
+    ),
+    index('business_listings_status_annual_revenue_idx').on(
+      table.status,
+      table.annual_revenue
+    ),
+    index('business_listings_status_ebitda_idx').on(table.status, table.ebitda),
+    index('business_listings_title_trgm_idx').using(
+      'gin',
+      sql`${table.title} gin_trgm_ops`
+    ),
+    index('business_listings_description_trgm_idx').using(
+      'gin',
+      sql`${table.description} gin_trgm_ops`
+    ),
+    index('business_listings_industry_trgm_idx').using(
+      'gin',
+      sql`${table.industry} gin_trgm_ops`
+    ),
+    index('business_listings_location_trgm_idx').using(
+      'gin',
+      sql`${table.location} gin_trgm_ops`
+    ),
     check(
       'business_listings_financials_nonnegative',
       sql`(${table.asking_price} IS NULL OR ${table.asking_price} >= 0) AND (${table.annual_revenue} IS NULL OR ${table.annual_revenue} >= 0) AND (${table.ebitda} IS NULL OR ${table.ebitda} >= 0)`

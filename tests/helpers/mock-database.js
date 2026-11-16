@@ -75,10 +75,14 @@ const condition = (operator, column, value) => ({ operator, column, value });
 export const drizzleOperators = {
   eq: (column, value) => condition('eq', column, value),
   gt: (column, value) => condition('gt', column, value),
+  gte: (column, value) => condition('gte', column, value),
+  lte: (column, value) => condition('lte', column, value),
+  ilike: (column, value) => condition('ilike', column, value),
   isNull: column => condition('isNull', column),
   and: (...conditions) => ({ operator: 'and', conditions }),
   or: (...conditions) => ({ operator: 'or', conditions }),
   desc: column => ({ operator: 'desc', column }),
+  asc: column => ({ operator: 'asc', column }),
   sql: (strings, ...values) => ({ __sql: strings.join('?'), values }),
 };
 
@@ -103,6 +107,18 @@ const matches = (expression, rowSet) => {
   }
   if (expression.operator === 'isNull') return value == null;
   if (expression.operator === 'gt') return value > expression.value;
+  if (expression.operator === 'gte')
+    return value != null && Number(value) >= Number(expression.value);
+  if (expression.operator === 'lte')
+    return value != null && Number(value) <= Number(expression.value);
+  if (expression.operator === 'ilike') {
+    if (value == null) return false;
+    const pattern = expression.value
+      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      .replace(/%/g, '.*')
+      .replace(/_/g, '.');
+    return new RegExp(`^${pattern}$`, 'i').test(String(value));
+  }
   return false;
 };
 
@@ -148,7 +164,8 @@ class Query {
     return this;
   }
 
-  orderBy() {
+  orderBy(...ordering) {
+    this.ordering = ordering;
     return this;
   }
 
@@ -207,6 +224,22 @@ class Query {
       );
     }
     const matching = rowSets.filter(rowSet => matches(this.expression, rowSet));
+    for (const order of [...(this.ordering ?? [])].reverse()) {
+      matching.sort((left, right) => {
+        const a = valueFor(left, order.column);
+        const b = valueFor(right, order.column);
+        if (a == null || b == null) return a == null ? (b == null ? 0 : 1) : -1;
+        const comparison =
+          a instanceof Date && b instanceof Date
+            ? a.getTime() - b.getTime()
+            : typeof a === 'number' && typeof b === 'number'
+              ? a - b
+              : String(a).localeCompare(String(b), undefined, {
+                  numeric: true,
+                });
+        return order.operator === 'desc' ? -comparison : comparison;
+      });
+    }
     const selected = matching
       .slice(
         this.rowOffset ?? 0,

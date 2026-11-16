@@ -1,4 +1,4 @@
-import { and, desc, eq, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, ilike, lte, or, sql } from 'drizzle-orm';
 import { db } from '#config/database.js';
 import { businessListings } from '#models/listing.model.js';
 import { users } from '#models/user.model.js';
@@ -60,14 +60,61 @@ export const getMyListings = async (sellerId, { page, limit }) => {
   };
 };
 
-export const getPublicListings = async ({ page, limit }) => {
-  const where = eq(businessListings.status, 'published');
+export const getPublicListings = async ({
+  page,
+  limit,
+  q,
+  industry,
+  location,
+  minPrice,
+  maxPrice,
+  minRevenue,
+  maxRevenue,
+  minEbitda,
+  maxEbitda,
+  sort = 'newest',
+}) => {
+  const filters = [eq(businessListings.status, 'published')];
+  if (q) {
+    const keyword = `%${q.replace(/[\\%_]/g, '\\$&')}%`;
+    filters.push(
+      or(
+        ilike(businessListings.title, keyword),
+        ilike(businessListings.description, keyword)
+      )
+    );
+  }
+  if (industry) filters.push(ilike(businessListings.industry, `%${industry}%`));
+  if (location) filters.push(ilike(businessListings.location, `%${location}%`));
+  for (const [column, minimum, maximum] of [
+    [businessListings.asking_price, minPrice, maxPrice],
+    [businessListings.annual_revenue, minRevenue, maxRevenue],
+    [businessListings.ebitda, minEbitda, maxEbitda],
+  ]) {
+    if (minimum !== undefined) filters.push(gte(column, minimum));
+    if (maximum !== undefined) filters.push(lte(column, maximum));
+  }
+  const where = and(...filters);
+  const ordering = {
+    newest: [desc(businessListings.published_at), desc(businessListings.id)],
+    oldest: [asc(businessListings.published_at), asc(businessListings.id)],
+    price_asc: [
+      asc(businessListings.asking_price),
+      desc(businessListings.published_at),
+      desc(businessListings.id),
+    ],
+    price_desc: [
+      desc(businessListings.asking_price),
+      desc(businessListings.published_at),
+      desc(businessListings.id),
+    ],
+  }[sort];
   const [rows, countRows] = await Promise.all([
     db
       .select(publicFields)
       .from(businessListings)
       .where(where)
-      .orderBy(desc(businessListings.published_at))
+      .orderBy(...ordering)
       .limit(limit)
       .offset((page - 1) * limit),
     db

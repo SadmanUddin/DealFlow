@@ -15,6 +15,7 @@ import {
   emptyBodySchema,
   listingIdSchema,
   paginationSchema,
+  publicListingQuerySchema,
   updateListingSchema,
 } from '#validations/listing.validation.js';
 
@@ -32,7 +33,7 @@ export const getMyListings = async (req, res) => {
 };
 
 export const getPublicListings = async (req, res) => {
-  const query = paginationSchema.parse(req.query);
+  const query = publicListingQuerySchema.parse(req.query);
   res.status(200).json(await getPublicListingsService(query));
 };
 
