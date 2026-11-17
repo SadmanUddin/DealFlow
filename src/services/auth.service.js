@@ -249,3 +249,4 @@ export const deactivateAccount = async (userId, password) => {
 };
 
 export const hashOpaqueToken = hashToken;
+// default
