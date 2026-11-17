@@ -10,6 +10,7 @@ import userRoutes from './routes/user.routes.js';
 import listingRoutes from './routes/listing.routes.js';
 import adminListingRoutes from './routes/admin-listing.routes.js';
 import conversationRoutes from './routes/conversation.routes.js';
+import documentRoutes from './routes/document.routes.js';
 import { optionalAuthentication } from '#middleware/auth.middleware.js';
 import {
   errorMiddleware,
@@ -72,6 +73,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/listings', listingRoutes);
 app.use('/api/admin/listings', adminListingRoutes);
 app.use('/api/conversations', conversationRoutes);
+app.use('/api/conversations/:conversationId/documents', documentRoutes);
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
 

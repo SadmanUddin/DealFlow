@@ -23,6 +23,7 @@ vi.mock('../src/models/conversation.model.js', async () => {
   return {
     conversations: modelTables.conversations,
     messages: modelTables.messages,
+    conversationDocuments: modelTables.conversationDocuments,
   };
 });
 vi.mock('../src/config/arcjet.js', () => ({

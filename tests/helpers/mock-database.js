@@ -64,6 +64,10 @@ export const modelTables = {
     'created_at',
     'read_at',
   ]),
+  conversationDocuments: table('conversation_documents', [
+    'id', 'conversation_id', 'uploaded_by', 'storage_key', 'original_filename',
+    'mime_type', 'size_bytes', 'sha256', 'status', 'created_at', 'updated_at', 'deleted_at',
+  ]),
 };
 
 export const databaseState = {
@@ -73,11 +77,14 @@ export const databaseState = {
   business_listings: [],
   conversations: [],
   messages: [],
+  conversation_documents: [],
   nextUserId: 1,
   nextListingId: 1,
   nextConversationId: 1,
   nextMessageId: 1,
+  nextDocumentId: 1,
   failNext: null,
+  failOn: null,
 };
 
 export const resetDatabase = () => {
@@ -87,11 +94,14 @@ export const resetDatabase = () => {
   databaseState.business_listings.length = 0;
   databaseState.conversations.length = 0;
   databaseState.messages.length = 0;
+  databaseState.conversation_documents.length = 0;
   databaseState.nextUserId = 1;
   databaseState.nextListingId = 1;
   databaseState.nextConversationId = 1;
   databaseState.nextMessageId = 1;
+  databaseState.nextDocumentId = 1;
   databaseState.failNext = null;
+  databaseState.failOn = null;
 };
 
 const condition = (operator, column, value) => ({ operator, column, value });
@@ -244,9 +254,10 @@ class Query {
   }
 
   execute() {
-    if (databaseState.failNext) {
+    if (databaseState.failNext && (!databaseState.failOn || (databaseState.failOn.table === this.target?.__name && databaseState.failOn.operation === this.operation))) {
       const error = databaseState.failNext;
       databaseState.failNext = null;
+      databaseState.failOn = null;
       throw error;
     }
     if (this.operation === 'select') return this.executeSelect();
@@ -359,6 +370,11 @@ class Query {
         row.id = databaseState.nextMessageId++;
         row.created_at = now;
         row.read_at ??= null;
+      } else if (this.target.__name === 'conversation_documents') {
+        row.id = databaseState.nextDocumentId++;
+        row.created_at = now;
+        row.updated_at = now;
+        row.deleted_at ??= null;
       } else {
         row.created_at = now;
         row.consumed_at ??= null;

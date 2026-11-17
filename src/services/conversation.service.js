@@ -126,7 +126,7 @@ export const getConversations = async (userId, { page, limit }) => {
   return { conversations: rows, pagination: pagination(page, limit, total) };
 };
 
-const getParticipantConversation = async (conversationId, userId) => {
+export const getParticipantConversation = async (conversationId, userId) => {
   const [conversation] = await db
     .select(conversationFields)
     .from(conversations)

@@ -36,8 +36,21 @@ const environmentSchema = z
           }),
         'CORS_ORIGINS must be a comma-separated list of origins'
       ),
+    DOCUMENT_STORAGE_DRIVER: z.enum(['r2', 'mock']).default('mock'),
+    R2_ACCOUNT_ID: z.string().optional(),
+    R2_ACCESS_KEY_ID: z.string().optional(),
+    R2_SECRET_ACCESS_KEY: z.string().optional(),
+    R2_BUCKET_NAME: z.string().optional(),
+    R2_ENDPOINT: z.url().optional(),
+    R2_REGION: z.string().default('auto'),
+    DOCUMENT_MAX_SIZE_BYTES: z.coerce.number().int().positive().max(10485760).default(10485760),
   })
   .superRefine((environment, context) => {
+    if (environment.DOCUMENT_STORAGE_DRIVER === 'r2') {
+      for (const key of ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET_NAME']) {
+        if (!environment[key]) context.addIssue({ code: 'custom', path: [key], message: `${key} is required when R2 storage is enabled` });
+      }
+    }
     const key =
       environment.NODE_ENV === 'test' ? 'TEST_DATABASE_URL' : 'DATABASE_URL';
     if (!environment[key]) {
