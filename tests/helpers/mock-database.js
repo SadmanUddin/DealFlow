@@ -85,6 +85,7 @@ export const databaseState = {
   nextDocumentId: 1,
   failNext: null,
   failOn: null,
+  batchCalls: 0,
 };
 
 export const resetDatabase = () => {
@@ -102,6 +103,7 @@ export const resetDatabase = () => {
   databaseState.nextDocumentId = 1;
   databaseState.failNext = null;
   databaseState.failOn = null;
+  databaseState.batchCalls = 0;
 };
 
 const condition = (operator, column, value) => ({ operator, column, value });
@@ -422,4 +424,41 @@ export const db = {
   insert: target => new Query('insert', null, target),
   update: target => new Query('update', null, target),
   delete: target => new Query('delete', null, target),
+  batch: async operations => {
+    databaseState.batchCalls += 1;
+    const snapshot = Object.fromEntries(
+      Object.entries(databaseState).map(([key, value]) => [
+        key,
+        Array.isArray(value)
+          ? value.map(row =>
+            Object.fromEntries(
+              Object.entries(row).map(([field, fieldValue]) => [
+                field,
+                fieldValue instanceof Date
+                  ? new Date(fieldValue)
+                  : fieldValue,
+              ])
+            )
+          )
+          : value,
+      ])
+    );
+    try {
+      return operations.map(operation => operation.execute());
+    } catch (error) {
+      const failedBatch = databaseState.failNext;
+      for (const key of Object.keys(databaseState)) {
+        if (Array.isArray(databaseState[key])) {
+          databaseState[key].splice(0, databaseState[key].length, ...snapshot[key]);
+        } else {
+          databaseState[key] = snapshot[key];
+        }
+      }
+      if (failedBatch) {
+        databaseState.failNext = null;
+        databaseState.failOn = null;
+      }
+      throw error;
+    }
+  },
 };
