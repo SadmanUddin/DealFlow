@@ -5,6 +5,7 @@ import {
   markConversationRead,
   sendConversationMessage,
   startConversation,
+  updateInquiryStatus,
 } from '#controllers/conversation.controller.js';
 import {
   authorizeRoles,
@@ -19,5 +20,6 @@ router.get('/', getConversations);
 router.get('/:id/messages', getConversationMessages);
 router.post('/:id/messages', requireCsrf, sendConversationMessage);
 router.patch('/:id/read', requireCsrf, markConversationRead);
+router.patch('/:id/status', authorizeRoles('seller'), requireCsrf, updateInquiryStatus);
 
 export default router;

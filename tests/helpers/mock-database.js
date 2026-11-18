@@ -44,6 +44,7 @@ export const modelTables = {
     'ebitda',
     'currency',
     'status',
+    'public_snapshot',
     'rejection_reason',
     'published_at',
     'created_at',
@@ -54,6 +55,8 @@ export const modelTables = {
     'listing_id',
     'buyer_id',
     'seller_id',
+    'status',
+    'status_updated_at',
     'created_at',
   ]),
   messages: table('messages', [
@@ -68,6 +71,17 @@ export const modelTables = {
     'id', 'conversation_id', 'uploaded_by', 'storage_key', 'original_filename',
     'mime_type', 'size_bytes', 'sha256', 'status', 'created_at', 'updated_at', 'deleted_at',
   ]),
+  favorites: table('favorites', ['id', 'user_id', 'listing_id', 'created_at']),
+  notifications: table('notifications', ['id', 'user_id', 'dedupe_key', 'type', 'payload', 'read_at', 'created_at']),
+  notificationEmailPreferences: table('notification_email_preferences', ['user_id', 'listing_status', 'listing_price', 'listing_details', 'updated_at']),
+  outboxEvents: table('outbox_events', ['id', 'event_key', 'type', 'payload', 'status', 'attempts', 'available_at', 'locked_at', 'lock_token', 'last_error', 'processed_at', 'quarantined_at', 'quarantine_reason', 'created_at']),
+};
+
+export const phase6Tables = {
+  favorites: modelTables.favorites,
+  notifications: modelTables.notifications,
+  notificationEmailPreferences: modelTables.notificationEmailPreferences,
+  outboxEvents: modelTables.outboxEvents,
 };
 
 export const databaseState = {
@@ -78,11 +92,17 @@ export const databaseState = {
   conversations: [],
   messages: [],
   conversation_documents: [],
+  favorites: [],
+  notifications: [],
+  notification_email_preferences: [],
+  outbox_events: [],
   nextUserId: 1,
   nextListingId: 1,
   nextConversationId: 1,
   nextMessageId: 1,
   nextDocumentId: 1,
+  nextFavoriteId: 1,
+  nextNotificationId: 1,
   failNext: null,
   failOn: null,
   batchCalls: 0,
@@ -96,11 +116,17 @@ export const resetDatabase = () => {
   databaseState.conversations.length = 0;
   databaseState.messages.length = 0;
   databaseState.conversation_documents.length = 0;
+  databaseState.favorites.length = 0;
+  databaseState.notifications.length = 0;
+  databaseState.notification_email_preferences.length = 0;
+  databaseState.outbox_events.length = 0;
   databaseState.nextUserId = 1;
   databaseState.nextListingId = 1;
   databaseState.nextConversationId = 1;
   databaseState.nextMessageId = 1;
   databaseState.nextDocumentId = 1;
+  databaseState.nextFavoriteId = 1;
+  databaseState.nextNotificationId = 1;
   databaseState.failNext = null;
   databaseState.failOn = null;
   databaseState.batchCalls = 0;
@@ -114,6 +140,7 @@ export const drizzleOperators = {
   exists: query => ({ operator: 'exists', query }),
   gte: (column, value) => condition('gte', column, value),
   lte: (column, value) => condition('lte', column, value),
+  inArray: (column, values) => condition('inArray', column, values),
   ilike: (column, value) => condition('ilike', column, value),
   isNull: column => condition('isNull', column),
   and: (...conditions) => ({ operator: 'and', conditions }),
@@ -129,6 +156,14 @@ const valueFor = (rowSet, column) => rowSet[column.table]?.[column.field];
 
 const matches = (expression, rowSet) => {
   if (!expression) return true;
+  if (expression.__sql) {
+    const column = expression.values?.find(value => value?.table);
+    const value = column ? valueFor(rowSet, column) : undefined;
+    if (expression.__sql.includes('now() - interval \'60 seconds\'')) {
+      return value instanceof Date && value.getTime() > Date.now() - 60000;
+    }
+    return false;
+  }
   if (expression.operator === 'and') {
     return expression.conditions.every(entry => matches(entry, rowSet));
   }
@@ -159,6 +194,7 @@ const matches = (expression, rowSet) => {
     return value != null && Number(value) >= Number(expression.value);
   if (expression.operator === 'lte')
     return value != null && Number(value) <= Number(expression.value);
+  if (expression.operator === 'inArray') return expression.value.includes(value);
   if (expression.operator === 'ilike') {
     if (value == null) return false;
     const pattern = expression.value
@@ -193,7 +229,12 @@ class Query {
   }
 
   innerJoin(target, on) {
-    this.join = { target, on };
+    (this.joins ??= []).push({ target, on, left: false });
+    return this;
+  }
+
+  leftJoin(target, on) {
+    (this.joins ??= []).push({ target, on, left: true });
     return this;
   }
 
@@ -237,8 +278,14 @@ class Query {
     return this;
   }
 
-  onConflictDoNothing() {
+  onConflictDoNothing(options) {
     this.ignoreConflict = true;
+    this.conflictTarget = options?.target;
+    return this;
+  }
+
+  onConflictDoUpdate(options) {
+    this.conflictUpdate = options;
     return this;
   }
 
@@ -272,15 +319,13 @@ class Query {
     let rowSets = tableRows(this.target).map(row => ({
       [this.target.__name]: row,
     }));
-    if (this.join) {
-      rowSets = rowSets.flatMap(rowSet =>
-        tableRows(this.join.target)
-          .map(joined => ({
-            ...rowSet,
-            [this.join.target.__name]: joined,
-          }))
-          .filter(joined => matches(this.join.on, joined))
-      );
+    for (const join of this.joins ?? []) {
+      rowSets = rowSets.flatMap(rowSet => {
+        const joinedRows = tableRows(join.target)
+          .map(joined => ({ ...rowSet, [join.target.__name]: joined }))
+          .filter(joined => matches(join.on, joined));
+        return joinedRows.length || !join.left ? joinedRows : [{ ...rowSet, [join.target.__name]: {} }];
+      });
     }
     const matching = rowSets.filter(rowSet => matches(this.expression, rowSet));
     for (const order of [...(this.ordering ?? [])].reverse()) {
@@ -327,14 +372,20 @@ class Query {
     const inserted = [];
     for (const values of inserts) {
       if (!values) continue;
+      if (this.conflictUpdate) {
+        const conflictColumn = this.conflictUpdate.target;
+        const existing = rows.find(row => row[conflictColumn.field] === values[conflictColumn.field]);
+        if (existing) {
+          Object.assign(existing, this.conflictUpdate.set);
+          inserted.push(existing);
+          continue;
+        }
+      }
       if (
         this.ignoreConflict &&
-        this.target.__name === 'conversations' &&
-        rows.some(
-          row =>
-            row.listing_id === values.listing_id &&
-            row.buyer_id === values.buyer_id
-        )
+        ((this.target.__name === 'conversations' && rows.some(row => row.listing_id === values.listing_id && row.buyer_id === values.buyer_id)) ||
+          (this.target.__name === 'favorites' && rows.some(row => row.user_id === values.user_id && row.listing_id === values.listing_id)) ||
+          (this.target.__name === 'notifications' && rows.some(row => row.dedupe_key === values.dedupe_key)))
       ) {
         continue;
       }
@@ -368,6 +419,8 @@ class Query {
       } else if (this.target.__name === 'conversations') {
         row.id = databaseState.nextConversationId++;
         row.created_at = now;
+        row.status ??= 'pending';
+        row.status_updated_at ??= now;
       } else if (this.target.__name === 'messages') {
         row.id = databaseState.nextMessageId++;
         row.created_at = now;
@@ -377,6 +430,19 @@ class Query {
         row.created_at = now;
         row.updated_at = now;
         row.deleted_at ??= null;
+      } else if (this.target.__name === 'favorites') {
+        row.id = databaseState.nextFavoriteId++;
+        row.created_at = now;
+      } else if (this.target.__name === 'notifications') {
+        row.id = databaseState.nextNotificationId++;
+        row.created_at = now;
+        row.read_at ??= null;
+      } else if (this.target.__name === 'notification_email_preferences') {
+        row.user_id ??= values.user_id;
+        row.updated_at = now;
+        row.listing_status ??= true;
+        row.listing_price ??= true;
+        row.listing_details ??= true;
       } else {
         row.created_at = now;
         row.consumed_at ??= null;
@@ -398,7 +464,14 @@ class Query {
       const rowSet = { [this.target.__name]: row };
       if (this.join) rowSet[this.join.target.__name] = this.join.row;
       if (!matches(this.expression, rowSet)) continue;
-      Object.assign(row, this.valuesToSet);
+      const values = Object.fromEntries(Object.entries(this.valuesToSet).map(([field, value]) => {
+        if (value?.__sql === 'now()') return [field, new Date()];
+        if (value?.__sql?.includes('now() + ? * interval \'1 millisecond\'')) {
+          return [field, new Date(Date.now() + Number(value.values[0]))];
+        }
+        return [field, value];
+      }));
+      Object.assign(row, values);
       updated.push(project(this.projection, rowSet, row));
     }
     return this.projection ? updated : undefined;

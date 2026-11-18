@@ -44,6 +44,11 @@ const environmentSchema = z
     R2_ENDPOINT: z.url().optional(),
     R2_REGION: z.string().default('auto'),
     DOCUMENT_MAX_SIZE_BYTES: z.coerce.number().int().positive().max(10485760).default(10485760),
+    EMAIL_PROVIDER: z.enum(['resend', 'mock']).default('resend'),
+    RESEND_API_KEY: z.string().optional(),
+    EMAIL_FROM: z.string().email().default('notifications@example.com'),
+    OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().min(250).max(60000).default(2000),
+    OUTBOX_BATCH_SIZE: z.coerce.number().int().min(1).max(100).default(20),
   })
   .superRefine((environment, context) => {
     if (environment.DOCUMENT_STORAGE_DRIVER === 'r2') {

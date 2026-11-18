@@ -23,6 +23,8 @@ export const conversations = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     seller_id: integer('seller_id').notNull(),
+    status: varchar('status', { length: 16 }).notNull().default('pending'),
+    status_updated_at: timestamp('status_updated_at', { withTimezone: true }).defaultNow().notNull(),
     created_at: timestamp('created_at', { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -46,6 +48,7 @@ export const conversations = pgTable(
       'conversations_distinct_participants',
       sql`${table.buyer_id} <> ${table.seller_id}`
     ),
+    check('conversations_status_valid', sql`${table.status} IN ('pending', 'in_review', 'accepted', 'rejected', 'closed')`),
     foreignKey({
       name: 'conversations_listing_seller_fk',
       columns: [table.listing_id, table.seller_id],

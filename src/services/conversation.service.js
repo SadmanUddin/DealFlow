@@ -19,6 +19,8 @@ import { messageCursorSchema } from '#validations/conversation.validation.js';
 const conversationFields = {
   id: conversations.id,
   listingId: conversations.listing_id,
+  status: conversations.status,
+  statusUpdatedAt: conversations.status_updated_at,
   createdAt: conversations.created_at,
 };
 const messageFields = {
@@ -97,6 +99,25 @@ export const startConversation = async (buyerId, listingId) => {
   );
 };
 
+const inquiryTransitions = {
+  pending: ['in_review', 'accepted', 'rejected', 'closed'],
+  in_review: ['accepted', 'rejected', 'closed'],
+  accepted: ['closed'],
+  rejected: ['closed'],
+  closed: [],
+};
+
+export const updateInquiryStatus = async (conversationId, sellerId, status) => {
+  const [current] = await db.select({ id: conversations.id, status: conversations.status }).from(conversations).where(and(eq(conversations.id, conversationId), eq(conversations.seller_id, sellerId))).limit(1);
+  if (!current) throw notFound();
+  if (!inquiryTransitions[current.status]?.includes(status)) {
+    throw new AppError(409, 'INVALID_INQUIRY_TRANSITION', `Cannot change inquiry from ${current.status} to ${status}`);
+  }
+  const [updated] = await db.update(conversations).set({ status, status_updated_at: new Date() }).where(and(eq(conversations.id, conversationId), eq(conversations.seller_id, sellerId), eq(conversations.status, current.status))).returning({ id: conversations.id, listingId: conversations.listing_id, status: conversations.status, statusUpdatedAt: conversations.status_updated_at });
+  if (!updated) throw new AppError(409, 'INQUIRY_STATUS_CHANGED', 'Inquiry status changed; reload and try again');
+  return updated;
+};
+
 export const getConversations = async (userId, { page, limit }) => {
   const where = participantCondition(userId);
   const offset = (page - 1) * limit;
@@ -106,6 +127,8 @@ export const getConversations = async (userId, { page, limit }) => {
         id: conversations.id,
         listingId: conversations.listing_id,
         listingTitle: businessListings.title,
+        status: conversations.status,
+        statusUpdatedAt: conversations.status_updated_at,
         createdAt: conversations.created_at,
       })
       .from(conversations)

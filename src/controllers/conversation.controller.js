@@ -4,6 +4,7 @@ import {
   markConversationRead as markConversationReadService,
   sendConversationMessage as sendConversationMessageService,
   startConversation as startConversationService,
+  updateInquiryStatus as updateInquiryStatusService,
 } from '#services/conversation.service.js';
 import {
   conversationIdSchema,
@@ -13,6 +14,7 @@ import {
   sendMessageSchema,
   startConversationSchema,
 } from '#validations/conversation.validation.js';
+import { inquiryStatusSchema } from '#validations/phase6.validation.js';
 
 export const startConversation = async (req, res) => {
   const { listingId } = startConversationSchema.parse(req.body);
@@ -20,6 +22,12 @@ export const startConversation = async (req, res) => {
   res.status(result.created ? 201 : 200).json({
     conversation: result.conversation,
   });
+};
+
+export const updateInquiryStatus = async (req, res) => {
+  const { id } = conversationIdSchema.parse(req.params);
+  const { status } = inquiryStatusSchema.parse(req.body);
+  res.status(200).json({ inquiry: await updateInquiryStatusService(id, req.user.id, status) });
 };
 
 export const getConversations = async (req, res) => {

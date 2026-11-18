@@ -354,3 +354,11 @@
 {"level":"info","message":"::1 - - [17/Nov/2026:01:28:19 +0000] \"GET /api/conversations/1/documents/1/download HTTP/1.1\" 200 26687 \"-\" \"HTTPie\"","service":"DealFlow-api"}
 {"level":"info","message":"::1 - - [17/Nov/2026:01:30:23 +0000] \"DELETE /api/conversations/1/documents/1 HTTP/1.1\" 204 - \"-\" \"HTTPie\"","service":"DealFlow-api"}
 {"level":"info","message":"::1 - - [17/Nov/2026:01:31:22 +0000] \"GET /api/conversations/1/documents HTTP/1.1\" 200 76 \"-\" \"HTTPie\"","service":"DealFlow-api"}
+{"level":"info","message":"127.0.0.1 - - [18/Nov/2026:15:16:26 +0000] \"GET /health HTTP/1.1\" 200 75 \"-\" \"-\"","service":"DealFlow-api"}
+{"level":"info","message":"127.0.0.1 - - [18/Nov/2026:15:18:22 +0000] \"POST /api/auth/sign-up HTTP/1.1\" 400 137 \"-\" \"-\"","service":"DealFlow-api"}
+{"level":"info","message":"127.0.0.1 - - [18/Nov/2026:15:18:49 +0000] \"POST /api/auth/sign-up HTTP/1.1\" 201 371 \"-\" \"Mozilla/5.0 (compatible; Phase6Verification/1.0)\"","service":"DealFlow-api"}
+{"level":"info","message":"127.0.0.1 - - [18/Nov/2026:15:18:50 +0000] \"POST /api/auth/sign-up HTTP/1.1\" 201 374 \"-\" \"Mozilla/5.0 (compatible; Phase6Verification/1.0)\"","service":"DealFlow-api"}
+{"level":"info","message":"127.0.0.1 - - [18/Nov/2026:15:18:52 +0000] \"POST /api/auth/sign-up HTTP/1.1\" 201 374 \"-\" \"Mozilla/5.0 (compatible; Phase6Verification/1.0)\"","service":"DealFlow-api"}
+{"level":"info","message":"127.0.0.1 - - [18/Nov/2026:15:18:54 +0000] \"POST /api/auth/sign-up HTTP/1.1\" 201 368 \"-\" \"Mozilla/5.0 (compatible; Phase6Verification/1.0)\"","service":"DealFlow-api"}
+{"level":"info","message":"127.0.0.1 - - [18/Nov/2026:15:21:50 +0000] \"POST /api/auth/sign-up HTTP/1.1\" 201 362 \"-\" \"Mozilla/5.0 (compatible; Phase6Verification/1.0)\"","service":"DealFlow-api"}
+{"level":"info","message":"127.0.0.1 - - [18/Nov/2026:15:21:50 +0000] \"POST /api/auth/verify-email HTTP/1.1\" 200 28 \"-\" \"Mozilla/5.0 (compatible; Phase6Verification/1.0)\"","service":"DealFlow-api"}
