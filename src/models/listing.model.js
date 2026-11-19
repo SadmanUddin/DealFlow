@@ -21,6 +21,7 @@ export const listingStatus = pgEnum('listing_status', [
   'published',
   'rejected',
   'archived',
+  'suspended',
 ]);
 
 export const businessListings = pgTable(
@@ -41,6 +42,11 @@ export const businessListings = pgTable(
     status: listingStatus('status').notNull().default('draft'),
     public_snapshot: jsonb('public_snapshot'),
     rejection_reason: text('rejection_reason'),
+    moderation_reason: text('moderation_reason'),
+    moderated_by: integer('moderated_by').references(() => users.id, { onDelete: 'set null' }),
+    moderated_at: timestamp('moderated_at', { withTimezone: true }),
+    suspended_at: timestamp('suspended_at', { withTimezone: true }),
+    suspended_by: integer('suspended_by').references(() => users.id, { onDelete: 'set null' }),
     published_at: timestamp('published_at'),
     created_at: timestamp('created_at').defaultNow().notNull(),
     updated_at: timestamp('updated_at').defaultNow().notNull(),

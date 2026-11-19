@@ -16,6 +16,8 @@
   "scripts": {
     "dev": "node --watch src/index.js",
     "worker": "node src/worker.js",
+    "admin:bootstrap": "node scripts/bootstrap-admin.js",
+    "admin:recovery-token": "node scripts/admin-recovery-token.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",

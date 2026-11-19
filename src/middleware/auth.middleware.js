@@ -75,6 +75,8 @@ export const authorizeRoles = (...allowedRoles) => {
   };
 };
 
+export const requireAdmin = [requireAuthentication, authorizeRoles('admin')];
+
 export const requireCsrf = (req, _res, next) => {
   if (!req.user) return next();
   const headerToken = req.get('x-csrf-token');

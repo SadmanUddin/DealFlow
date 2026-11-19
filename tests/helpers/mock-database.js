@@ -13,6 +13,7 @@ export const modelTables = {
     'role',
     'email_verified',
     'is_active',
+    'suspension_reason', 'suspended_at', 'suspended_by',
     'created_at',
     'updated_at',
   ]),
@@ -46,6 +47,7 @@ export const modelTables = {
     'status',
     'public_snapshot',
     'rejection_reason',
+    'moderation_reason', 'moderated_by', 'moderated_at', 'suspended_at', 'suspended_by',
     'published_at',
     'created_at',
     'updated_at',
@@ -75,6 +77,8 @@ export const modelTables = {
   notifications: table('notifications', ['id', 'user_id', 'dedupe_key', 'type', 'payload', 'read_at', 'created_at']),
   notificationEmailPreferences: table('notification_email_preferences', ['user_id', 'listing_status', 'listing_price', 'listing_details', 'updated_at']),
   outboxEvents: table('outbox_events', ['id', 'event_key', 'type', 'payload', 'status', 'attempts', 'available_at', 'locked_at', 'lock_token', 'last_error', 'processed_at', 'quarantined_at', 'quarantine_reason', 'created_at']),
+  moderationReports: table('moderation_reports', ['id', 'reporter_id', 'listing_id', 'reported_user_id', 'category', 'description', 'status', 'moderator_notes', 'resolution_reason', 'assigned_to', 'resolved_by', 'created_at', 'updated_at', 'resolved_at']),
+  adminAuditLogs: table('admin_audit_logs', ['id', 'actor_id', 'action', 'target_type', 'target_id', 'reason', 'before_state', 'after_state', 'request_id', 'created_at']),
 };
 
 export const phase6Tables = {
@@ -82,6 +86,8 @@ export const phase6Tables = {
   notifications: modelTables.notifications,
   notificationEmailPreferences: modelTables.notificationEmailPreferences,
   outboxEvents: modelTables.outboxEvents,
+  moderationReports: modelTables.moderationReports,
+  adminAuditLogs: modelTables.adminAuditLogs,
 };
 
 export const databaseState = {
@@ -96,6 +102,8 @@ export const databaseState = {
   notifications: [],
   notification_email_preferences: [],
   outbox_events: [],
+  moderation_reports: [],
+  admin_audit_logs: [],
   nextUserId: 1,
   nextListingId: 1,
   nextConversationId: 1,
@@ -103,8 +111,11 @@ export const databaseState = {
   nextDocumentId: 1,
   nextFavoriteId: 1,
   nextNotificationId: 1,
+  nextReportId: 1,
+  nextAuditId: 1,
   failNext: null,
   failOn: null,
+  staleNext: null,
   batchCalls: 0,
 };
 
@@ -120,6 +131,8 @@ export const resetDatabase = () => {
   databaseState.notifications.length = 0;
   databaseState.notification_email_preferences.length = 0;
   databaseState.outbox_events.length = 0;
+  databaseState.moderation_reports.length = 0;
+  databaseState.admin_audit_logs.length = 0;
   databaseState.nextUserId = 1;
   databaseState.nextListingId = 1;
   databaseState.nextConversationId = 1;
@@ -127,8 +140,11 @@ export const resetDatabase = () => {
   databaseState.nextDocumentId = 1;
   databaseState.nextFavoriteId = 1;
   databaseState.nextNotificationId = 1;
+  databaseState.nextReportId = 1;
+  databaseState.nextAuditId = 1;
   databaseState.failNext = null;
   databaseState.failOn = null;
+  databaseState.staleNext = null;
   databaseState.batchCalls = 0;
 };
 
@@ -443,6 +459,14 @@ class Query {
         row.listing_status ??= true;
         row.listing_price ??= true;
         row.listing_details ??= true;
+      } else if (this.target.__name === 'moderation_reports') {
+        row.id = databaseState.nextReportId++;
+        row.created_at = now;
+        row.updated_at = now;
+        row.status ??= 'pending';
+      } else if (this.target.__name === 'admin_audit_logs') {
+        row.id = databaseState.nextAuditId++;
+        row.created_at = now;
       } else {
         row.created_at = now;
         row.consumed_at ??= null;
@@ -497,6 +521,102 @@ export const db = {
   insert: target => new Query('insert', null, target),
   update: target => new Query('update', null, target),
   delete: target => new Query('delete', null, target),
+  execute: async statement => {
+    const marker = statement.__sql?.match(/phase7:([a-z-]+)/)?.[1];
+    if (!marker) throw new Error('Mock database received an unsupported raw SQL statement');
+    if (!statement.__sql.includes('INSERT INTO admin_audit_logs') ||
+      (marker === 'session-revoke' ? !statement.__sql.includes('EXISTS (SELECT 1 FROM changed)') : !statement.__sql.includes('FROM changed'))) {
+      throw new Error('Phase 7 audit insert must be sourced from the conditional update CTE');
+    }
+    const payload = JSON.parse(statement.values[0]);
+    const targetTable = marker.startsWith('user-') ? 'users'
+      : marker.startsWith('listing-') ? 'business_listings'
+        : marker === 'report-status' ? 'moderation_reports' : 'auth_sessions';
+    const targetId = payload.targetId ?? payload.id;
+    if (databaseState.staleNext?.table === targetTable && databaseState.staleNext.id === targetId) {
+      const staleRow = databaseState[targetTable].find(row => row.id === targetId);
+      if (staleRow) Object.assign(staleRow, databaseState.staleNext.patch);
+      databaseState.staleNext = null;
+    }
+    const fault = databaseState.failNext && (!databaseState.failOn ||
+      (databaseState.failOn.table === 'admin_audit_logs' && databaseState.failOn.operation === 'insert') ||
+      (databaseState.failOn.table === targetTable && databaseState.failOn.operation === 'update'));
+    if (fault) {
+      const error = databaseState.failNext;
+      databaseState.failNext = null;
+      databaseState.failOn = null;
+      throw error;
+    }
+    const insertAudit = ({ action, targetType, id, reason, before, after, actorId, requestId }) => {
+      const row = { actor_id: actorId, action, target_type: targetType, target_id: String(id), reason, before_state: before, after_state: after, request_id: requestId, created_at: new Date(), id: databaseState.nextAuditId++ };
+      databaseState.admin_audit_logs.push(row);
+      return row.id;
+    };
+    if (marker === 'user-status') {
+      const user = databaseState.users.find(row => row.id === payload.targetId);
+      if (!user || user.is_active !== payload.expectedIsActive || user.role !== payload.before.role) return [];
+      user.is_active = payload.active;
+      user.suspension_reason = payload.active ? null : payload.reason;
+      user.suspended_at = payload.active ? null : new Date();
+      user.suspended_by = payload.active ? null : payload.actorId;
+      user.updated_at = new Date();
+      if (!payload.active) for (const session of databaseState.auth_sessions.filter(row => row.user_id === user.id && row.revoked_at == null)) session.revoked_at = new Date();
+      const after = { id: user.id, role: user.role, isActive: user.is_active };
+      const auditId = insertAudit({ actorId: payload.actorId, action: payload.action, targetType: 'user', id: user.id, reason: payload.reason, before: payload.before, after, requestId: payload.requestId });
+      return [{ id: user.id, role: user.role, isActive: user.is_active, auditId }];
+    }
+    if (marker === 'user-role') {
+      const user = databaseState.users.find(row => row.id === payload.targetId);
+      if (!user || user.role !== payload.expectedRole || user.is_active !== payload.expectedIsActive) return [];
+      user.role = payload.role;
+      user.updated_at = new Date();
+      for (const session of databaseState.auth_sessions.filter(row => row.user_id === user.id && row.revoked_at == null)) session.revoked_at = new Date();
+      const after = { id: user.id, role: user.role, isActive: user.is_active };
+      const auditId = insertAudit({ actorId: payload.actorId, action: payload.action, targetType: payload.targetType, id: user.id, reason: payload.reason, before: payload.before, after, requestId: payload.requestId });
+      return [{ id: user.id, role: user.role, auditId }];
+    }
+    if (marker === 'session-revoke') {
+      const sessions = databaseState.auth_sessions.filter(row => row.user_id === payload.targetId && row.revoked_at == null);
+      for (const session of sessions) session.revoked_at = new Date();
+      if (sessions.length) insertAudit({ actorId: payload.actorId, action: 'user.sessions_revoked', targetType: 'user', id: payload.targetId, reason: payload.reason, before: { activeSessions: sessions.length }, after: { activeSessions: 0 }, requestId: payload.requestId });
+      return [{ revokedCount: sessions.length, auditCount: sessions.length ? 1 : 0 }];
+    }
+    if (marker === 'listing-moderation' || marker === 'listing-availability') {
+      const listing = databaseState.business_listings.find(row => row.id === payload.id);
+      if (!listing || listing.status !== payload.expectedStatus || listing.moderated_by !== payload.before.moderatedBy) return [];
+      listing.status = payload.status;
+      listing.moderation_reason = payload.reason;
+      listing.moderated_by = payload.actorId;
+      listing.moderated_at = new Date();
+      listing.updated_at = new Date();
+      if (marker === 'listing-moderation') {
+        listing.published_at = payload.status === 'published' ? new Date() : null;
+        listing.rejection_reason = payload.status === 'rejected' ? payload.reason : null;
+      } else {
+        listing.suspended_by = payload.status === 'suspended' ? payload.actorId : null;
+        listing.suspended_at = payload.status === 'suspended' ? new Date() : null;
+        if (payload.status === 'published') listing.published_at = new Date();
+      }
+      const after = { status: listing.status, moderatedBy: listing.moderated_by };
+      const auditId = insertAudit({ actorId: payload.actorId, action: payload.action ?? payload.eventType, targetType: 'listing', id: listing.id, reason: payload.reason, before: payload.before, after, requestId: payload.requestId });
+      return [{ id: listing.id, status: listing.status, title: listing.title, publishedAt: listing.published_at, rejectionReason: listing.rejection_reason, moderationReason: listing.moderation_reason, moderatedBy: listing.moderated_by, moderatedAt: listing.moderated_at, auditId }];
+    }
+    if (marker === 'report-status') {
+      const report = databaseState.moderation_reports.find(row => row.id === payload.id);
+      if (!report || report.status !== payload.expectedStatus || (report.assigned_to ?? null) !== (payload.before.assignedTo ?? null) || (report.resolved_by ?? null) !== (payload.before.resolvedBy ?? null)) return [];
+      report.status = payload.status;
+      report.moderator_notes = payload.moderatorNotes ?? null;
+      report.resolution_reason = ['resolved', 'dismissed'].includes(payload.status) ? payload.reason : null;
+      report.assigned_to = payload.actorId;
+      report.resolved_by = ['resolved', 'dismissed'].includes(payload.status) ? payload.actorId : null;
+      report.resolved_at = report.resolved_by ? new Date() : null;
+      report.updated_at = new Date();
+      const after = { status: report.status, assignedTo: report.assigned_to, resolvedBy: report.resolved_by };
+      const auditId = insertAudit({ actorId: payload.actorId, action: `report.${report.status}`, targetType: 'report', id: report.id, reason: payload.reason, before: payload.before, after, requestId: payload.requestId });
+      return [{ id: report.id, status: report.status, assignedTo: report.assigned_to, resolvedBy: report.resolved_by, resolvedAt: report.resolved_at, auditId }];
+    }
+    throw new Error(`Unknown Phase 7 mock statement ${marker}`);
+  },
   batch: async operations => {
     databaseState.batchCalls += 1;
     const snapshot = Object.fromEntries(

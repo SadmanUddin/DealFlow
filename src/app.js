@@ -13,6 +13,9 @@ import conversationRoutes from './routes/conversation.routes.js';
 import documentRoutes from './routes/document.routes.js';
 import favoriteRoutes from './routes/favorite.routes.js';
 import notificationRoutes from './routes/notification.routes.js';
+import adminRoutes from './routes/admin.routes.js';
+import reportRoutes from './routes/report.routes.js';
+import { randomUUID } from 'node:crypto';
 import { optionalAuthentication } from '#middleware/auth.middleware.js';
 import {
   errorMiddleware,
@@ -50,6 +53,12 @@ app.use(
   })
 );
 app.use(cookieParser());
+app.use((req, res, next) => {
+  const candidate = req.get('x-request-id');
+  req.requestId = candidate && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(candidate) ? candidate : randomUUID();
+  res.set('X-Request-Id', req.requestId);
+  next();
+});
 app.use(optionalAuthentication);
 
 app.get('/', (req, res) => {
@@ -74,6 +83,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/listings', listingRoutes);
 app.use('/api/admin/listings', adminListingRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/reports', reportRoutes);
 app.use('/api/conversations', conversationRoutes);
 app.use('/api/favorites', favoriteRoutes);
 app.use('/api/notifications', notificationRoutes);

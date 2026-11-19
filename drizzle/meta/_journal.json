@@ -78,6 +78,20 @@
       "when": 1795032000000,
       "tag": "0010_phase6_legacy_outbox_quarantine",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1795047631699,
+      "tag": "0011_phase7_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1795048256463,
+      "tag": "0012_phase7_moderation_search_indexes",
+      "breakpoints": true
     }
   ]
 }

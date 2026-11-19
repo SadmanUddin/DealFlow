@@ -8,6 +8,7 @@ import {
   timestamp,
   varchar,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 export const userRole = pgEnum('user_role', ['buyer', 'seller', 'admin']);
 export const authTokenType = pgEnum('auth_token_type', [
@@ -31,9 +32,15 @@ export const users = pgTable('users', {
   role: userRole('role').notNull().default('buyer'),
   email_verified: boolean('email_verified').notNull().default(false),
   is_active: boolean('is_active').notNull().default(true),
+  suspension_reason: varchar('suspension_reason', { length: 2000 }),
+  suspended_at: timestamp({ withTimezone: true }),
+  suspended_by: integer('suspended_by').references(() => users.id, { onDelete: 'set null' }),
   created_at: timestamp().defaultNow().notNull(),
   updated_at: timestamp().defaultNow().notNull(),
-});
+}, table => [
+  index('users_name_trgm_idx').using('gin', sql`${table.name} gin_trgm_ops`),
+  index('users_email_trgm_idx').using('gin', sql`${table.email} gin_trgm_ops`),
+]);
 
 export const authSessions = pgTable(
   'auth_sessions',

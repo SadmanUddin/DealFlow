@@ -18,6 +18,13 @@ vi.mock('../src/models/listing.model.js', async () => ({
   businessListings: (await import('./helpers/mock-database.js')).modelTables
     .businessListings,
 }));
+vi.mock('../src/models/admin.model.js', async () => {
+  const { modelTables } = await import('./helpers/mock-database.js');
+  return {
+    moderationReports: modelTables.moderationReports,
+    adminAuditLogs: modelTables.adminAuditLogs,
+  };
+});
 vi.mock('../src/config/arcjet.js', () => ({
   default: {
     withRule: () => ({ protect: async () => ({ isDenied: () => false }) }),
