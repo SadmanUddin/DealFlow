@@ -1,2 +1,0 @@
-ALTER TABLE "conversation_documents" DROP CONSTRAINT "conversation_documents_status_valid";--> statement-breakpoint
-ALTER TABLE "conversation_documents" ADD CONSTRAINT "conversation_documents_status_valid" CHECK ("conversation_documents"."status" IN ('pending', 'available', 'rejected', 'deletion_pending', 'deleted'));

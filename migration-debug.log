@@ -1,5 +1,0 @@
-
-> dealflow@1.0.0 db:migrate
-> drizzle-kit migrate --verbose
-
-Unrecognized options for command 'migrate': --verbose

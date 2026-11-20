@@ -14,8 +14,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  verify:
-    name: Install and verify
+  backend:
+    name: Backend CI
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -26,25 +26,84 @@ jobs:
       - name: Set up Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: 22.21.0
+          node-version: 24
           cache: npm
+          cache-dependency-path: backend/package-lock.json
 
-      - name: Install locked dependencies
-        id: install
+      - name: Install backend dependencies
+        working-directory: backend
         run: npm ci
 
-      - name: Check code style with ESLint
+      - name: Lint backend
+        working-directory: backend
         run: npm run lint
 
-      # - name: Check formatting
-      #   run: npm run format:check
+      - name: Test backend
+        working-directory: backend
+        run: npm test -- --pool=threads --maxWorkers=1
 
-      - name: Run automated tests
-        if: always() && steps.install.outcome == 'success'
+  frontend:
+    name: Frontend CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Check for frontend package
+        id: frontend-package
         run: |
-          if node -e "process.exit(Object.hasOwn(require('./package.json').scripts ?? {}, 'test') ? 0 : 1)"; then
-            npm test
+          if [ -f frontend/package.json ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            if [ -f frontend/package-lock.json ]; then
+              echo "lockfile=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "lockfile=false" >> "$GITHUB_OUTPUT"
+            fi
           else
-            echo "::error title=Automated tests are not configured::Add a test script and test suite to package.json before CI can verify tests."
-            exit 1
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "lockfile=false" >> "$GITHUB_OUTPUT"
+            echo "Frontend CI skipped: frontend/package.json does not exist yet."
           fi
+
+      - name: Set up Node.js 24 with npm cache
+        if: steps.frontend-package.outputs.exists == 'true' && steps.frontend-package.outputs.lockfile == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Set up Node.js 24 without npm cache
+        if: steps.frontend-package.outputs.exists == 'true' && steps.frontend-package.outputs.lockfile != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install frontend dependencies
+        if: steps.frontend-package.outputs.exists == 'true'
+        working-directory: frontend
+        run: npm ci
+
+      - name: Inspect configured frontend scripts
+        if: steps.frontend-package.outputs.exists == 'true'
+        id: frontend-scripts
+        working-directory: frontend
+        run: |
+          node -e "const scripts = require('./package.json').scripts || {}; const typecheck = scripts.typecheck ? 'typecheck' : scripts['type-check'] ? 'type-check' : ''; console.log('lint=' + Boolean(scripts.lint)); console.log('typecheck=' + typecheck);" >> "$GITHUB_OUTPUT"
+
+      - name: Lint frontend
+        if: steps.frontend-package.outputs.exists == 'true' && steps.frontend-scripts.outputs.lint == 'true'
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Type-check frontend
+        if: steps.frontend-package.outputs.exists == 'true' && steps.frontend-scripts.outputs.typecheck != ''
+        working-directory: frontend
+        run: npm run ${{ steps.frontend-scripts.outputs.typecheck }}
+
+      - name: Build frontend for production
+        if: steps.frontend-package.outputs.exists == 'true'
+        working-directory: frontend
+        run: npm run build
