@@ -51,59 +51,25 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Check for frontend package
-        id: frontend-package
-        run: |
-          if [ -f frontend/package.json ]; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-            if [ -f frontend/package-lock.json ]; then
-              echo "lockfile=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "lockfile=false" >> "$GITHUB_OUTPUT"
-            fi
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-            echo "lockfile=false" >> "$GITHUB_OUTPUT"
-            echo "Frontend CI skipped: frontend/package.json does not exist yet."
-          fi
-
-      - name: Set up Node.js 24 with npm cache
-        if: steps.frontend-package.outputs.exists == 'true' && steps.frontend-package.outputs.lockfile == 'true'
+      - name: Set up Node.js 24
         uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Set up Node.js 24 without npm cache
-        if: steps.frontend-package.outputs.exists == 'true' && steps.frontend-package.outputs.lockfile != 'true'
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-
       - name: Install frontend dependencies
-        if: steps.frontend-package.outputs.exists == 'true'
         working-directory: frontend
         run: npm ci
 
-      - name: Inspect configured frontend scripts
-        if: steps.frontend-package.outputs.exists == 'true'
-        id: frontend-scripts
-        working-directory: frontend
-        run: |
-          node -e "const scripts = require('./package.json').scripts || {}; const typecheck = scripts.typecheck ? 'typecheck' : scripts['type-check'] ? 'type-check' : ''; console.log('lint=' + Boolean(scripts.lint)); console.log('typecheck=' + typecheck);" >> "$GITHUB_OUTPUT"
-
       - name: Lint frontend
-        if: steps.frontend-package.outputs.exists == 'true' && steps.frontend-scripts.outputs.lint == 'true'
         working-directory: frontend
         run: npm run lint
 
       - name: Type-check frontend
-        if: steps.frontend-package.outputs.exists == 'true' && steps.frontend-scripts.outputs.typecheck != ''
         working-directory: frontend
-        run: npm run ${{ steps.frontend-scripts.outputs.typecheck }}
+        run: npm run typecheck
 
       - name: Build frontend for production
-        if: steps.frontend-package.outputs.exists == 'true'
         working-directory: frontend
         run: npm run build
