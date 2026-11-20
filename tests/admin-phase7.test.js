@@ -90,6 +90,17 @@ describe('Phase 7 authorization and user moderation', () => {
     await expect(changeUserRole(3, 3, { role: 'buyer', reason: 'test reason' }, 'req')).rejects.toMatchObject({ code: 'SELF_DEMOTION_DENIED' });
   });
 
+  it('rechecks the active-admin minimum in the conditional write after a concurrent admin suspension', async () => {
+    const { moderateUser } = await import('../src/services/admin.service.js');
+    mock.databaseState.users.push({ id: 5, name: 'Second Admin', email: 'second-admin@phase7.test', password: 'hash', role: 'admin', email_verified: true, is_active: true, created_at: new Date(), updated_at: new Date() });
+    mock.databaseState.staleNext = { table: 'users', id: 3, anyTarget: true, patch: { is_active: false } };
+
+    await expect(moderateUser(3, 5, { action: 'suspend', reason: 'Admin review' }, 'req-race'))
+      .rejects.toMatchObject({ status: 409, code: 'USER_STATUS_CHANGED' });
+    expect(mock.databaseState.users.find(row => row.id === 5).is_active).toBe(true);
+    expect(mock.databaseState.admin_audit_logs).toHaveLength(0);
+  });
+
   it('does not audit stale user status or role updates that return no row', async () => {
     mock.databaseState.staleNext = { table: 'users', id: 1, patch: { is_active: false } };
     const suspension = await signed(request(app).patch('/api/admin/users/1/status'), cookieFor(3)).send({ action: 'suspend', reason: 'Stale state test' });

@@ -1,6 +1,6 @@
 import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
 import bcrypt from 'bcrypt';
-import { and, eq, gt, isNull } from 'drizzle-orm';
+import { and, eq, gt, isNull, sql } from 'drizzle-orm';
 import { db } from '#config/database.js';
 import { authSessions, authTokens, users } from '#models/user.model.js';
 import { AppError } from '#utils/app-error.js';
@@ -14,6 +14,12 @@ const RESET_TOKEN_MS = 60 * 60 * 1000;
 
 const hashToken = token => createHash('sha256').update(token).digest('hex');
 const newToken = () => randomBytes(32).toString('base64url');
+const extractRows = result => Array.isArray(result) ? result : result?.rows ?? [];
+const invalidToken = () => new AppError(
+  400,
+  'INVALID_OR_EXPIRED_TOKEN',
+  'Token is invalid, expired, or already used'
+);
 export const csrfTokenForSession = sessionId =>
   createHmac('sha256', getEnvironment().JWT_SECRET)
     .update(`dealflow-csrf:${sessionId}`)
@@ -172,38 +178,24 @@ const issueOneTimeToken = async (userId, type, lifetimeMs) => {
   return token;
 };
 
-const consumeOneTimeToken = async (token, type) => {
-  const [record] = await db
-    .update(authTokens)
-    .set({ consumed_at: new Date() })
-    .where(
-      and(
-        eq(authTokens.token_hash, hashToken(token)),
-        eq(authTokens.type, type),
-        isNull(authTokens.consumed_at),
-        gt(authTokens.expires_at, new Date())
-      )
-    )
-    .returning({ userId: authTokens.user_id });
-  if (!record) {
-    throw new AppError(
-      400,
-      'INVALID_OR_EXPIRED_TOKEN',
-      'Token is invalid, expired, or already used'
-    );
-  }
-  return record.userId;
-};
-
 export const createEmailVerificationToken = userId =>
   issueOneTimeToken(userId, 'email_verification', EMAIL_TOKEN_MS);
 
 export const verifyEmail = async token => {
-  const userId = await consumeOneTimeToken(token, 'email_verification');
-  await db
-    .update(users)
-    .set({ email_verified: true, updated_at: new Date() })
-    .where(eq(users.id, userId));
+  const result = await db.execute(sql`
+    /* auth:verify-email */
+    WITH consumed AS (
+      UPDATE auth_tokens SET consumed_at = now()
+      WHERE token_hash = ${hashToken(token)} AND type = 'email_verification'
+        AND consumed_at IS NULL AND expires_at > now()
+      RETURNING user_id
+    ), updated AS (
+      UPDATE users SET email_verified = true, updated_at = now()
+      WHERE id = (SELECT user_id FROM consumed)
+      RETURNING id
+    ) SELECT id FROM updated
+  `);
+  if (!extractRows(result).length) throw invalidToken();
 };
 
 export const requestPasswordReset = async email => {
@@ -219,13 +211,28 @@ export const requestPasswordReset = async email => {
 };
 
 export const resetPassword = async (token, password) => {
-  const userId = await consumeOneTimeToken(token, 'password_reset');
   const passwordHash = await hashPassword(password);
-  await db
-    .update(users)
-    .set({ password: passwordHash, updated_at: new Date() })
-    .where(eq(users.id, userId));
-  await revokeUserSessions(userId);
+  const result = await db.execute(sql`
+    /* auth:reset-password */
+    WITH consumed AS (
+      UPDATE auth_tokens SET consumed_at = now()
+      WHERE token_hash = ${hashToken(token)} AND type = 'password_reset'
+        AND consumed_at IS NULL AND expires_at > now()
+      RETURNING user_id
+    ), updated AS (
+      UPDATE users SET password = ${passwordHash}, updated_at = now()
+      WHERE id = (SELECT user_id FROM consumed)
+      RETURNING id
+    ), revoked AS (
+      UPDATE auth_sessions AS session SET revoked_at = now()
+      FROM updated
+      WHERE session.user_id = updated.id AND session.revoked_at IS NULL
+      RETURNING session.id
+    )
+    SELECT updated.id FROM updated
+    LEFT JOIN (SELECT count(*) FROM revoked) AS revoked_count ON true
+  `);
+  if (!extractRows(result).length) throw invalidToken();
 };
 
 export const deactivateAccount = async (userId, password) => {

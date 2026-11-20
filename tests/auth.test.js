@@ -374,6 +374,21 @@ describe('email verification', () => {
     expect(invalid.status).toBe(400);
     expect(expired.status).toBe(400);
   });
+
+  it('does not consume a verification token if the user update fails', async () => {
+    const registration = await register();
+    const tokenRow = mockDatabase.databaseState.auth_tokens[0];
+    mockDatabase.databaseState.failNext = new Error('simulated update failure');
+    mockDatabase.databaseState.failOn = { table: 'users', operation: 'update' };
+
+    const response = await request(app)
+      .post('/api/auth/verify-email')
+      .send({ token: registration.body.verificationToken });
+
+    expect(response.status).toBe(500);
+    expect(tokenRow.consumed_at).toBeNull();
+    expect(mockDatabase.databaseState.users[0].email_verified).toBe(false);
+  });
 });
 
 describe('password recovery', () => {
@@ -445,5 +460,26 @@ describe('password recovery', () => {
     expect(expired.status).toBe(400);
     expect(usedOnce.status).toBe(200);
     expect(reused.status).toBe(400);
+  });
+
+  it('keeps the reset token, password, and sessions unchanged if session revocation fails', async () => {
+    await register();
+    const resetRequest = await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email: 'buyer@example.test' });
+    const resetToken = mockDatabase.databaseState.auth_tokens.at(-1);
+    const passwordHash = mockDatabase.databaseState.users[0].password;
+    mockDatabase.databaseState.failNext = new Error('simulated revoke failure');
+    mockDatabase.databaseState.failOn = { table: 'auth_sessions', operation: 'update' };
+
+    const response = await request(app).post('/api/auth/reset-password').send({
+      token: resetRequest.body.resetToken,
+      password: 'New-strong-password-81',
+    });
+
+    expect(response.status).toBe(500);
+    expect(resetToken.consumed_at).toBeNull();
+    expect(mockDatabase.databaseState.users[0].password).toBe(passwordHash);
+    expect(mockDatabase.databaseState.auth_sessions.every(session => session.revoked_at == null)).toBe(true);
   });
 });

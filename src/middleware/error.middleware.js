@@ -6,8 +6,8 @@ export const notFoundMiddleware = (req, res, next) => {
   next(new AppError(404, 'NOT_FOUND', 'The requested endpoint was not found'));
 };
 
-export const errorMiddleware = (error, req, res, _next) => {
-  if (res.headersSent) return;
+export const errorMiddleware = (error, req, res, next) => {
+  if (res.headersSent) return next(error);
 
   let status = 500;
   let code = 'INTERNAL_SERVER_ERROR';

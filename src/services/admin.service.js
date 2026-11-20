@@ -50,6 +50,12 @@ export const moderateUser = async (actorId, targetId, { action, reason }, reques
   const rows = await executeRows(sql`
     /* phase7:user-status */
     WITH args AS (SELECT ${payload}::jsonb AS value),
+    active_admin_count AS MATERIALIZED (
+      SELECT count(*)::int AS count FROM (
+        SELECT id FROM users WHERE role = 'admin' AND is_active = true
+        ORDER BY id FOR UPDATE
+      ) AS locked_admins
+    ),
     changed AS (
       UPDATE users AS target
       SET is_active = (args.value->>'active')::boolean,
@@ -57,10 +63,12 @@ export const moderateUser = async (actorId, targetId, { action, reason }, reques
           suspended_at = CASE WHEN (args.value->>'active')::boolean THEN NULL ELSE now() END,
           suspended_by = CASE WHEN (args.value->>'active')::boolean THEN NULL ELSE (args.value->>'actorId')::integer END,
           updated_at = now()
-      FROM args
+      FROM args CROSS JOIN active_admin_count
       WHERE target.id = (args.value->>'targetId')::integer
         AND target.is_active = (args.value->>'expectedIsActive')::boolean
         AND target.role = (args.value->'before'->>'role')::user_role
+        AND (target.role <> 'admin' OR NOT target.is_active
+          OR (args.value->>'active')::boolean OR active_admin_count.count > 1)
       RETURNING target.id, target.role, target.is_active
     ), revoked AS (
       UPDATE auth_sessions AS session SET revoked_at = now()
@@ -100,12 +108,20 @@ export const changeUserRole = async (actorId, targetId, { role, reason }, reques
   const rows = await executeRows(sql`
     /* phase7:user-role */
     WITH args AS (SELECT ${payload}::jsonb AS value),
+    active_admin_count AS MATERIALIZED (
+      SELECT count(*)::int AS count FROM (
+        SELECT id FROM users WHERE role = 'admin' AND is_active = true
+        ORDER BY id FOR UPDATE
+      ) AS locked_admins
+    ),
     changed AS (
       UPDATE users AS target SET role = (args.value->>'role')::user_role, updated_at = now()
-      FROM args
+      FROM args CROSS JOIN active_admin_count
       WHERE target.id = (args.value->>'targetId')::integer
         AND target.role = (args.value->>'expectedRole')::user_role
         AND target.is_active = (args.value->>'expectedIsActive')::boolean
+        AND (target.role <> 'admin' OR NOT target.is_active
+          OR args.value->>'role' = 'admin' OR active_admin_count.count > 1)
       RETURNING target.id, target.role, target.is_active
     ), revoked AS (
       UPDATE auth_sessions AS session SET revoked_at = now()

@@ -524,6 +524,34 @@ export const db = {
   update: target => new Query('update', null, target),
   delete: target => new Query('delete', null, target),
   execute: async statement => {
+    const authMarker = statement.__sql?.match(/auth:([a-z-]+)/)?.[1];
+    if (authMarker === 'verify-email' || authMarker === 'reset-password') {
+      const error = databaseState.failNext;
+      const shouldFail = error && (!databaseState.failOn ||
+        (authMarker === 'verify-email' && databaseState.failOn.table === 'users' && databaseState.failOn.operation === 'update') ||
+        (authMarker === 'reset-password' && databaseState.failOn.table === 'auth_sessions' && databaseState.failOn.operation === 'update'));
+      if (shouldFail) {
+        databaseState.failNext = null;
+        databaseState.failOn = null;
+        throw error;
+      }
+      const [tokenHash, passwordHash] = statement.values;
+      const type = authMarker === 'verify-email' ? 'email_verification' : 'password_reset';
+      const token = databaseState.auth_tokens.find(row => row.token_hash === tokenHash && row.type === type && row.consumed_at == null && row.expires_at > new Date());
+      if (!token) return [];
+      const user = databaseState.users.find(row => row.id === token.user_id);
+      if (!user) return [];
+      token.consumed_at = new Date();
+      if (authMarker === 'verify-email') {
+        user.email_verified = true;
+        user.updated_at = new Date();
+      } else {
+        user.password = passwordHash;
+        user.updated_at = new Date();
+        for (const session of databaseState.auth_sessions.filter(row => row.user_id === user.id && row.revoked_at == null)) session.revoked_at = new Date();
+      }
+      return [{ id: user.id }];
+    }
     const marker = statement.__sql?.match(/phase7:([a-z-]+)/)?.[1];
     if (!marker) throw new Error('Mock database received an unsupported raw SQL statement');
     if (!statement.__sql.includes('INSERT INTO admin_audit_logs') ||
@@ -535,9 +563,10 @@ export const db = {
       : marker.startsWith('listing-') ? 'business_listings'
         : marker === 'report-status' ? 'moderation_reports' : 'auth_sessions';
     const targetId = payload.targetId ?? payload.id;
-    if (databaseState.staleNext?.table === targetTable && databaseState.staleNext.id === targetId) {
-      const staleRow = databaseState[targetTable].find(row => row.id === targetId);
-      if (staleRow) Object.assign(staleRow, databaseState.staleNext.patch);
+    if (databaseState.staleNext?.table === targetTable &&
+      (databaseState.staleNext.id === targetId || databaseState.staleNext.anyTarget)) {
+      const selectedRow = databaseState[targetTable].find(row => row.id === databaseState.staleNext.id);
+      if (selectedRow) Object.assign(selectedRow, databaseState.staleNext.patch);
       databaseState.staleNext = null;
     }
     const fault = databaseState.failNext && (!databaseState.failOn ||
@@ -557,6 +586,7 @@ export const db = {
     if (marker === 'user-status') {
       const user = databaseState.users.find(row => row.id === payload.targetId);
       if (!user || user.is_active !== payload.expectedIsActive || user.role !== payload.before.role) return [];
+      if (user.role === 'admin' && user.is_active && !payload.active && databaseState.users.filter(row => row.role === 'admin' && row.is_active).length <= 1) return [];
       user.is_active = payload.active;
       user.suspension_reason = payload.active ? null : payload.reason;
       user.suspended_at = payload.active ? null : new Date();
@@ -570,6 +600,7 @@ export const db = {
     if (marker === 'user-role') {
       const user = databaseState.users.find(row => row.id === payload.targetId);
       if (!user || user.role !== payload.expectedRole || user.is_active !== payload.expectedIsActive) return [];
+      if (user.role === 'admin' && user.is_active && payload.role !== 'admin' && databaseState.users.filter(row => row.role === 'admin' && row.is_active).length <= 1) return [];
       user.role = payload.role;
       user.updated_at = new Date();
       for (const session of databaseState.auth_sessions.filter(row => row.user_id === user.id && row.revoked_at == null)) session.revoked_at = new Date();
