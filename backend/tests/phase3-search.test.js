@@ -17,11 +17,13 @@ vi.mock('../src/models/listing.model.js', async () => ({
   businessListings: (await import('./helpers/mock-database.js')).modelTables
     .businessListings,
 }));
-vi.mock('../src/config/arcjet.js', () => ({
-  default: {
-    withRule: () => ({ protect: async () => ({ isDenied: () => false }) }),
-  },
-}));
+vi.mock('../src/config/arcjet.js', () => {
+  const client = {
+    withRule: () => client,
+    protect: async () => ({ isDenied: () => false }),
+  };
+  return { default: client };
+});
 vi.mock('../src/config/logger.js', () => ({
   default: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));

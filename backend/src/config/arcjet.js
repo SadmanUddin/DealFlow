@@ -1,4 +1,4 @@
-import arcjet, { shield, detectBot, slidingWindow } from '@arcjet/node';
+import arcjet, { shield, detectBot } from '@arcjet/node';
 import { getEnvironment } from '#config/env.js';
 // import { isSpoofedBot } from "@arcjet/inspect";
 // import express from "express";
@@ -16,11 +16,6 @@ const aj = arcjet({
     detectBot({
       mode: 'LIVE',
       allow: ['CATEGORY:SEARCH_ENGINE', 'CATEGORY:PREVIEW'],
-    }),
-    slidingWindow({
-      mode: 'LIVE',
-      interval: '2s',
-      max: 5,
     }),
   ],
 });

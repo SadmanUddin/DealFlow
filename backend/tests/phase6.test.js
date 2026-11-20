@@ -35,11 +35,13 @@ vi.mock(
   '#models/phase6.model.js',
   async () => (await import('./helpers/mock-database.js')).phase6Tables
 );
-vi.mock('#config/arcjet.js', () => ({
-  default: {
-    withRule: () => ({ protect: async () => ({ isDenied: () => false }) }),
-  },
-}));
+vi.mock('#config/arcjet.js', () => {
+  const client = {
+    withRule: () => client,
+    protect: async () => ({ isDenied: () => false }),
+  };
+  return { default: client };
+});
 vi.mock('#config/logger.js', () => ({
   default: {
     info: vi.fn(),

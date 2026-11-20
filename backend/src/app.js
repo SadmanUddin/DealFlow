@@ -6,6 +6,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import authRoutes from './routes/auth.routes.js';
 import securityMiddleware from '#middleware/security.middleware.js';
+import privateCacheMiddleware from '#middleware/private-cache.middleware.js';
 import userRoutes from './routes/user.routes.js';
 import listingRoutes from './routes/listing.routes.js';
 import adminListingRoutes from './routes/admin-listing.routes.js';
@@ -67,6 +68,7 @@ app.use((req, res, next) => {
   next();
 });
 app.use(optionalAuthentication);
+app.use(privateCacheMiddleware);
 
 app.get('/', (req, res) => {
   logger.info('Hello from DealFlow');

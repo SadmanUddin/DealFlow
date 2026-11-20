@@ -3,33 +3,37 @@
 
 @theme {
   --font-sans: "Inter Variable", Inter, ui-sans-serif, system-ui, sans-serif;
-  --color-paper: #f6f8f6;
-  --color-mist: #f1f4f1;
+  --color-brand-navy: #0b1f36;
+  --color-brand-emerald: #10b981;
+  --color-soft-mint: #f3f7f5;
+  --color-paper: #f3f7f5;
+  --color-mist: #edf3f0;
   --color-line: #e3e9e4;
-  --color-ink: #17251f;
+  --color-ink: #0b1f36;
   --color-ink-soft: #607069;
   --color-ink-faint: #87948d;
   --color-navy-50: #eef3f7;
   --color-navy-100: #dce7ef;
-  --color-navy-800: #1c3b55;
-  --color-navy-900: #142f46;
-  --color-navy-950: #102639;
+  --color-navy-800: #173b56;
+  --color-navy-900: #0b1f36;
+  --color-navy-950: #0b1f36;
   --color-emerald-50: #edf7f1;
   --color-emerald-100: #d8eee1;
   --color-emerald-200: #b4dcc5;
   --color-emerald-300: #85c4a2;
-  --color-emerald-600: #178354;
-  --color-emerald-700: #116d46;
-  --color-emerald-800: #105b3d;
-  --color-emerald-900: #104b35;
+  --color-emerald-500: #10b981;
+  --color-emerald-600: #059669;
+  --color-emerald-700: #10b981;
+  --color-emerald-800: #047857;
+  --color-emerald-900: #065f46;
   --shadow-soft: 0 1px 2px rgb(16 38 57 / 4%), 0 8px 26px rgb(16 38 57 / 4%);
   --shadow-card: 0 18px 48px -28px rgb(16 38 57 / 28%);
 }
 
 :root {
   font-family: "Inter Variable", Inter, ui-sans-serif, system-ui, sans-serif;
-  color: #17251f;
-  background: #f6f8f6;
+  color: #0b1f36;
+  background: #f3f7f5;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -50,8 +54,8 @@ a {
 }
 
 ::selection {
-  color: #102639;
-  background: #b4dcc5;
+  color: #0b1f36;
+  background: #10b981;
 }
 
 .page-container {
@@ -62,24 +66,22 @@ a {
 .brand-lockup {
   display: inline-flex;
   align-items: center;
-  gap: 0.65rem;
-  color: #102639;
+  gap: 0.45rem;
+  color: #0b1f36;
 }
 
-.brand-mark {
-  display: grid;
-  width: 2.15rem;
-  height: 2.15rem;
-  place-items: center;
+.brand-symbol-tile {
+  flex: none;
   border-radius: 0.75rem;
-  background: #102f46;
-  color: #a9dfbe;
+  background: #fff;
+  object-fit: cover;
 }
 
-.brand-mark-light {
-  border: 1px solid rgb(255 255 255 / 12%);
-  background: rgb(255 255 255 / 8%);
-  color: #a9dfbe;
+.brand-wordmark {
+  display: block;
+  flex: none;
+  object-fit: cover;
+  object-position: center;
 }
 
 .eyebrow {
@@ -100,9 +102,13 @@ a {
 
 .hero-grid {
   background:
-    radial-gradient(ellipse at 82% 47%, rgb(208 231 216 / 38%), transparent 38%),
+    radial-gradient(
+      ellipse at 82% 47%,
+      rgb(208 231 216 / 38%),
+      transparent 38%
+    ),
     radial-gradient(ellipse at 4% 5%, rgb(255 255 255 / 95%), transparent 43%),
-    #f6f8f6;
+    #f3f7f5;
 }
 
 .footer-link {
@@ -110,7 +116,7 @@ a {
 }
 
 .footer-link:hover {
-  color: #a9dfbe;
+  color: #10b981;
 }
 
 @media (min-width: 640px) {
