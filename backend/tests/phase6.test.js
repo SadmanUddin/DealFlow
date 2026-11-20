@@ -67,7 +67,10 @@ const {
 const { sendEmail } = await import('#services/email/email.adapter.js');
 const { sendResendEmail } =
   await import('../src/services/email/resend.provider.js');
+const { encryptVerificationToken } =
+  await import('../src/services/auth.service.js');
 const password = 'StrongTestPassword!123';
+const { attachVerifiedSession } = await import('./helpers/verified-session.js');
 const listingInput = {
   title: 'A tested business listing',
   description: 'A detailed description suitable for the test listing.',
@@ -84,12 +87,21 @@ const credentials = response => ({
 });
 const signed = (builder, user) =>
   builder.set('Cookie', user.cookie).set('X-CSRF-Token', user.csrf);
-const signup = async (role, email) =>
-  credentials(
-    await request(app)
-      .post('/api/auth/sign-up')
-      .send({ name: role, email, password, role })
+const signup = async (role, email) => {
+  const response = await request(app)
+    .post('/api/auth/sign-up')
+    .send({ name: role, email, password, role });
+  return credentials(
+    await attachVerifiedSession(
+      app,
+      request,
+      response,
+      email,
+      password,
+      databaseState
+    )
   );
+};
 
 let buyer;
 let seller;
@@ -695,5 +707,45 @@ describe('Phase 6 favorites and notifications', () => {
         EMAIL_FROM: 'notifications@example.test',
       })
     ).rejects.toMatchObject({ permanent: true });
+  });
+});
+
+describe('verification email outbox delivery', () => {
+  it('decrypts only for mocked provider delivery and retries transient failures safely', async () => {
+    resetDatabase();
+    const token = 'v'.repeat(43);
+    const event = {
+      id: 991,
+      eventKey: 'auth:email-verification:mock-event',
+      type: 'auth.email_verification',
+      attempts: 1,
+      lockToken: 'mock-lock',
+      payload: {
+        email: 'new-user@example.test',
+        encryptedToken: encryptVerificationToken(token),
+      },
+    };
+    databaseState.outbox_events.push({
+      id: event.id,
+      status: 'processing',
+      lock_token: event.lockToken,
+      locked_at: new Date(),
+      attempts: event.attempts,
+    });
+    sendEmail.mockRejectedValueOnce(new Error('Temporary provider issue'));
+    await expect(processOutboxEvent(event)).rejects.toThrow(
+      'Temporary provider issue'
+    );
+    await failOutboxEvent(event, new Error('Temporary provider issue'));
+    expect(databaseState.outbox_events[0].status).toBe('pending');
+    expect(event.payload.encryptedToken).not.toContain(token);
+    sendEmail.mockResolvedValueOnce({ id: 'mock:verification' });
+    await processOutboxEvent(event);
+    expect(sendEmail).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        to: 'new-user@example.test',
+        text: expect.stringContaining(token),
+      })
+    );
   });
 });

@@ -4,6 +4,7 @@ import {
   getCsrfToken,
   getCurrentUser,
   resetPasswordWithToken,
+  resendEmailVerification,
   signIn,
   signOut,
   signup,
@@ -21,6 +22,7 @@ router.post('/sign-out', requireCsrf, signOut);
 router.get('/me', requireAuthentication, getCurrentUser);
 router.get('/csrf', requireAuthentication, getCsrfToken);
 router.post('/verify-email', verifyEmailAddress);
+router.post('/resend-verification', resendEmailVerification);
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPasswordWithToken);
 

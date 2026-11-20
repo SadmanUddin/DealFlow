@@ -9,7 +9,7 @@ export type AuthContextValue = {
   isSigningUp: boolean;
   isSigningOut: boolean;
   login: (input: SignInInput) => Promise<AuthUser>;
-  register: (input: SignUpInput) => Promise<AuthUser>;
+  register: (input: SignUpInput) => Promise<{ message: string; email: string }>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
 };

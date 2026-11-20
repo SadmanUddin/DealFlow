@@ -9,6 +9,8 @@ import {
 import { users } from '#models/user.model.js';
 import { sendEmail } from '#services/email/email.adapter.js';
 import { listingEmailTemplate } from '#services/email/templates/listing-notification.js';
+import { decryptVerificationToken } from '#services/auth.service.js';
+import { getEnvironment } from '#config/env.js';
 import logger from '#config/logger.js';
 
 const maxAttempts = 8;
@@ -200,6 +202,35 @@ export const processOutboxEvent = async (
   event,
   { assertLease = async () => {} } = {}
 ) => {
+  if (event.type === 'auth.email_verification') {
+    const payload = event.payload;
+    if (
+      !payload ||
+      typeof payload.email !== 'string' ||
+      typeof payload.encryptedToken !== 'string'
+    ) {
+      const error = new Error('Invalid verification email event payload');
+      error.permanent = true;
+      throw error;
+    }
+    await assertLease();
+    const token = decryptVerificationToken(payload.encryptedToken);
+    const frontendUrl =
+      getEnvironment().FRONTEND_URL ||
+      getEnvironment().CORS_ORIGINS.split(',')[0].trim();
+    const link = new URL('/verify-email', frontendUrl);
+    link.searchParams.set('token', token);
+    link.searchParams.set('email', payload.email);
+    await sendEmail({
+      to: payload.email,
+      subject: 'Verify your DealFlow email',
+      text: `Verify your email address to complete your DealFlow registration: ${link}\n\nYou can also enter this verification token on DealFlow: ${token}\n\nThis link expires in 24 hours.`,
+      html: `<p>Verify your email address to complete your DealFlow registration.</p><p><a href="${link}">Verify email</a></p><p>If the link does not work, enter this token on DealFlow:</p><p><code>${token}</code></p><p>This link expires in 24 hours.</p>`,
+      idempotencyKey: `${event.eventKey}:email`,
+      signal: event.signal,
+    });
+    return;
+  }
   if (event.type.startsWith('deal.'))
     return processDealEvent(event, assertLease);
   if (!event.type.startsWith('listing.')) {

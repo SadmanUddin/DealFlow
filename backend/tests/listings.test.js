@@ -14,6 +14,10 @@ vi.mock('../src/models/user.model.js', async () => {
   const { modelTables } = await import('./helpers/mock-database.js');
   return modelTables;
 });
+vi.mock(
+  '../src/models/phase6.model.js',
+  async () => (await import('./helpers/mock-database.js')).phase6Tables
+);
 vi.mock('../src/models/listing.model.js', async () => ({
   businessListings: (await import('./helpers/mock-database.js')).modelTables
     .businessListings,
@@ -46,6 +50,7 @@ const [{ default: app }, mock] = await Promise.all([
 ]);
 
 const password = 'A-strong-test-password-42';
+const { attachVerifiedSession } = await import('./helpers/verified-session.js');
 const body = overrides => ({
   title: 'Established manufacturing business',
   description: 'A profitable operation with a long operating history.',
@@ -57,8 +62,8 @@ const body = overrides => ({
   currency: 'EUR',
   ...overrides,
 });
-const signup = async (role, email) =>
-  request(app)
+const signup = async (role, email) => {
+  const response = await request(app)
     .post('/api/auth/sign-up')
     .send({
       name: `Test ${role}`,
@@ -66,6 +71,15 @@ const signup = async (role, email) =>
       password,
       role,
     });
+  return attachVerifiedSession(
+    app,
+    request,
+    response,
+    email,
+    password,
+    mock.databaseState
+  );
+};
 const credentialsFor = response => {
   if (!response.headers['set-cookie'])
     throw new Error(
@@ -249,9 +263,10 @@ describe('seller listing lifecycle', () => {
         })
       ).status
     ).toBe(400);
+    mock.databaseState.users[0].email_verified = false;
     expect(
       (await signed(request(app).post(submitPath), credentials).send({})).status
-    ).toBe(403);
+    ).toBe(401);
     mock.databaseState.users[0].email_verified = true;
     expect(
       (await signed(request(app).post(submitPath), credentials).send({})).status
@@ -362,7 +377,7 @@ describe('admin moderation', () => {
           .set('Cookie', admin.cookie)
       ).status
     ).toBe(400);
-    expect(adminSignup.status).toBe(201);
+    expect(adminSignup.status).toBe(202);
   });
 
   it('requires rejection reasons and rejects invalid actions', async () => {

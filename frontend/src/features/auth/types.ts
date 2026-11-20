@@ -31,7 +31,6 @@ export type AuthResponse = {
   user: AuthUser;
   csrfToken: string;
   message?: string;
-  verificationToken?: string;
 };
 
 export type MessageResponse = { message: string };

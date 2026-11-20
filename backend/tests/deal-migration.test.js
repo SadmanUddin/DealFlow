@@ -52,11 +52,14 @@ describe('Phase 8 migration sequence', () => {
     expect(
       snapshot16.tables['public.deals'].checkConstraints.deals_accepted_at_valid
     ).toBeDefined();
-    expect(journal.entries.slice(-3).map(entry => entry.tag)).toEqual([
+    expect(journal.entries.slice(-4, -1).map(entry => entry.tag)).toEqual([
       '0014_phase8_deal_listing_integrity',
       '0015_phase8_iso4217_currency',
       '0016_phase8_deal_offer_invariants',
     ]);
+    expect(journal.entries.at(-1).tag).toBe(
+      '0017_phase11_existing_account_verification_backfill'
+    );
   });
 
   it('uses a literal ISO 4217 allowlist in the currency constraint migration', async () => {

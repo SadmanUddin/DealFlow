@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff, LoaderCircle } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -20,7 +19,12 @@ import {
 } from "./schemas";
 import { AuthLayout } from "./AuthLayout";
 import { useAuth } from "./useAuth";
-import { requestPasswordReset, resetPassword, verifyEmail } from "./api";
+import {
+  requestPasswordReset,
+  resendEmailVerification,
+  resetPassword,
+  verifyEmail,
+} from "./api";
 
 function FieldError({ children, id }: { children?: string; id: string }) {
   if (!children) return null;
@@ -259,17 +263,15 @@ export function RegisterPage() {
   const submit = handleSubmit(async (values) => {
     setFormError("");
     try {
-      const user = await createAccount({
+      const result = await createAccount({
         name: values.name,
         email: values.email,
         password: values.password,
         role: values.role,
       });
-      navigate("/account", {
+      navigate("/verify-email", {
         replace: true,
-        state: {
-          notice: `Account created. Email verification is ${user.emailVerified ? "complete" : "pending"}.`,
-        },
+        state: { email: result.email, notice: result.message },
       });
     } catch (error) {
       setFormError(toApiError(error).message);
@@ -488,11 +490,16 @@ export function ResetPasswordPage() {
 }
 
 export function VerifyEmailPage() {
-  const { refreshSession } = useAuth();
-  const queryClient = useQueryClient();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const [success, setSuccess] = useState(false);
   const [formError, setFormError] = useState("");
+  const [resendMessage, setResendMessage] = useState("");
+  const [resending, setResending] = useState(false);
+  const email =
+    (location.state as { email?: string } | null)?.email ??
+    searchParams.get("email") ??
+    "";
   const {
     register,
     handleSubmit,
@@ -506,8 +513,6 @@ export function VerifyEmailPage() {
     setFormError("");
     try {
       await verifyEmail(token);
-      await refreshSession();
-      await queryClient.invalidateQueries({ queryKey: ["auth", "profile"] });
       setSuccess(true);
     } catch (error) {
       setFormError(toApiError(error).message);
@@ -521,14 +526,29 @@ export function VerifyEmailPage() {
         Verify your email
       </h1>
       {success ? (
-        <FormAlert success>
-          Email verified. You can continue using your DealFlow account.
-        </FormAlert>
+        <div className="mt-5 space-y-4">
+          <FormAlert success>
+            Your account has been successfully verified!
+          </FormAlert>
+          <p className="text-sm leading-6 text-ink-soft">
+            Your DealFlow registration is complete. You can now sign in to
+            access your account.
+          </p>
+          <Button asChild className="w-full" size="lg" variant="accent">
+            <Link to="/login">Sign in</Link>
+          </Button>
+        </div>
       ) : (
         <>
           <p className="mt-2 text-sm leading-6 text-ink-soft">
-            Paste the verification token from your email link.
+            Confirm your email address to complete registration and unlock your
+            DealFlow account. We sent a verification link to:
           </p>
+          {email && (
+            <p className="mt-2 break-all text-sm font-semibold text-navy-950">
+              {email}
+            </p>
+          )}
           <form className="mt-7 space-y-5" noValidate onSubmit={submit}>
             <TextField
               autoComplete="one-time-code"
@@ -540,6 +560,30 @@ export function VerifyEmailPage() {
             <FormAlert>{formError}</FormAlert>
             <SubmitButton pending={isSubmitting}>Verify email</SubmitButton>
           </form>
+          {email && (
+            <div className="mt-4 space-y-2 text-center">
+              <button
+                className="text-sm font-semibold text-emerald-800 hover:underline disabled:opacity-60"
+                disabled={resending}
+                onClick={async () => {
+                  setResending(true);
+                  setResendMessage("");
+                  try {
+                    const result = await resendEmailVerification(email);
+                    setResendMessage(result.message);
+                  } catch (error) {
+                    setFormError(toApiError(error).message);
+                  } finally {
+                    setResending(false);
+                  }
+                }}
+                type="button"
+              >
+                {resending ? "Sending…" : "Resend verification email"}
+              </button>
+              <FormAlert success>{resendMessage}</FormAlert>
+            </div>
+          )}
         </>
       )}
     </AuthLayout>

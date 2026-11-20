@@ -1,8 +1,16 @@
-import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  createHmac,
+  randomBytes,
+  randomUUID,
+} from 'node:crypto';
 import bcrypt from 'bcrypt';
 import { and, eq, gt, isNull, sql } from 'drizzle-orm';
 import { db } from '#config/database.js';
 import { authSessions, authTokens, users } from '#models/user.model.js';
+import { outboxEvents } from '#models/phase6.model.js';
 import { AppError } from '#utils/app-error.js';
 import { signAccessToken } from '#utils/jwt.js';
 import { getEnvironment } from '#config/env.js';
@@ -48,14 +56,66 @@ export const registerUser = async ({ name, email, password, role }) => {
     return user;
   } catch (error) {
     if (error?.code === '23505') {
-      throw new AppError(
-        409,
-        'EMAIL_ALREADY_REGISTERED',
-        'An account with this email already exists'
-      );
+      return null;
     }
     throw error;
   }
+};
+
+const verificationEncryptionKey = () =>
+  createHmac('sha256', getEnvironment().JWT_SECRET)
+    .update('dealflow:verification-outbox:v1')
+    .digest();
+
+export const encryptVerificationToken = token => {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', verificationEncryptionKey(), iv);
+  const ciphertext = Buffer.concat([
+    cipher.update(token, 'utf8'),
+    cipher.final(),
+  ]);
+  return [iv, cipher.getAuthTag(), ciphertext]
+    .map(value => value.toString('base64url'))
+    .join('.');
+};
+
+export const decryptVerificationToken = value => {
+  const [iv, tag, ciphertext] = value
+    .split('.')
+    .map(part => Buffer.from(part, 'base64url'));
+  const decipher = createDecipheriv(
+    'aes-256-gcm',
+    verificationEncryptionKey(),
+    iv
+  );
+  decipher.setAuthTag(tag);
+  return Buffer.concat([
+    decipher.update(ciphertext),
+    decipher.final(),
+  ]).toString('utf8');
+};
+
+export const queueEmailVerification = async user => {
+  const token = await createEmailVerificationToken(user.id);
+  const encryptedToken = encryptVerificationToken(token);
+  await db.insert(outboxEvents).values({
+    event_key: `auth:email-verification:${randomUUID()}`,
+    type: 'auth.email_verification',
+    payload: { userId: user.id, email: user.email, encryptedToken },
+  });
+};
+
+export const requestEmailVerification = async email => {
+  const [user] = await db
+    .select({
+      id: users.id,
+      email: users.email,
+      emailVerified: users.email_verified,
+    })
+    .from(users)
+    .where(and(eq(users.email, email), eq(users.is_active, true)))
+    .limit(1);
+  if (user && !user.emailVerified) await queueEmailVerification(user);
 };
 
 export const authenticateUser = async ({ email, password }) => {
@@ -86,6 +146,13 @@ export const authenticateUser = async ({ email, password }) => {
       403,
       'ACCOUNT_DEACTIVATED',
       'This account is deactivated'
+    );
+  }
+  if (!user.emailVerified) {
+    throw new AppError(
+      403,
+      'EMAIL_VERIFICATION_REQUIRED',
+      'Verify your email address before signing in'
     );
   }
   return {
@@ -133,7 +200,8 @@ export const findActiveSession = async ({ userId, sessionId }) => {
         eq(authSessions.user_id, userId),
         isNull(authSessions.revoked_at),
         gt(authSessions.expires_at, new Date()),
-        eq(users.is_active, true)
+        eq(users.is_active, true),
+        eq(users.email_verified, true)
       )
     )
     .limit(1);
@@ -195,7 +263,13 @@ export const verifyEmail = async token => {
       UPDATE users SET email_verified = true, updated_at = now()
       WHERE id = (SELECT user_id FROM consumed)
       RETURNING id
-    ) SELECT id FROM updated
+    ), revoked AS (
+      UPDATE auth_sessions AS session SET revoked_at = now()
+      FROM updated
+      WHERE session.user_id = updated.id AND session.revoked_at IS NULL
+      RETURNING session.id
+    ) SELECT updated.id FROM updated
+      LEFT JOIN (SELECT count(*) FROM revoked) AS revoked_count ON true
   `);
   if (!extractRows(result).length) throw invalidToken();
 };

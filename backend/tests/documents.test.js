@@ -16,6 +16,10 @@ vi.mock(
   '../src/models/user.model.js',
   async () => (await import('./helpers/mock-database.js')).modelTables
 );
+vi.mock(
+  '../src/models/phase6.model.js',
+  async () => (await import('./helpers/mock-database.js')).phase6Tables
+);
 vi.mock('../src/models/listing.model.js', async () => ({
   businessListings: (await import('./helpers/mock-database.js')).modelTables
     .businessListings,
@@ -49,6 +53,7 @@ const [{ default: app }, mock, storage] = await Promise.all([
   import('../src/services/document-storage.service.js'),
 ]);
 const password = 'A-strong-test-password-42';
+const { attachVerifiedSession } = await import('./helpers/verified-session.js');
 const credentials = response => ({
   cookie: response.headers['set-cookie']
     .map(value => value.split(';')[0])
@@ -65,12 +70,21 @@ let stored;
 let failStorageRemoval = false;
 let failStorageUpload = false;
 let failStorageDownload = false;
-const createUser = async (role, email) =>
-  credentials(
-    await request(app)
-      .post('/api/auth/sign-up')
-      .send({ name: role, email, password, role })
+const createUser = async (role, email) => {
+  const response = await request(app)
+    .post('/api/auth/sign-up')
+    .send({ name: role, email, password, role });
+  return credentials(
+    await attachVerifiedSession(
+      app,
+      request,
+      response,
+      email,
+      password,
+      mock.databaseState
+    )
   );
+};
 
 beforeEach(async () => {
   mock.resetDatabase();

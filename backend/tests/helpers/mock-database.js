@@ -656,6 +656,10 @@ export const db = {
       if (authMarker === 'verify-email') {
         user.email_verified = true;
         user.updated_at = new Date();
+        for (const session of databaseState.auth_sessions.filter(
+          row => row.user_id === user.id && row.revoked_at == null
+        ))
+          session.revoked_at = new Date();
       } else {
         user.password = passwordHash;
         user.updated_at = new Date();

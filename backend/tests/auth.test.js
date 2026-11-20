@@ -18,6 +18,11 @@ vi.mock('../src/models/user.model.js', async () => {
   return modelTables;
 });
 
+vi.mock('../src/models/phase6.model.js', async () => {
+  const { phase6Tables } = await import('./helpers/mock-database.js');
+  return phase6Tables;
+});
+
 vi.mock('../src/models/listing.model.js', async () => {
   const { modelTables } = await import('./helpers/mock-database.js');
   return { businessListings: modelTables.businessListings };
@@ -59,8 +64,30 @@ const buyerRegistration = overrides => ({
   ...overrides,
 });
 
-const register = (overrides = {}) =>
+const rawRegister = (overrides = {}) =>
   request(app).post('/api/auth/sign-up').send(buyerRegistration(overrides));
+const { decryptVerificationToken } =
+  await import('../src/services/auth.service.js');
+const register = async (overrides = {}) => {
+  const response = await rawRegister(overrides);
+  const event = mockDatabase.databaseState.outbox_events.at(-1);
+  if (event) {
+    await request(app)
+      .post('/api/auth/verify-email')
+      .send({
+        token: decryptVerificationToken(event.payload.encryptedToken),
+      });
+    const login = await request(app)
+      .post('/api/auth/sign-in')
+      .send({
+        email: buyerRegistration(overrides).email,
+        password: validPassword,
+      });
+    response.headers['set-cookie'] = login.headers['set-cookie'];
+    response.body.csrfToken = login.body.csrfToken;
+  }
+  return response;
+};
 
 const cookieCredentials = response => {
   const setCookie = response.headers['set-cookie'];
@@ -86,10 +113,11 @@ describe('registration', () => {
   it('registers a buyer and does not return a password hash', async () => {
     const response = await register();
 
-    expect(response.status).toBe(201);
-    expect(response.body.user.role).toBe('buyer');
-    expect(response.body.user).not.toHaveProperty('password');
-    expect(response.body.user).not.toHaveProperty('passwordHash');
+    expect(response.status).toBe(202);
+    expect(response.body.email).toBe('buyer@example.test');
+    expect(response.body).not.toHaveProperty('user');
+    expect(response.body).not.toHaveProperty('verificationToken');
+    expect(mockDatabase.databaseState.users[0].role).toBe('buyer');
     expect(mockDatabase.databaseState.users[0].password).not.toBe(
       validPassword
     );
@@ -102,8 +130,8 @@ describe('registration', () => {
       name: 'Test Seller',
     });
 
-    expect(response.status).toBe(201);
-    expect(response.body.user.role).toBe('seller');
+    expect(response.status).toBe(202);
+    expect(mockDatabase.databaseState.users[0].role).toBe('seller');
   });
 
   it('rejects invalid email, weak password, missing fields, and admin role input', async () => {
@@ -121,16 +149,31 @@ describe('registration', () => {
     expect(mockDatabase.databaseState.users).toHaveLength(0);
   });
 
-  it('returns conflict for duplicate email registrations', async () => {
+  it('uses a generic response for duplicate email registrations', async () => {
     await register();
     const duplicate = await register({ name: 'Second Account' });
 
-    expect(duplicate.status).toBe(409);
-    expect(duplicate.body.error.code).toBe('EMAIL_ALREADY_REGISTERED');
+    expect(duplicate.status).toBe(202);
+    expect(duplicate.body.message).toContain(
+      'If registration can be completed'
+    );
   });
 });
 
 describe('login and authentication', () => {
+  it('does not create a session for unverified registration and blocks sign in', async () => {
+    const response = await rawRegister();
+    const signin = await request(app)
+      .post('/api/auth/sign-in')
+      .send({ email: 'buyer@example.test', password: validPassword });
+    expect(response.status).toBe(202);
+    expect(response.headers['set-cookie']).toBeUndefined();
+    expect(response.body).not.toHaveProperty('verificationToken');
+    expect(mockDatabase.databaseState.auth_sessions).toHaveLength(0);
+    expect(signin.status).toBe(403);
+    expect(signin.body.error.code).toBe('EMAIL_VERIFICATION_REQUIRED');
+  });
+
   it('logs in with correct credentials and sets secure session cookies', async () => {
     await register();
     const response = await request(app)
@@ -344,9 +387,59 @@ describe('user profile and deactivation', () => {
 });
 
 describe('email verification', () => {
-  it('verifies a valid token and prevents reuse', async () => {
+  it('revokes an older unverified cookie session when verification succeeds', async () => {
     const registration = await register();
-    const token = registration.body.verificationToken;
+    const credentials = cookieCredentials(registration);
+    mockDatabase.databaseState.users[0].email_verified = false;
+    const blocked = await request(app)
+      .get('/api/auth/me')
+      .set('Cookie', credentials.cookieHeader);
+    const resend = await request(app)
+      .post('/api/auth/resend-verification')
+      .send({ email: 'buyer@example.test' });
+    const token = decryptVerificationToken(
+      mockDatabase.databaseState.outbox_events.at(-1).payload.encryptedToken
+    );
+    const verification = await request(app)
+      .post('/api/auth/verify-email')
+      .send({ token });
+    const afterVerification = await request(app)
+      .get('/api/auth/me')
+      .set('Cookie', credentials.cookieHeader);
+    expect(blocked.status).toBe(401);
+    expect(resend.status).toBe(200);
+    expect(verification.status).toBe(200);
+    expect(
+      mockDatabase.databaseState.auth_sessions[0].revoked_at
+    ).toBeInstanceOf(Date);
+    expect(afterVerification.status).toBe(401);
+  });
+
+  it('resends with an enumeration-safe response and invalidates the prior token', async () => {
+    await rawRegister();
+    const oldToken = decryptVerificationToken(
+      mockDatabase.databaseState.outbox_events[0].payload.encryptedToken
+    );
+    const response = await request(app)
+      .post('/api/auth/resend-verification')
+      .send({ email: 'buyer@example.test' });
+    const unknown = await request(app)
+      .post('/api/auth/resend-verification')
+      .send({ email: 'unknown@example.test' });
+    expect(response.status).toBe(200);
+    expect(response.body.message).toBe(unknown.body.message);
+    expect(response.body).not.toHaveProperty('token');
+    const stale = await request(app)
+      .post('/api/auth/verify-email')
+      .send({ token: oldToken });
+    expect(stale.status).toBe(400);
+  });
+
+  it('verifies a valid token and prevents reuse', async () => {
+    await rawRegister();
+    const token = decryptVerificationToken(
+      mockDatabase.databaseState.outbox_events[0].payload.encryptedToken
+    );
     const firstUse = await request(app)
       .post('/api/auth/verify-email')
       .send({ token });
@@ -363,25 +456,31 @@ describe('email verification', () => {
     const invalid = await request(app)
       .post('/api/auth/verify-email')
       .send({ token: 'x'.repeat(40) });
-    const registration = await register();
+    await rawRegister();
+    const token = decryptVerificationToken(
+      mockDatabase.databaseState.outbox_events[0].payload.encryptedToken
+    );
     mockDatabase.databaseState.auth_tokens[0].expires_at = new Date(0);
     const expired = await request(app)
       .post('/api/auth/verify-email')
-      .send({ token: registration.body.verificationToken });
+      .send({ token });
 
     expect(invalid.status).toBe(400);
     expect(expired.status).toBe(400);
   });
 
   it('does not consume a verification token if the user update fails', async () => {
-    const registration = await register();
+    await rawRegister();
     const tokenRow = mockDatabase.databaseState.auth_tokens[0];
+    const token = decryptVerificationToken(
+      mockDatabase.databaseState.outbox_events[0].payload.encryptedToken
+    );
     mockDatabase.databaseState.failNext = new Error('simulated update failure');
     mockDatabase.databaseState.failOn = { table: 'users', operation: 'update' };
 
     const response = await request(app)
       .post('/api/auth/verify-email')
-      .send({ token: registration.body.verificationToken });
+      .send({ token });
 
     expect(response.status).toBe(500);
     expect(tokenRow.consumed_at).toBeNull();

@@ -88,13 +88,17 @@ export function signIn(input: SignInInput): Promise<AuthUser> {
   });
 }
 
-export function signUp(input: SignUpInput): Promise<AuthResponse> {
+export function signUp(input: SignUpInput): Promise<RegistrationResponse> {
   return serializeAuthTransition(async () => {
-    const { data } = await apiClient.post<AuthResponse>("/auth/sign-up", input);
-    setCsrfToken(data.csrfToken);
+    const { data } = await apiClient.post<RegistrationResponse>(
+      "/auth/sign-up",
+      input,
+    );
     return data;
   });
 }
+
+export type RegistrationResponse = { message: string; email: string };
 
 export function signOut(): Promise<MessageResponse> {
   return serializeAuthTransition(() =>
@@ -126,6 +130,14 @@ export async function verifyEmail(token: string) {
   const { data } = await apiClient.post<MessageResponse>("/auth/verify-email", {
     token,
   });
+  return data;
+}
+
+export async function resendEmailVerification(email: string) {
+  const { data } = await apiClient.post<MessageResponse>(
+    "/auth/resend-verification",
+    { email },
+  );
   return data;
 }
 

@@ -37,8 +37,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
   const signUpMutation = useMutation({
     mutationFn: signUpRequest,
-    onSuccess: (response) =>
-      queryClient.setQueryData(authQueryKeys.session, response.user),
   });
   const signOutMutation = useMutation({
     mutationFn: signOutRequest,
@@ -78,8 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [signInAsync],
   );
   const register = useCallback(
-    async (input: Parameters<typeof signUpAsync>[0]) =>
-      (await signUpAsync(input)).user,
+    async (input: Parameters<typeof signUpAsync>[0]) => signUpAsync(input),
     [signUpAsync],
   );
   const logout = useCallback(async () => {

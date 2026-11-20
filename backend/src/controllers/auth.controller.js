@@ -1,10 +1,11 @@
 import { getEnvironment } from '#config/env.js';
 import {
   authenticateUser,
-  createEmailVerificationToken,
   createSession,
   csrfTokenForSession,
   registerUser,
+  requestEmailVerification,
+  queueEmailVerification,
   requestPasswordReset,
   resetPassword,
   revokeSession,
@@ -28,15 +29,11 @@ const startSession = async (user, res) => {
 export const signup = async (req, res) => {
   const input = signupSchema.parse(req.body);
   const user = await registerUser(input);
-  const session = await startSession(user, res);
-  const verificationToken = await createEmailVerificationToken(user.id);
-  const { NODE_ENV } = getEnvironment();
-
-  res.status(201).json({
-    message: 'Account created. Email verification is pending.',
-    user,
-    csrfToken: session.csrfToken,
-    ...(NODE_ENV !== 'production' ? { verificationToken } : {}),
+  if (user) await queueEmailVerification(user);
+  res.status(202).json({
+    message:
+      'If registration can be completed, a verification email will be sent.',
+    email: input.email,
   });
 };
 
@@ -65,6 +62,15 @@ export const verifyEmailAddress = async (req, res) => {
   const { token } = tokenSchema.parse(req.body);
   await verifyEmail(token);
   res.status(200).json({ message: 'Email verified' });
+};
+
+export const resendEmailVerification = async (req, res) => {
+  const { email } = forgotPasswordSchema.parse(req.body);
+  await requestEmailVerification(email);
+  res.status(200).json({
+    message:
+      'If an unverified account exists for this email, a verification email will be sent.',
+  });
 };
 
 export const forgotPassword = async (req, res) => {

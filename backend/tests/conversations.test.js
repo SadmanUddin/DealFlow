@@ -14,6 +14,10 @@ vi.mock(
   '../src/models/user.model.js',
   async () => (await import('./helpers/mock-database.js')).modelTables
 );
+vi.mock(
+  '../src/models/phase6.model.js',
+  async () => (await import('./helpers/mock-database.js')).phase6Tables
+);
 vi.mock('../src/models/listing.model.js', async () => ({
   businessListings: (await import('./helpers/mock-database.js')).modelTables
     .businessListings,
@@ -47,6 +51,7 @@ const [{ default: app }, mock] = await Promise.all([
 ]);
 
 const password = 'A-strong-test-password-42';
+const { attachVerifiedSession } = await import('./helpers/verified-session.js');
 const listingInput = {
   title: 'Established manufacturing business',
   description: 'A profitable operation with a long operating history.',
@@ -57,10 +62,19 @@ const listingInput = {
   ebitda: '180000.00',
   currency: 'EUR',
 };
-const signUp = async (role, email) =>
-  request(app)
+const signUp = async (role, email) => {
+  const response = await request(app)
     .post('/api/auth/sign-up')
     .send({ name: `Test ${role}`, email, password, role });
+  return attachVerifiedSession(
+    app,
+    request,
+    response,
+    email,
+    password,
+    mock.databaseState
+  );
+};
 const credentialsFor = response => ({
   cookie: (response.headers['set-cookie'] ?? [])
     .map(value => value.split(';')[0])

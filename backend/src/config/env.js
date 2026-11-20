@@ -36,6 +36,7 @@ const environmentSchema = z
           }),
         'CORS_ORIGINS must be a comma-separated list of origins'
       ),
+    FRONTEND_URL: z.url().optional(),
     DOCUMENT_STORAGE_DRIVER: z.enum(['r2', 'mock']).default('mock'),
     R2_ACCOUNT_ID: z.string().optional(),
     R2_ACCESS_KEY_ID: z.string().optional(),

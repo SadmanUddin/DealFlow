@@ -15,7 +15,7 @@ import {
 import { RequireAuth } from "./RouteGuards";
 import { AccountPage } from "@/features/account/AccountPage";
 import { SiteHeader } from "@/components/shared/SiteHeader";
-import type { AuthResponse, AuthUser, UserProfile } from "./types";
+import type { AuthUser, UserProfile } from "./types";
 
 const apiMocks = vi.hoisted(() => ({
   restoreSession: vi.fn(),
@@ -150,16 +150,18 @@ describe("authentication pages", () => {
 
   it("validates registration confirmation and registers with the backend role contract", async () => {
     const user = userEvent.setup();
-    const response: AuthResponse = {
-      user: { ...buyer, emailVerified: false },
-      csrfToken: "csrf-value",
+    const response = {
       message: "Account created. Email verification is pending.",
+      email: "alex@example.com",
     };
     apiMocks.signUp.mockResolvedValueOnce(response);
     renderApp(
       <Routes>
         <Route path="/register" element={<RegisterPage />} />
-        <Route path="/account" element={<p>Registration complete</p>} />
+        <Route
+          path="/verify-email"
+          element={<p>Verification email sent to Alex</p>}
+        />
       </Routes>,
       "/register",
     );
@@ -187,7 +189,7 @@ describe("authentication pages", () => {
     );
     await user.click(screen.getByRole("button", { name: "Create account" }));
     expect(
-      await screen.findByText("Registration complete"),
+      await screen.findByText("Verification email sent to Alex"),
     ).toBeInTheDocument();
     expect(apiMocks.signUp.mock.calls[0]?.[0]).toEqual({
       name: "Alex Buyer",
@@ -195,6 +197,31 @@ describe("authentication pages", () => {
       password: "long-secure-password",
       role: "seller",
     });
+  });
+
+  it("shows the verification completion message and requires explicit sign in", async () => {
+    const user = userEvent.setup();
+    apiMocks.verifyEmail.mockResolvedValueOnce({ message: "Email verified" });
+    renderApp(
+      <Routes>
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
+        <Route path="/login" element={<p>Sign in destination</p>} />
+      </Routes>,
+      "/verify-email?token=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&email=alex%40example.com",
+    );
+    await user.click(
+      await screen.findByRole("button", { name: "Verify email" }),
+    );
+    expect(
+      await screen.findByText("Your account has been successfully verified!"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Your DealFlow registration is complete. You can now sign in to access your account.",
+      ),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("link", { name: "Sign in" }));
+    expect(await screen.findByText("Sign in destination")).toBeInTheDocument();
   });
 });
 
@@ -225,7 +252,10 @@ describe("session and route access", () => {
   it("keeps session restoration to one request under React StrictMode", async () => {
     apiMocks.restoreSession.mockResolvedValueOnce(buyer);
     const queryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
     });
     render(
       <StrictMode>
@@ -500,7 +530,7 @@ describe("backend-supported recovery and verification forms", () => {
       await screen.findByRole("button", { name: "Verify email" }),
     );
     expect(await screen.findByRole("status")).toHaveTextContent(
-      "Email verified.",
+      "Your account has been successfully verified!",
     );
     expect(apiMocks.verifyEmail.mock.calls[0]?.[0]).toBe(
       "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
