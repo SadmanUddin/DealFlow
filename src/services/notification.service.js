@@ -33,8 +33,8 @@ export const deleteNotification = async (userId, id) => {
   return { deleted: true };
 };
 
-const defaults = { listingStatus: true, listingPrice: true, listingDetails: true };
-const fields = { user_id: notificationEmailPreferences.user_id, listingStatus: notificationEmailPreferences.listing_status, listingPrice: notificationEmailPreferences.listing_price, listingDetails: notificationEmailPreferences.listing_details, updatedAt: notificationEmailPreferences.updated_at };
+const defaults = { listingStatus: true, listingPrice: true, listingDetails: true, dealUpdates: true };
+const fields = { user_id: notificationEmailPreferences.user_id, listingStatus: notificationEmailPreferences.listing_status, listingPrice: notificationEmailPreferences.listing_price, listingDetails: notificationEmailPreferences.listing_details, dealUpdates: notificationEmailPreferences.deal_updates, updatedAt: notificationEmailPreferences.updated_at };
 export const getEmailPreferences = async userId => {
   const [preferences] = await db.select(fields).from(notificationEmailPreferences).where(eq(notificationEmailPreferences.user_id, userId)).limit(1);
   return { preferences: preferences ?? defaults };
@@ -45,11 +45,13 @@ export const updateEmailPreferences = async (userId, input) => {
     ...(input.listingStatus === undefined ? {} : { listing_status: input.listingStatus }),
     ...(input.listingPrice === undefined ? {} : { listing_price: input.listingPrice }),
     ...(input.listingDetails === undefined ? {} : { listing_details: input.listingDetails }),
+    ...(input.dealUpdates === undefined ? {} : { deal_updates: input.dealUpdates }),
   };
   const updates = {
     ...(input.listingStatus === undefined ? {} : { listing_status: input.listingStatus }),
     ...(input.listingPrice === undefined ? {} : { listing_price: input.listingPrice }),
     ...(input.listingDetails === undefined ? {} : { listing_details: input.listingDetails }),
+    ...(input.dealUpdates === undefined ? {} : { deal_updates: input.dealUpdates }),
     updated_at: new Date(),
   };
   const [preferences] = await db.insert(notificationEmailPreferences).values(values).onConflictDoUpdate({ target: notificationEmailPreferences.user_id, set: updates }).returning(fields);

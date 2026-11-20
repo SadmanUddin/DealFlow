@@ -15,6 +15,7 @@ import favoriteRoutes from './routes/favorite.routes.js';
 import notificationRoutes from './routes/notification.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import reportRoutes from './routes/report.routes.js';
+import dealRoutes from './routes/deal.routes.js';
 import { randomUUID } from 'node:crypto';
 import { optionalAuthentication } from '#middleware/auth.middleware.js';
 import {
@@ -86,6 +87,7 @@ app.use('/api/admin/listings', adminListingRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/conversations', conversationRoutes);
+app.use('/api/deals', dealRoutes);
 app.use('/api/favorites', favoriteRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/conversations/:conversationId/documents', documentRoutes);

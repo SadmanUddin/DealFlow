@@ -32,6 +32,7 @@ export const notificationEmailPreferences = pgTable('notification_email_preferen
   listing_status: boolean('listing_status').notNull().default(true),
   listing_price: boolean('listing_price').notNull().default(true),
   listing_details: boolean('listing_details').notNull().default(true),
+  deal_updates: boolean('deal_updates').notNull().default(true),
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 

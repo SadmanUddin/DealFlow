@@ -98,7 +98,39 @@ const processListingEvent = async (event, assertLease) => {
   }
 };
 
+const processDealEvent = async (event, assertLease) => {
+  const payload = event.payload;
+  if (!payload || !Number.isSafeInteger(Number(payload.dealId)) || !Array.isArray(payload.recipientIds)) {
+    const error = new Error('Invalid deal event payload');
+    error.permanent = true;
+    throw error;
+  }
+  if (!payload.recipientIds.length) return;
+  const recipients = await db.select({ id: users.id, email: users.email, verified: users.email_verified, dealUpdates: notificationEmailPreferences.deal_updates })
+    .from(users).leftJoin(notificationEmailPreferences, eq(notificationEmailPreferences.user_id, users.id))
+    .where(and(inArray(users.id, payload.recipientIds), eq(users.is_active, true)));
+  for (const recipient of recipients) {
+    if (recipient.verified && recipient.email && recipient.dealUpdates !== false) {
+      await assertLease();
+      try {
+        await sendEmail({
+          to: recipient.email,
+          subject: 'DealFlow deal update',
+          text: `There is a new update for deal ${payload.dealId}: ${event.type.replaceAll('.', ' ')}. Sign in to DealFlow to review it.`,
+          html: `<p>There is a new update for deal ${payload.dealId}: ${event.type.replaceAll('.', ' ')}.</p><p>Sign in to DealFlow to review it.</p>`,
+          idempotencyKey: `${event.eventKey}:email:${recipient.id}`,
+          signal: event.signal,
+        });
+      } catch (error) {
+        if (error.permanent) continue;
+        throw error;
+      }
+    }
+  }
+};
+
 export const processOutboxEvent = async (event, { assertLease = async () => {} } = {}) => {
+  if (event.type.startsWith('deal.')) return processDealEvent(event, assertLease);
   if (!event.type.startsWith('listing.')) {
     const error = new Error('Unsupported outbox event type');
     error.permanent = true;

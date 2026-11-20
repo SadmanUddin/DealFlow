@@ -75,7 +75,7 @@ export const modelTables = {
   ]),
   favorites: table('favorites', ['id', 'user_id', 'listing_id', 'created_at']),
   notifications: table('notifications', ['id', 'user_id', 'dedupe_key', 'type', 'payload', 'read_at', 'created_at']),
-  notificationEmailPreferences: table('notification_email_preferences', ['user_id', 'listing_status', 'listing_price', 'listing_details', 'updated_at']),
+  notificationEmailPreferences: table('notification_email_preferences', ['user_id', 'listing_status', 'listing_price', 'listing_details', 'deal_updates', 'updated_at']),
   outboxEvents: table('outbox_events', ['id', 'event_key', 'type', 'payload', 'status', 'attempts', 'available_at', 'locked_at', 'lock_token', 'last_error', 'processed_at', 'quarantined_at', 'quarantine_reason', 'created_at']),
   moderationReports: table('moderation_reports', ['id', 'reporter_id', 'listing_id', 'reported_user_id', 'category', 'description', 'status', 'moderator_notes', 'resolution_reason', 'assigned_to', 'resolved_by', 'created_at', 'updated_at', 'resolved_at']),
   adminAuditLogs: table('admin_audit_logs', ['id', 'actor_id', 'action', 'target_type', 'target_id', 'reason', 'before_state', 'after_state', 'request_id', 'created_at']),
@@ -163,7 +163,9 @@ export const drizzleOperators = {
   or: (...conditions) => ({ operator: 'or', conditions }),
   desc: column => ({ operator: 'desc', column }),
   asc: column => ({ operator: 'asc', column }),
-  sql: (strings, ...values) => ({ __sql: strings.join('?'), values }),
+  sql: Object.assign((strings, ...values) => ({ __sql: strings.join('?'), values }), {
+    raw: value => ({ __sql: value, values: [] }),
+  }),
 };
 
 const tableRows = target => databaseState[target.__name];
