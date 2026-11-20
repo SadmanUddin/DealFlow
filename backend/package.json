@@ -1,0 +1,75 @@
+{
+  "name": "dealflow",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "imports": {
+    "#config/*": "./src/config/*",
+    "#controllers/*": "./src/controllers/*",
+    "#middleware/*": "./src/middleware/*",
+    "#models/*": "./src/models/*",
+    "#routes/*": "./src/routes/*",
+    "#services/*": "./src/services/*",
+    "#utils/*": "./src/utils/*",
+    "#validations/*": "./src/validations/*"
+  },
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "worker": "node src/worker.js",
+    "admin:bootstrap": "node scripts/bootstrap-admin.js",
+    "admin:recovery-token": "node scripts/admin-recovery-token.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run --exclude '**/integration/**'",
+    "test:integration": "node scripts/test-neon-integration.js",
+    "test:integration:phase4": "node scripts/test-phase4-neon-integration.js",
+    "test:integration:phase6": "node scripts/test-phase6-neon-integration.js",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:migrate:test": "drizzle-kit migrate --config=drizzle.test.config.js",
+    "db:studio": "drizzle-kit studio"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SadmanUddin/DealFlow.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/SadmanUddin/DealFlow/issues"
+  },
+  "homepage": "https://github.com/SadmanUddin/DealFlow#readme",
+  "dependencies": {
+    "@arcjet/inspect": "^1.15.0",
+    "@arcjet/node": "^1.15.0",
+    "@aws-sdk/client-s3": "^3.1169.0",
+    "@aws-sdk/lib-storage": "^3.1170.0",
+    "@neondatabase/serverless": "^1.2.0",
+    "bcrypt": "^6.0.0",
+    "busboy": "^1.6.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.9",
+    "drizzle-orm": "^0.45.4",
+    "express": "^5.3.0",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "morgan": "^1.12.1",
+    "winston": "^3.19.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "drizzle-kit": "^0.31.11",
+    "eslint": "^10.14.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.7",
+    "prettier": "^3.9.10",
+    "supertest": "^7.3.2",
+    "vitest": "^5.1.0"
+  }
+}
