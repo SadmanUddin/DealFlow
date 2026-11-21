@@ -11,6 +11,7 @@ import {
   RequireGuest,
   UnauthorizedPage,
 } from "@/features/auth/RouteGuards";
+import { WorkspaceLayout } from "@/components/shared/workspace/WorkspaceLayout";
 
 const AccountPage = lazy(() =>
   import("@/features/account/AccountPage").then((module) => ({
@@ -40,6 +41,36 @@ const ResetPasswordPage = lazy(() =>
 const VerifyEmailPage = lazy(() =>
   import("@/features/auth/AuthPages").then((module) => ({
     default: module.VerifyEmailPage,
+  })),
+);
+const BuyerOverviewPage = lazy(() =>
+  import("@/features/buyer/BuyerOverviewPage").then((module) => ({
+    default: module.BuyerOverviewPage,
+  })),
+);
+const BuyerSavedPage = lazy(() =>
+  import("@/features/buyer/BuyerSavedPage").then((module) => ({
+    default: module.BuyerSavedPage,
+  })),
+);
+const BuyerOffersPage = lazy(() =>
+  import("@/features/buyer/BuyerOffersPage").then((module) => ({
+    default: module.BuyerOffersPage,
+  })),
+);
+const BuyerDealsPage = lazy(() =>
+  import("@/features/buyer/BuyerDealsPage").then((module) => ({
+    default: module.BuyerDealsPage,
+  })),
+);
+const BuyerNotificationsPage = lazy(() =>
+  import("@/features/buyer/BuyerNotificationsPage").then((module) => ({
+    default: module.BuyerNotificationsPage,
+  })),
+);
+const BuyerAnalyticsPage = lazy(() =>
+  import("@/features/buyer/BuyerAnalyticsPage").then((module) => ({
+    default: module.BuyerAnalyticsPage,
   })),
 );
 
@@ -104,6 +135,22 @@ const router = createBrowserRouter([
   },
   { path: "/reset-password", element: lazyPage(<ResetPasswordPage />) },
   { path: "/verify-email", element: lazyPage(<VerifyEmailPage />) },
+  {
+    path: "/buyer",
+    element: lazyPage(
+      <RequireAuth roles={["buyer"]}>
+        <WorkspaceLayout role="buyer" />
+      </RequireAuth>,
+    ),
+    children: [
+      { index: true, element: lazyPage(<BuyerOverviewPage />) },
+      { path: "saved", element: lazyPage(<BuyerSavedPage />) },
+      { path: "offers", element: lazyPage(<BuyerOffersPage />) },
+      { path: "deals", element: lazyPage(<BuyerDealsPage />) },
+      { path: "notifications", element: lazyPage(<BuyerNotificationsPage />) },
+      { path: "analytics", element: lazyPage(<BuyerAnalyticsPage />) },
+    ],
+  },
 ]);
 
 export function AppRouter() {
