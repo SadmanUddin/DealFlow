@@ -6,6 +6,7 @@ import {
   patchValidated,
   postValidated,
 } from "@/features/workspace/api-core";
+import { apiClient } from "@/lib/api-client";
 
 const money = z
   .string()
@@ -74,3 +75,69 @@ export const markNotificationRead = (id: number) =>
   patchValidated(`/notifications/${id}/read`, {}, notificationReadSchema);
 export const markAllNotificationsRead = () =>
   patchValidated("/notifications/read", {}, markAllSchema);
+
+const conversationSchema = z.object({
+  id: z.number().int().positive(),
+  listingId: z.number().int().positive(),
+  listingTitle: z.string(),
+  buyerId: z.number().int().positive(),
+  sellerId: z.number().int().positive(),
+  participantName: z.string().nullable(),
+  status: z.enum(["pending", "in_review", "accepted", "rejected", "closed"]),
+  statusUpdatedAt: z.string().or(z.date()),
+  createdAt: z.string().or(z.date()),
+  latestMessage: z.string().nullable(),
+  latestMessageAt: z.string().or(z.date()).nullable(),
+  unreadCount: z.number().int().nonnegative(),
+});
+export type BuyerConversation = z.infer<typeof conversationSchema>;
+const conversationPageSchema = z.object({
+  conversations: z.array(conversationSchema),
+  pagination: paginationSchema,
+});
+export const listBuyerConversations = (page = 1, limit = 100) =>
+  getValidated("/conversations", conversationPageSchema, { page, limit });
+export const startListingConversation = (listingId: number) =>
+  postValidated(
+    "/conversations",
+    { listingId },
+    z.object({ conversation: z.object({ id: z.number().int().positive() }) }),
+  );
+const conversationMessageSchema = z.object({
+  id: z.number().int().positive(),
+  conversationId: z.number().int().positive(),
+  senderId: z.number().int().positive(),
+  senderName: z.string().nullable().optional(),
+  content: z.string(),
+  createdAt: z.string().or(z.date()),
+  readAt: z.string().or(z.date()).nullable(),
+});
+const conversationMessagesSchema = z.object({
+  messages: z.array(conversationMessageSchema),
+  pagination: z.object({
+    limit: z.number().int().positive(),
+    hasMore: z.boolean(),
+    nextCursor: z.string().nullable(),
+  }),
+});
+export const listBuyerConversationMessages = (
+  id: number,
+  limit = 50,
+  cursor?: string,
+) =>
+  getValidated(`/conversations/${id}/messages`, conversationMessagesSchema, {
+    limit,
+    cursor,
+  });
+export const sendBuyerConversationMessage = (id: number, content: string) =>
+  postValidated(
+    `/conversations/${id}/messages`,
+    { content },
+    z.object({ message: conversationMessageSchema }),
+  );
+export const markBuyerConversationRead = (id: number) =>
+  patchValidated(
+    `/conversations/${id}/read`,
+    {},
+    z.object({ conversationId: z.number(), readCount: z.number() }),
+  );

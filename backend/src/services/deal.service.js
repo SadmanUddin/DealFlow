@@ -509,11 +509,11 @@ export const linkDealDocument = async (dealId, userId, documentId) => {
       SELECT deal_id, ${userId}, 'deal.document_linked', jsonb_build_object('documentId', conversation_document_id) FROM linked RETURNING id
     ), notice AS (
       INSERT INTO notifications(user_id, dedupe_key, type, payload)
-      SELECT ${userId === deal.buyer_id ? deal.seller_id : deal.buyer_id}, 'deal:' || ${dealId} || ':document:' || conversation_document_id, 'deal.document_added', jsonb_build_object('dealId', ${dealId}, 'documentId', conversation_document_id)
+      SELECT ${userId === deal.buyer_id ? deal.seller_id : deal.buyer_id}, 'deal:' || ${dealId} || ':document:' || conversation_document_id, 'deal.document_added', jsonb_build_object('dealId', ${dealId}::integer, 'documentId', conversation_document_id)
       FROM linked ON CONFLICT (dedupe_key) DO NOTHING RETURNING id
     ), email_event AS (
       INSERT INTO outbox_events(event_key, type, payload)
-      SELECT 'deal:' || ${dealId} || ':document:' || conversation_document_id, 'deal.document_added', jsonb_build_object('dealId', ${dealId}, 'documentId', conversation_document_id, 'recipientIds', jsonb_build_array(${userId === deal.buyer_id ? deal.seller_id : deal.buyer_id}))
+      SELECT 'deal:' || ${dealId} || ':document:' || conversation_document_id, 'deal.document_added', jsonb_build_object('dealId', ${dealId}::integer, 'documentId', conversation_document_id, 'recipientIds', jsonb_build_array(${userId === deal.buyer_id ? deal.seller_id : deal.buyer_id}::integer))
       FROM linked ON CONFLICT (event_key) DO NOTHING RETURNING id
     ) SELECT linked.* FROM linked CROSS JOIN activity`);
   const rows = Array.isArray(result) ? result : (result?.rows ?? []);
