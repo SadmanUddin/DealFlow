@@ -219,6 +219,7 @@ export function DealDetailPage() {
           </Link>
         </Button>
         <ErrorState
+          error={dealQuery.error}
           description="This deal could not be loaded. Access is limited to its participants."
           onRetry={() => void dealQuery.refetch()}
           title="Deal unavailable"
@@ -395,6 +396,7 @@ export function DealDetailPage() {
               ) : null}
               {offersQuery.isError ? (
                 <ErrorState
+                  error={offersQuery.error}
                   description="The offer history could not be loaded."
                   onRetry={() => void offersQuery.refetch()}
                   title="Offer history unavailable"
@@ -567,6 +569,7 @@ export function DealDetailPage() {
               ) : null}
               {activityQuery.isError ? (
                 <ErrorState
+                  error={activityQuery.error}
                   description="Deal activity could not be loaded."
                   onRetry={() => void activityQuery.refetch()}
                   title="Activity unavailable"

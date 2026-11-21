@@ -1,20 +1,22 @@
 import arcjet, { shield, detectBot } from '@arcjet/node';
 import { getEnvironment } from '#config/env.js';
-// import { isSpoofedBot } from "@arcjet/inspect";
-// import express from "express";
 
-// const app = express();
-// const port = 3000;
+const environment = getEnvironment();
+const mode = environment.NODE_ENV === 'production' ? 'LIVE' : 'DRY_RUN';
+const trustedProxies = environment.ARCJET_TRUSTED_PROXIES.split(',')
+  .map(proxy => proxy.trim())
+  .filter(Boolean);
 
 const aj = arcjet({
-  key: getEnvironment().ARCJET_KEY,
+  key: environment.ARCJET_KEY,
+  characteristics: ['userId', 'accountKey'],
+  ...(trustedProxies.length ? { proxies: trustedProxies } : {}),
   rules: [
     shield({
-      mode: 'LIVE',
+      mode,
     }),
-    // Create a bot detection rule
     detectBot({
-      mode: 'LIVE',
+      mode,
       allow: ['CATEGORY:SEARCH_ENGINE', 'CATEGORY:PREVIEW'],
     }),
   ],

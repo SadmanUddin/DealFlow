@@ -152,6 +152,7 @@ export function SellerInquiryDetailPage() {
   if (inquiryQuery.isError)
     return (
       <ErrorState
+        error={inquiryQuery.error}
         description="The inquiry could not be opened."
         onRetry={() => void inquiryQuery.refetch()}
         title="Inquiry unavailable"
@@ -209,6 +210,7 @@ export function SellerInquiryDetailPage() {
             ) : null}
             {messagesQuery.isError ? (
               <ErrorState
+                error={messagesQuery.error}
                 description="Messages could not be loaded."
                 onRetry={() => void messagesQuery.refetch()}
                 title="Conversation unavailable"
@@ -296,6 +298,7 @@ export function SellerInquiryDetailPage() {
             ) : null}
             {documentsQuery.isError ? (
               <ErrorState
+                error={documentsQuery.error}
                 description="Documents could not be loaded."
                 onRetry={() => void documentsQuery.refetch()}
                 title="Documents unavailable"

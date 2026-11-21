@@ -19,7 +19,7 @@ export function SellerInquiriesPage() {
   const query = useQuery({
     queryKey: ["seller", "inquiries", page, 20],
     queryFn: () => listInquiries(page, 20),
-    staleTime: 10_000,
+    staleTime: 45_000,
   });
   const inquiries = useMemo(
     () => query.data?.conversations ?? [],
@@ -46,6 +46,7 @@ export function SellerInquiriesPage() {
       {query.isPending ? <WorkspaceSkeleton rows={3} /> : null}
       {query.isError ? (
         <ErrorState
+          error={query.error}
           description="Your inquiry list could not be loaded."
           onRetry={() => void query.refetch()}
           title="Inquiries unavailable"

@@ -48,17 +48,17 @@ export function SellerAnalyticsPage() {
   const listingsQuery = useQuery({
     queryKey: ["seller", "listings", 1, 100],
     queryFn: () => listMyListings(1, 100),
-    staleTime: 20_000,
+    staleTime: 45_000,
   });
   const inquiriesQuery = useQuery({
     queryKey: ["seller", "inquiries", 1, 100],
     queryFn: () => listInquiries(1, 100),
-    staleTime: 20_000,
+    staleTime: 45_000,
   });
   const dealsQuery = useQuery({
     queryKey: ["deals", "mine", 1, 20],
     queryFn: () => listDeals(1, 20),
-    staleTime: 20_000,
+    staleTime: 45_000,
   });
   const deals = useMemo(
     () => dealsQuery.data?.deals ?? [],
@@ -130,6 +130,9 @@ export function SellerAnalyticsPage() {
       {pending ? <WorkspaceSkeleton rows={3} /> : null}
       {failed ? (
         <ErrorState
+          error={
+            listingsQuery.error ?? inquiriesQuery.error ?? dealsQuery.error
+          }
           description="Some seller analytics could not be loaded."
           onRetry={() => {
             void listingsQuery.refetch();

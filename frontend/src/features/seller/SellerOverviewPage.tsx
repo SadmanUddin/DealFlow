@@ -25,17 +25,17 @@ export function SellerOverviewPage() {
   const listings = useQuery({
     queryKey: ["seller", "listings", 1, 100],
     queryFn: () => listMyListings(1, 100),
-    staleTime: 15_000,
+    staleTime: 45_000,
   });
   const inquiries = useQuery({
     queryKey: ["seller", "inquiries", 1, 100],
     queryFn: () => listInquiries(1, 100),
-    staleTime: 15_000,
+    staleTime: 45_000,
   });
   const deals = useQuery({
     queryKey: ["deals", "mine", 1, 20],
     queryFn: () => listDeals(1, 20),
-    staleTime: 15_000,
+    staleTime: 45_000,
   });
   const dealRows = useMemo(() => deals.data?.deals ?? [], [deals.data?.deals]);
   const offerQueries = useQueries({
@@ -81,6 +81,7 @@ export function SellerOverviewPage() {
       {loading ? <WorkspaceSkeleton rows={3} /> : null}
       {failed ? (
         <ErrorState
+          error={listings.error ?? inquiries.error ?? deals.error}
           description="Some seller workspace data could not be loaded."
           onRetry={() => {
             void listings.refetch();

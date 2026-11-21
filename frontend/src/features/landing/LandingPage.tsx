@@ -175,7 +175,7 @@ export function LandingPage() {
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Button asChild size="lg" variant="accent">
-                <Link to="/buyers">
+                <Link to="/marketplace">
                   I’m looking to buy
                   <ArrowUpRight aria-hidden="true" size={16} />
                 </Link>
@@ -320,7 +320,7 @@ export function LandingPage() {
               </div>
               <div className="flex shrink-0 flex-col gap-3 sm:flex-row">
                 <Button asChild className="bg-white text-emerald-900 hover:bg-emerald-50" size="lg">
-                  <Link to="/buyers">
+                  <Link to="/marketplace">
                     For buyers <ArrowUpRight aria-hidden="true" size={16} />
                   </Link>
                 </Button>

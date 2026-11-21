@@ -29,7 +29,7 @@ export function BuyerDealsPage() {
   const dealsQuery = useQuery({
     queryKey: ["deals", "mine", page, 10],
     queryFn: () => listDeals(page, 10),
-    staleTime: 15_000,
+    staleTime: 45_000,
   });
   const deals = useMemo(
     () => dealsQuery.data?.deals ?? [],
@@ -64,6 +64,7 @@ export function BuyerDealsPage() {
       {dealsQuery.isPending ? <WorkspaceSkeleton rows={2} /> : null}
       {dealsQuery.isError ? (
         <ErrorState
+          error={dealsQuery.error}
           description="Your deal pipeline could not be loaded."
           onRetry={() => void dealsQuery.refetch()}
           title="Deals unavailable"

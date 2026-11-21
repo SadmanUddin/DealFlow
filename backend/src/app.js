@@ -31,11 +31,25 @@ const allowedOrigins = getEnvironment()
   .CORS_ORIGINS.split(',')
   .map(origin => origin.trim())
   .filter(Boolean);
+const trustedProxies = getEnvironment()
+  .ARCJET_TRUSTED_PROXIES.split(',')
+  .map(proxy => proxy.trim())
+  .filter(Boolean);
+
+// Only trust forwarding headers from explicitly configured proxy addresses.
+// The default is a direct connection; arbitrary X-Forwarded-For values are ignored.
+app.set('trust proxy', trustedProxies.length ? trustedProxies : false);
 
 app.use(helmet());
 app.use(
   cors({
     credentials: true,
+    exposedHeaders: [
+      'Retry-After',
+      'RateLimit',
+      'RateLimit-Policy',
+      'X-Request-Id',
+    ],
     origin(origin, callback) {
       if (!origin || allowedOrigins.includes(origin))
         return callback(null, true);
@@ -81,13 +95,12 @@ app.get('/health', (req, res) => {
     uptime: process.uptime(),
   });
 });
+app.use(securityMiddleware);
 app.get('/api', (req, res) => {
   res.status(200).json({
     message: 'DealFLow api is running!',
   });
 });
-
-app.use(securityMiddleware);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/listings', listingRoutes);

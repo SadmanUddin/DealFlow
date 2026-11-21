@@ -28,17 +28,17 @@ export function BuyerOverviewPage() {
   const savedQuery = useQuery({
     queryKey: ["buyer", "favorites", 1, 100],
     queryFn: () => listFavorites(1, 100),
-    staleTime: 20_000,
+    staleTime: 45_000,
   });
   const dealsQuery = useQuery({
     queryKey: ["deals", "mine", 1, 100],
     queryFn: () => listDeals(1, 100),
-    staleTime: 20_000,
+    staleTime: 45_000,
   });
   const notificationQuery = useQuery({
     queryKey: ["buyer", "notifications", "unread", 1],
     queryFn: () => listNotifications(1, 1, true),
-    staleTime: 10_000,
+    staleTime: 15_000,
   });
   const isPending =
     savedQuery.isPending || dealsQuery.isPending || notificationQuery.isPending;
@@ -63,6 +63,9 @@ export function BuyerOverviewPage() {
       {isPending ? <WorkspaceSkeleton rows={3} /> : null}
       {hasError ? (
         <ErrorState
+          error={
+            savedQuery.error ?? dealsQuery.error ?? notificationQuery.error
+          }
           description="Your buyer workspace could not load all of its data. Try again to refresh your overview."
           onRetry={() => {
             void savedQuery.refetch();

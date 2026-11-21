@@ -126,6 +126,7 @@ export function AdminUsersPage() {
       {query.isPending ? <WorkspaceSkeleton rows={2} /> : null}
       {query.isError ? (
         <ErrorState
+          error={query.error}
           description="User records could not be loaded."
           onRetry={() => void query.refetch()}
           title="Users unavailable"

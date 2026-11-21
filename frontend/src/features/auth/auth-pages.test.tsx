@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StrictMode } from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -54,13 +54,14 @@ function renderApp(element: React.ReactNode, initialPath = "/") {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  return render(
+  const rendered = render(
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <MemoryRouter initialEntries={[initialPath]}>{element}</MemoryRouter>
       </AuthProvider>
     </QueryClientProvider>,
   );
+  return { ...rendered, queryClient };
 }
 
 beforeEach(() => {
@@ -380,12 +381,25 @@ describe("session and route access", () => {
     const user = userEvent.setup();
     apiMocks.restoreSession.mockResolvedValueOnce(buyer);
     apiMocks.signOut.mockResolvedValueOnce({ message: "Signed out" });
-    renderApp(<SiteHeader />, "/");
+    const { queryClient } = renderApp(<SiteHeader />, "/");
     await user.click(await screen.findByRole("button", { name: "Sign out" }));
+    queryClient.setQueryData(["marketplace", { q: "bakery" }], ["public"]);
+    queryClient.setQueryData(["buyer", "favorites"], ["private"]);
+    queryClient.setQueryData(["deals", "mine"], ["private deal"]);
+    await user.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", {
+        name: "Sign out",
+      }),
+    );
     expect(
       await screen.findByRole("link", { name: "Sign in" }),
     ).toBeInTheDocument();
     expect(apiMocks.signOut).toHaveBeenCalledOnce();
+    expect(queryClient.getQueryData(["marketplace", { q: "bakery" }])).toEqual([
+      "public",
+    ]);
+    expect(queryClient.getQueryData(["buyer", "favorites"])).toBeUndefined();
+    expect(queryClient.getQueryData(["deals", "mine"])).toBeUndefined();
   });
 
   it("keeps a confirmed session visible when logout fails with a server error", async () => {
@@ -404,11 +418,16 @@ describe("session and route access", () => {
     });
     renderApp(<SiteHeader />, "/");
     await user.click(await screen.findByRole("button", { name: "Sign out" }));
+    await user.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", {
+        name: "Sign out",
+      }),
+    );
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Sign out could not be confirmed",
     );
     expect(
-      screen.getByRole("link", { name: "My account" }),
+      screen.getByRole("link", { name: "My workspace" }),
     ).toBeInTheDocument();
   });
 });

@@ -110,6 +110,7 @@ export function AdminUserDetailPage() {
       />
       {!Number.isSafeInteger(id) || id <= 0 ? (
         <ErrorState
+          error={query.error}
           description="The user identifier in this address is invalid."
           title="User record unavailable"
         />

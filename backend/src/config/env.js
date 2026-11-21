@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { isIP } from 'node:net';
 import { z } from 'zod';
 
 const postgresUrl = z
@@ -7,6 +8,31 @@ const postgresUrl = z
     value => ['postgres:', 'postgresql:'].includes(new URL(value).protocol),
     'Database URLs must use a PostgreSQL protocol'
   );
+
+const trustedProxyList = z
+  .string()
+  .default('')
+  .superRefine((value, context) => {
+    const entries = value
+      .split(',')
+      .map(entry => entry.trim())
+      .filter(Boolean);
+    for (const entry of entries) {
+      const [address, prefix, extra] = entry.split('/');
+      const version = isIP(address);
+      const maxPrefix = version === 4 ? 32 : version === 6 ? 128 : 0;
+      const validPrefix =
+        prefix === undefined ||
+        (/^\d+$/.test(prefix) && Number(prefix) <= maxPrefix);
+      if (!version || !validPrefix || extra !== undefined) {
+        context.addIssue({
+          code: 'custom',
+          message:
+            'ARCJET_TRUSTED_PROXIES must contain comma-separated IP addresses or CIDR ranges',
+        });
+      }
+    }
+  });
 
 const environmentSchema = z
   .object({
@@ -18,6 +44,7 @@ const environmentSchema = z
     TEST_DATABASE_URL: postgresUrl.optional(),
     JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
     ARCJET_KEY: z.string().min(1, 'ARCJET_KEY is required'),
+    ARCJET_TRUSTED_PROXIES: trustedProxyList,
     CORS_ORIGINS: z
       .string()
       .default('http://localhost:5173')

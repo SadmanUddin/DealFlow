@@ -137,6 +137,7 @@ export function DealDocumentsPanel({
       {documentsQuery.isPending ? <WorkspaceSkeleton rows={2} /> : null}
       {documentsQuery.isError ? (
         <ErrorState
+          error={documentsQuery.error}
           description="Deal room documents could not be loaded."
           onRetry={() => void documentsQuery.refetch()}
           title="Documents unavailable"
@@ -210,6 +211,7 @@ export function DealDocumentsPanel({
           ) : null}
           {conversationsQuery.isError ? (
             <ErrorState
+              error={conversationsQuery.error}
               description="Your private listing conversation could not be loaded."
               onRetry={() => void conversationsQuery.refetch()}
               title="Conversation unavailable"
@@ -224,6 +226,7 @@ export function DealDocumentsPanel({
           ) : null}
           {conversation && sourceDocumentsQuery.isError ? (
             <ErrorState
+              error={sourceDocumentsQuery.error}
               description="Private source documents could not be loaded."
               onRetry={() => void sourceDocumentsQuery.refetch()}
               title="Source documents unavailable"

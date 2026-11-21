@@ -9,6 +9,7 @@ import {
   signUp as signUpRequest,
 } from "./api";
 import { AuthContext, type AuthContextValue } from "./auth-context";
+import { clearPrivateQueryCache } from "@/app/providers/query-cache";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
@@ -24,6 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const onSessionExpired = () => {
       queryClient.setQueryData(authQueryKeys.session, null);
+      void clearPrivateQueryCache(queryClient);
       queryClient.removeQueries({ queryKey: authQueryKeys.profile });
     };
     window.addEventListener("dealflow:session-expired", onSessionExpired);
@@ -33,24 +35,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInMutation = useMutation({
     mutationFn: signInRequest,
-    onSuccess: (user) => queryClient.setQueryData(authQueryKeys.session, user),
+    onSuccess: async (user) => {
+      await clearPrivateQueryCache(queryClient);
+      queryClient.setQueryData(authQueryKeys.session, user);
+    },
   });
   const signUpMutation = useMutation({
     mutationFn: signUpRequest,
   });
   const signOutMutation = useMutation({
     mutationFn: signOutRequest,
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.setQueryData(authQueryKeys.session, null);
-      queryClient.removeQueries({
-        predicate: (query) =>
-          query.queryKey[0] !== "public" && query.queryKey[0] !== "auth",
-      });
+      await clearPrivateQueryCache(queryClient);
       queryClient.removeQueries({ queryKey: authQueryKeys.profile });
     },
     onError: async (error) => {
       if (normalizeAuthError(error).status === 401) {
         queryClient.setQueryData(authQueryKeys.session, null);
+        await clearPrivateQueryCache(queryClient);
         queryClient.removeQueries({ queryKey: authQueryKeys.profile });
         return;
       }

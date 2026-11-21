@@ -145,6 +145,7 @@ export function DealConversationPanel({
       {conversationsQuery.isPending ? <WorkspaceSkeleton rows={1} /> : null}
       {conversationsQuery.isError ? (
         <ErrorState
+          error={conversationsQuery.error}
           description="Private conversation records could not be loaded."
           onRetry={() => void conversationsQuery.refetch()}
           title="Conversation unavailable"
@@ -201,6 +202,7 @@ export function DealConversationPanel({
           ) : null}
           {messagesQuery.isError ? (
             <ErrorState
+              error={messagesQuery.error}
               description="Messages could not be loaded."
               onRetry={() => void messagesQuery.refetch()}
               title="Message history unavailable"

@@ -133,6 +133,7 @@ export function SellerListingFormPage() {
   if (id && listingsQuery.isError)
     return (
       <ErrorState
+        error={listingsQuery.error}
         description="The listing could not be loaded for editing."
         onRetry={() => void listingsQuery.refetch()}
         title="Listing unavailable"

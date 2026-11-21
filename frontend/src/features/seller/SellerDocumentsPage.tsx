@@ -17,7 +17,7 @@ export function SellerDocumentsPage() {
   const query = useQuery({
     queryKey: ["seller", "inquiries", 1, 100],
     queryFn: () => listInquiries(1, 100),
-    staleTime: 15_000,
+    staleTime: 45_000,
   });
   const conversations = useMemo(
     () => query.data?.conversations ?? [],
@@ -40,6 +40,7 @@ export function SellerDocumentsPage() {
       {query.isPending ? <WorkspaceSkeleton rows={3} /> : null}
       {query.isError ? (
         <ErrorState
+          error={query.error}
           description="Your conversations could not be loaded."
           onRetry={() => void query.refetch()}
           title="Documents unavailable"

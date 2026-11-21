@@ -56,12 +56,12 @@ export function SellerOffersPage() {
   const dealsQuery = useQuery({
     queryKey: ["deals", "mine", page, 20],
     queryFn: () => listDeals(page, 20),
-    staleTime: 15_000,
+    staleTime: 45_000,
   });
   const listingQuery = useQuery({
     queryKey: ["seller", "listings", 1, 100],
     queryFn: () => listMyListings(1, 100),
-    staleTime: 15_000,
+    staleTime: 45_000,
   });
   const deals = useMemo(
     () => dealsQuery.data?.deals ?? [],
@@ -71,7 +71,7 @@ export function SellerOffersPage() {
     queries: deals.map((deal) => ({
       queryKey: ["deals", deal.id, "offers"],
       queryFn: () => listOffers(deal.id),
-      staleTime: 10_000,
+      staleTime: 15_000,
     })),
   });
   const dealId = Number(params.get("deal"));
@@ -157,6 +157,7 @@ export function SellerOffersPage() {
       {dealsQuery.isPending ? <WorkspaceSkeleton rows={3} /> : null}
       {dealsQuery.isError ? (
         <ErrorState
+          error={dealsQuery.error}
           description="Offers are returned within your deal records."
           onRetry={() => void dealsQuery.refetch()}
           title="Offers unavailable"
@@ -289,6 +290,7 @@ export function SellerOffersPage() {
               ) : null}
               {selectedOffersQuery?.isError ? (
                 <ErrorState
+                  error={selectedOffersQuery.error}
                   description="Negotiation history could not be loaded."
                   onRetry={() => void selectedOffersQuery.refetch()}
                   title="Offers unavailable"

@@ -180,6 +180,7 @@ export function AdminModerationPage() {
       {query.isPending ? <WorkspaceSkeleton rows={3} /> : null}
       {query.isError ? (
         <ErrorState
+          error={query.error}
           description="The listing queue could not be loaded."
           onRetry={() => void query.refetch()}
           title="Moderation queue unavailable"

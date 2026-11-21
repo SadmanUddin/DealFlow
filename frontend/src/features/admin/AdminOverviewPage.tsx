@@ -44,12 +44,12 @@ export function AdminOverviewPage() {
   const query = useQuery({
     queryKey: ["admin", "dashboard"],
     queryFn: getAdminDashboard,
-    staleTime: 20_000,
+    staleTime: 45_000,
   });
   const listingSample = useQuery({
     queryKey: ["admin", "listing-sample", 1, 100],
     queryFn: () => listAdminListings({ page: 1, limit: 100, status: "all" }),
-    staleTime: 20_000,
+    staleTime: 45_000,
   });
   const data = query.data;
   const industryData = useMemo(
@@ -129,6 +129,7 @@ export function AdminOverviewPage() {
       {query.isPending ? <WorkspaceSkeleton rows={4} /> : null}
       {query.isError ? (
         <ErrorState
+          error={query.error ?? listingSample.error}
           description="The admin dashboard could not be loaded."
           onRetry={() => void query.refetch()}
           title="Operations snapshot unavailable"

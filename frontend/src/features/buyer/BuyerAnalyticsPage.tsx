@@ -143,12 +143,12 @@ export function BuyerAnalyticsPage() {
   const favoritesQuery = useQuery({
     queryKey: ["buyer", "favorites", 1, 100],
     queryFn: () => listFavorites(1, 100),
-    staleTime: 20_000,
+    staleTime: 45_000,
   });
   const dealsQuery = useQuery({
     queryKey: ["deals", "mine", 1, 100],
     queryFn: () => listDeals(1, 100),
-    staleTime: 20_000,
+    staleTime: 45_000,
   });
   const loading = favoritesQuery.isPending || dealsQuery.isPending;
   const error = favoritesQuery.isError || dealsQuery.isError;
@@ -215,6 +215,7 @@ export function BuyerAnalyticsPage() {
       {loading ? <WorkspaceSkeleton rows={2} /> : null}
       {error ? (
         <ErrorState
+          error={favoritesQuery.error ?? dealsQuery.error}
           description="Your buyer analytics could not be loaded."
           onRetry={() => {
             void favoritesQuery.refetch();

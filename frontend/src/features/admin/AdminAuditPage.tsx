@@ -153,6 +153,7 @@ export function AdminAuditPage() {
       {query.isPending ? <WorkspaceSkeleton rows={3} /> : null}
       {query.isError ? (
         <ErrorState
+          error={query.error}
           description="Audit records could not be loaded."
           onRetry={() => void query.refetch()}
           title="Audit history unavailable"

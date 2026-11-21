@@ -12,6 +12,7 @@ import {
 import { Link, useNavigate, useParams } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { retryQuery } from "@/app/providers/query-defaults";
 import { Badge } from "@/components/ui/badge";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { toApiError } from "@/lib/api-error";
@@ -109,8 +110,7 @@ export function ListingDetailsPage() {
     queryKey: ["marketplace", "listing", validId ? id : null],
     queryFn: () => getPublishedListing(id),
     enabled: validId,
-    retry: (failureCount, error) =>
-      toApiError(error).status !== 404 && failureCount < 1,
+    retry: retryQuery,
     staleTime: 30_000,
     refetchOnWindowFocus: false,
   });
@@ -131,6 +131,7 @@ export function ListingDetailsPage() {
           </Link>
         </Button>
         <ErrorState
+          error={listingQuery.error}
           description="We couldn’t load this public listing. Check your connection and try again."
           onRetry={() => void listingQuery.refetch()}
           title="Listing unavailable right now"

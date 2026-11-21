@@ -14,6 +14,7 @@ import { useSearchParams } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ErrorState } from "@/components/shared/ErrorState";
+import { retryQuery } from "@/app/providers/query-defaults";
 import {
   getPublicListings,
   parseMarketplaceFilters,
@@ -82,7 +83,7 @@ function MarketplaceContent() {
   const listingsQuery = useQuery({
     queryKey: ["marketplace", filters],
     queryFn: () => getPublicListings(filters),
-    retry: 1,
+    retry: retryQuery,
     staleTime: 30_000,
     refetchOnWindowFocus: false,
     placeholderData: (previousData) => previousData,
@@ -296,6 +297,7 @@ function MarketplaceContent() {
         {listingsQuery.isError && !listingsQuery.data ? (
           <div className="mt-8">
             <ErrorState
+              error={listingsQuery.error}
               description="The business listings could not be loaded. Check your connection and try again."
               onRetry={() => void listingsQuery.refetch()}
               title="Marketplace unavailable"

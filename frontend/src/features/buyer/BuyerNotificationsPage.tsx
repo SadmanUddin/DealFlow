@@ -57,7 +57,7 @@ export function BuyerNotificationsPage() {
   const query = useQuery({
     queryKey: ["buyer", "notifications", page, unreadOnly],
     queryFn: () => listNotifications(page, 30, unreadOnly ? true : undefined),
-    staleTime: 10_000,
+    staleTime: 15_000,
   });
   const refresh = () =>
     Promise.all([
@@ -158,6 +158,7 @@ export function BuyerNotificationsPage() {
       ) : null}
       {query.isError ? (
         <ErrorState
+          error={query.error}
           description="We couldn’t load your notifications."
           onRetry={() => void query.refetch()}
           title="Notifications unavailable"

@@ -42,7 +42,7 @@ export function BuyerSavedPage() {
   const query = useQuery({
     queryKey: ["buyer", "favorites", page, 100],
     queryFn: () => listFavorites(page, 100),
-    staleTime: 20_000,
+    staleTime: 45_000,
   });
   const removeMutation = useMutation({
     mutationFn: (listingId: number) => removeFavorite(listingId),
@@ -151,6 +151,7 @@ export function BuyerSavedPage() {
       ) : null}
       {query.isError ? (
         <ErrorState
+          error={query.error}
           description="Your saved businesses could not be loaded. Your list has not been changed."
           onRetry={() => void query.refetch()}
           title="Saved businesses unavailable"

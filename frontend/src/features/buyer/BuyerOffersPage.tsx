@@ -50,7 +50,7 @@ export function BuyerOffersPage() {
   const dealsQuery = useQuery({
     queryKey: ["deals", "mine", 1, 100],
     queryFn: () => listDeals(1, 100),
-    staleTime: 15_000,
+    staleTime: 45_000,
   });
   const deals = useMemo(
     () => dealsQuery.data?.deals ?? [],
@@ -62,7 +62,7 @@ export function BuyerOffersPage() {
     queryKey: ["deals", selectedDeal?.id, "offers"],
     queryFn: () => listOffers(selectedDeal!.id),
     enabled: Boolean(selectedDeal),
-    staleTime: 10_000,
+    staleTime: 15_000,
   });
   const listingQuery = useQuery({
     queryKey: ["marketplace", "listing", selectedDeal?.listing_id],
@@ -162,6 +162,7 @@ export function BuyerOffersPage() {
       {dealsQuery.isPending ? <WorkspaceSkeleton rows={2} /> : null}
       {dealsQuery.isError ? (
         <ErrorState
+          error={dealsQuery.error}
           description="Offers are stored within deals. The deal list could not be loaded."
           onRetry={() => void dealsQuery.refetch()}
           title="Offers unavailable"
@@ -282,6 +283,7 @@ export function BuyerOffersPage() {
                 ) : null}
                 {offersQuery.isError ? (
                   <ErrorState
+                    error={offersQuery.error}
                     description="Offer history could not be loaded."
                     onRetry={() => void offersQuery.refetch()}
                     title="History unavailable"

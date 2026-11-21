@@ -37,7 +37,7 @@ export function SellerListingsPage() {
   const query = useQuery({
     queryKey: ["seller", "listings", page, 100],
     queryFn: () => listMyListings(page, 100),
-    staleTime: 15_000,
+    staleTime: 45_000,
   });
   const mutation = useMutation({
     mutationFn: async ({ listing, kind }: Exclude<ListingAction, null>) => {
@@ -122,6 +122,7 @@ export function SellerListingsPage() {
       {query.isPending ? <WorkspaceSkeleton rows={3} /> : null}
       {query.isError ? (
         <ErrorState
+          error={query.error}
           description="Your business listings could not be loaded."
           onRetry={() => void query.refetch()}
           title="Listings unavailable"
