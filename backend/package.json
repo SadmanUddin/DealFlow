@@ -22,7 +22,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "vitest run --exclude '**/integration/**'",
+    "test": "vitest run --config vitest.config.js --exclude '**/integration/**'",
     "test:integration": "node scripts/test-neon-integration.js",
     "test:integration:phase4": "node scripts/test-phase4-neon-integration.js",
     "test:integration:phase6": "node scripts/test-phase6-neon-integration.js",
