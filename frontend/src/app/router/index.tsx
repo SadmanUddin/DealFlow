@@ -123,6 +123,36 @@ const SellerAnalyticsPage = lazy(() =>
     default: module.SellerAnalyticsPage,
   })),
 );
+const AdminOverviewPage = lazy(() =>
+  import("@/features/admin/AdminOverviewPage").then((module) => ({
+    default: module.AdminOverviewPage,
+  })),
+);
+const AdminUsersPage = lazy(() =>
+  import("@/features/admin/AdminUsersPage").then((module) => ({
+    default: module.AdminUsersPage,
+  })),
+);
+const AdminUserDetailPage = lazy(() =>
+  import("@/features/admin/AdminUserDetailPage").then((module) => ({
+    default: module.AdminUserDetailPage,
+  })),
+);
+const AdminModerationPage = lazy(() =>
+  import("@/features/admin/AdminModerationPage").then((module) => ({
+    default: module.AdminModerationPage,
+  })),
+);
+const AdminReportsPage = lazy(() =>
+  import("@/features/admin/AdminReportsPage").then((module) => ({
+    default: module.AdminReportsPage,
+  })),
+);
+const AdminAuditPage = lazy(() =>
+  import("@/features/admin/AdminAuditPage").then((module) => ({
+    default: module.AdminAuditPage,
+  })),
+);
 
 function lazyPage(element: React.ReactNode) {
   return (
@@ -223,6 +253,22 @@ const router = createBrowserRouter([
       { path: "deals", element: lazyPage(<SellerOffersPage />) },
       { path: "documents", element: lazyPage(<SellerDocumentsPage />) },
       { path: "analytics", element: lazyPage(<SellerAnalyticsPage />) },
+    ],
+  },
+  {
+    path: "/admin",
+    element: lazyPage(
+      <RequireAuth roles={["admin"]}>
+        <WorkspaceLayout role="admin" />
+      </RequireAuth>,
+    ),
+    children: [
+      { index: true, element: lazyPage(<AdminOverviewPage />) },
+      { path: "users", element: lazyPage(<AdminUsersPage />) },
+      { path: "users/:id", element: lazyPage(<AdminUserDetailPage />) },
+      { path: "moderation", element: lazyPage(<AdminModerationPage />) },
+      { path: "reports", element: lazyPage(<AdminReportsPage />) },
+      { path: "audit", element: lazyPage(<AdminAuditPage />) },
     ],
   },
 ]);

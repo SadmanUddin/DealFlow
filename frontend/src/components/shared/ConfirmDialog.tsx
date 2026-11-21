@@ -1,4 +1,4 @@
-import { useEffect, useRef, type KeyboardEvent } from "react";
+import { useEffect, useRef, type KeyboardEvent, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 
 type ConfirmDialogProps = {
@@ -7,7 +7,9 @@ type ConfirmDialogProps = {
   confirmLabel: string;
   busyLabel?: string;
   busy?: boolean;
+  confirmDisabled?: boolean;
   error?: string;
+  children?: ReactNode;
   onCancel: () => void;
   onConfirm: () => void;
 };
@@ -18,7 +20,9 @@ export function ConfirmDialog({
   confirmLabel,
   busyLabel,
   busy = false,
+  confirmDisabled = false,
   error,
+  children,
   onCancel,
   onConfirm,
 }: ConfirmDialogProps) {
@@ -84,6 +88,7 @@ export function ConfirmDialog({
         >
           {description}
         </p>
+        {children ? <div className="mt-4">{children}</div> : null}
         {error ? (
           <p
             className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800"
@@ -102,7 +107,7 @@ export function ConfirmDialog({
             Cancel
           </Button>
           <Button
-            disabled={busy}
+            disabled={busy || confirmDisabled}
             onClick={onConfirm}
             ref={confirmRef}
             variant="accent"
