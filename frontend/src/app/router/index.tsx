@@ -83,6 +83,46 @@ const BuyerAnalyticsPage = lazy(() =>
     default: module.BuyerAnalyticsPage,
   })),
 );
+const SellerOverviewPage = lazy(() =>
+  import("@/features/seller/SellerOverviewPage").then((module) => ({
+    default: module.SellerOverviewPage,
+  })),
+);
+const SellerListingsPage = lazy(() =>
+  import("@/features/seller/SellerListingsPage").then((module) => ({
+    default: module.SellerListingsPage,
+  })),
+);
+const SellerListingFormPage = lazy(() =>
+  import("@/features/seller/SellerListingFormPage").then((module) => ({
+    default: module.SellerListingFormPage,
+  })),
+);
+const SellerInquiriesPage = lazy(() =>
+  import("@/features/seller/SellerInquiriesPage").then((module) => ({
+    default: module.SellerInquiriesPage,
+  })),
+);
+const SellerInquiryDetailPage = lazy(() =>
+  import("@/features/seller/SellerInquiryDetailPage").then((module) => ({
+    default: module.SellerInquiryDetailPage,
+  })),
+);
+const SellerOffersPage = lazy(() =>
+  import("@/features/seller/SellerOffersPage").then((module) => ({
+    default: module.SellerOffersPage,
+  })),
+);
+const SellerDocumentsPage = lazy(() =>
+  import("@/features/seller/SellerDocumentsPage").then((module) => ({
+    default: module.SellerDocumentsPage,
+  })),
+);
+const SellerAnalyticsPage = lazy(() =>
+  import("@/features/seller/SellerAnalyticsPage").then((module) => ({
+    default: module.SellerAnalyticsPage,
+  })),
+);
 
 function lazyPage(element: React.ReactNode) {
   return (
@@ -161,6 +201,28 @@ const router = createBrowserRouter([
       { path: "deals", element: lazyPage(<BuyerDealsPage />) },
       { path: "notifications", element: lazyPage(<BuyerNotificationsPage />) },
       { path: "analytics", element: lazyPage(<BuyerAnalyticsPage />) },
+    ],
+  },
+  {
+    path: "/seller",
+    element: lazyPage(
+      <RequireAuth roles={["seller"]}>
+        <WorkspaceLayout role="seller" />
+      </RequireAuth>,
+    ),
+    children: [
+      { index: true, element: lazyPage(<SellerOverviewPage />) },
+      { path: "listings", element: lazyPage(<SellerListingsPage />) },
+      { path: "listings/new", element: lazyPage(<SellerListingFormPage />) },
+      {
+        path: "listings/:id/edit",
+        element: lazyPage(<SellerListingFormPage />),
+      },
+      { path: "inquiries", element: lazyPage(<SellerInquiriesPage />) },
+      { path: "inquiries/:id", element: lazyPage(<SellerInquiryDetailPage />) },
+      { path: "deals", element: lazyPage(<SellerOffersPage />) },
+      { path: "documents", element: lazyPage(<SellerDocumentsPage />) },
+      { path: "analytics", element: lazyPage(<SellerAnalyticsPage />) },
     ],
   },
 ]);
