@@ -24,6 +24,9 @@ const apiMocks = vi.hoisted(() => ({
   signOut: vi.fn(),
   getProfile: vi.fn(),
   updateProfile: vi.fn(),
+  getEmailPreferences: vi.fn(),
+  updateEmailPreferences: vi.fn(),
+  deactivateAccount: vi.fn(),
   requestPasswordReset: vi.fn(),
   resetPassword: vi.fn(),
   verifyEmail: vi.fn(),
@@ -71,6 +74,14 @@ beforeEach(() => {
   apiMocks.signOut.mockReset();
   apiMocks.getProfile.mockReset();
   apiMocks.updateProfile.mockReset();
+  apiMocks.getEmailPreferences.mockResolvedValue({
+    listingStatus: true,
+    listingPrice: true,
+    listingDetails: true,
+    dealUpdates: true,
+  });
+  apiMocks.updateEmailPreferences.mockReset();
+  apiMocks.deactivateAccount.mockReset();
   apiMocks.requestPasswordReset.mockReset();
   apiMocks.resetPassword.mockReset();
   apiMocks.verifyEmail.mockReset();
@@ -436,7 +447,7 @@ describe("profile updates", () => {
   it("loads the backend profile and updates the permitted name field", async () => {
     const user = userEvent.setup();
     apiMocks.restoreSession.mockResolvedValueOnce(buyer);
-    apiMocks.getProfile.mockResolvedValueOnce(profile);
+    apiMocks.getProfile.mockResolvedValue(profile);
     apiMocks.updateProfile.mockImplementationOnce(async (name) => ({
       ...profile,
       name,
@@ -450,6 +461,36 @@ describe("profile updates", () => {
       "Your profile has been updated.",
     );
     expect(apiMocks.updateProfile).toHaveBeenCalledWith("Alex Seller");
+  });
+
+  it("updates email preferences and confirms account deactivation", async () => {
+    const user = userEvent.setup();
+    apiMocks.restoreSession.mockResolvedValueOnce(buyer);
+    apiMocks.getProfile.mockResolvedValue(profile);
+    apiMocks.deactivateAccount.mockResolvedValue({
+      message: "Account deactivated",
+    });
+    apiMocks.updateEmailPreferences.mockImplementation(async (value) => value);
+    renderApp(<AccountPage />, "/account");
+    const statusPreference = await screen.findByLabelText(
+      "Listing status changes",
+    );
+    await user.click(statusPreference);
+    expect(apiMocks.updateEmailPreferences).toHaveBeenCalledWith(
+      expect.objectContaining({ listingStatus: false }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Deactivate account" }),
+    );
+    const dialog = screen.getByRole("alertdialog");
+    await user.type(
+      within(dialog).getByLabelText("Current password"),
+      "current-password",
+    );
+    await user.click(
+      within(dialog).getByRole("button", { name: "Deactivate account" }),
+    );
+    expect(apiMocks.deactivateAccount).toHaveBeenCalledWith("current-password");
   });
 });
 

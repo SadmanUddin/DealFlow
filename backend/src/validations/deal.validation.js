@@ -13,6 +13,9 @@ const pagination = {
 export const dealIdSchema = z.object({ id }).strict();
 export const dealOfferIdSchema = z.object({ offerId: id }).strict();
 export const dealDocumentIdSchema = z.object({ documentId: id }).strict();
+export const dealDocumentDownloadParamsSchema = z
+  .object({ id, documentId: id })
+  .strict();
 export const createDealSchema = z
   .object({ listingId: z.number().int().positive().safe() })
   .strict();

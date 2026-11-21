@@ -620,10 +620,7 @@ export function DealDetailPage() {
               </SectionCard>
             )}
 
-            <DealDocumentsPanel
-              dealId={deal.id}
-              isBuyer={isBuyer}
-            />
+            <DealDocumentsPanel dealId={deal.id} />
           </div>
 
           <aside className="space-y-5">

@@ -123,6 +123,7 @@ const {
   withdrawOffer,
   listDealDocuments,
   getDealDocumentDownload,
+  linkDealDocument,
 } = await import('#services/deal.service.js');
 
 describe('Phase 8 deal service writes', () => {
@@ -199,8 +200,12 @@ describe('Phase 8 deal service writes', () => {
     expect(executed[0].query).toContain('INSERT INTO deal_offers');
     expect(executed[0].query).toContain('INSERT INTO deal_activities');
     expect(executed[0].query).toContain('INSERT INTO notifications');
-    expect(executed[0].query.match(/INSERT INTO notifications/g)).toHaveLength(1);
-    expect(executed[0].query.match(/INSERT INTO outbox_events/g)).toHaveLength(1);
+    expect(executed[0].query.match(/INSERT INTO notifications/g)).toHaveLength(
+      1
+    );
+    expect(executed[0].query.match(/INSERT INTO outbox_events/g)).toHaveLength(
+      1
+    );
     expect(executed[0].query).toContain('UNION ALL');
     expect(executed[0].query).toContain('AS recipients(user_id)');
     expect(executed[0].query).toContain('recipients.user_id <> ?');
@@ -226,6 +231,31 @@ describe('Phase 8 deal service writes', () => {
       createOffer(31, 99, { amount: '90000', currency: 'EUR' })
     ).rejects.toMatchObject({ status: 404, code: 'DEAL_NOT_FOUND' });
     expect(db.execute).not.toHaveBeenCalled();
+  });
+
+  it('types numeric document metadata parameters in jsonb expressions', async () => {
+    rowsByTable.deals = [
+      {
+        id: 31,
+        listing_id: 8,
+        buyer_id: 4,
+        seller_id: 7,
+        status: 'due_diligence',
+      },
+    ];
+    db.executeResults.push([
+      { id: 91, deal_id: 31, conversation_document_id: 18, linked_by: 4 },
+    ]);
+    await expect(linkDealDocument(31, 4, 18)).resolves.toMatchObject({
+      id: 91,
+    });
+    expect(executed[0].query).toContain(
+      'jsonb_build_object(\'dealId\', ?::integer'
+    );
+    expect(executed[0].query).toContain('jsonb_build_array(?::integer)');
+    expect(executed[0].query).toContain('INSERT INTO deal_activities');
+    expect(executed[0].query).toContain('INSERT INTO notifications');
+    expect(executed[0].query).toContain('INSERT INTO outbox_events');
   });
 
   it('rejects unauthorised deal status changes and stale concurrent updates', async () => {
@@ -478,5 +508,21 @@ describe('Phase 8 deal service writes', () => {
       row: { id: 90 },
     });
     expect(downloadObject).toHaveBeenCalledWith('private/key');
+
+    db.selectResults.push([dealRow]);
+    db.selectResults.push([
+      {
+        id: 90,
+        storage_key: 'private/key',
+        original_filename: 'terms.pdf',
+        mime_type: 'application/pdf',
+        size_bytes: 100,
+      },
+    ]);
+    await expect(getDealDocumentDownload(31, 90, 7)).resolves.toMatchObject({
+      row: { id: 90 },
+    });
+    expect(downloadObject).toHaveBeenCalledTimes(2);
+    expect(downloadObject).toHaveBeenLastCalledWith('private/key');
   });
 });

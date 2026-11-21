@@ -25,11 +25,20 @@ const apiMocks = vi.hoisted(() => ({
   getPublishedListing: vi.fn(),
   savePublishedListing: vi.fn(),
   unsavePublishedListing: vi.fn(),
+  submitListingReport: vi.fn(),
+  startListingConversation: vi.fn(),
 }));
 
 vi.mock("./marketplace-api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./marketplace-api")>();
   return { ...actual, ...apiMocks };
+});
+vi.mock("@/features/buyer/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/features/buyer/api")>();
+  return {
+    ...actual,
+    startListingConversation: apiMocks.startListingConversation,
+  };
 });
 
 const listing: PublicListing = {
@@ -109,6 +118,7 @@ function renderMarketplace(initialPath = "/marketplace", auth = guestAuth) {
           <Routes>
             <Route path="/marketplace" element={<MarketplacePage />} />
             <Route path="/listings/:id" element={<ListingDetailsPage />} />
+            <Route path="/buyer/conversations" element={<p>Buyer inbox</p>} />
           </Routes>
         </MemoryRouter>
       </AuthContext.Provider>
@@ -121,11 +131,44 @@ beforeEach(() => {
   apiMocks.getPublishedListing.mockReset();
   apiMocks.savePublishedListing.mockReset();
   apiMocks.unsavePublishedListing.mockReset();
+  apiMocks.submitListingReport.mockReset();
+  apiMocks.startListingConversation.mockReset();
   apiMocks.getPublicListings.mockResolvedValue(listingPage());
   apiMocks.getPublishedListing.mockResolvedValue(listing);
 });
 
 describe("public marketplace", () => {
+  it("loads a versioned public image for a listing card", async () => {
+    const imageListing = {
+      ...listing,
+      imageUrl: "/api/listings/8/image?v=1795281600000",
+    };
+    apiMocks.getPublicListings.mockResolvedValue(listingPage([imageListing]));
+    const { container } = renderMarketplace();
+
+    await screen.findByRole("link", {
+      name: /view independent neighborhood bakery/i,
+    });
+    expect(container.querySelector("img")?.getAttribute("src")).toBe(
+      "http://localhost:3000/api/listings/8/image?v=1795281600000",
+    );
+  });
+
+  it("loads the public listing image on the detail page", async () => {
+    apiMocks.getPublishedListing.mockResolvedValue({
+      ...listing,
+      imageUrl: "/api/listings/8/image?v=1795281600000",
+    });
+    const { container } = renderMarketplace("/listings/8");
+
+    await screen.findByRole("heading", {
+      name: "Independent neighborhood bakery",
+    });
+    expect(container.querySelector("img")?.getAttribute("src")).toBe(
+      "http://localhost:3000/api/listings/8/image?v=1795281600000",
+    );
+  });
+
   it("renders public listing cards with industry, location, and supported financials", async () => {
     renderMarketplace();
     const card = await screen.findByRole("link", {
@@ -204,17 +247,40 @@ describe("public marketplace", () => {
     );
   });
 
-  it("omits financial range controls from the search experience", async () => {
+  it("exposes supported financial range controls", async () => {
     renderMarketplace();
     await screen.findByRole("link", {
       name: /view independent neighborhood bakery/i,
     });
-    expect(screen.queryByText(/asking price range/i)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/minimum/i)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/minimum asking price/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/maximum asking price/i)).toBeInTheDocument();
     expect(
-      screen.queryByLabelText(/annual revenue range/i),
-    ).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/ebitda/i)).not.toBeInTheDocument();
+      screen.getByLabelText(/minimum annual revenue/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByLabelText(/maximum annual revenue/i),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/minimum ebitda/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/maximum ebitda/i)).toBeInTheDocument();
+  });
+
+  it("applies numerical ranges to supported API filters and URL parameters", async () => {
+    const user = userEvent.setup();
+    renderMarketplace();
+    await screen.findByRole("link", {
+      name: /view independent neighborhood bakery/i,
+    });
+    await user.type(screen.getByLabelText(/minimum asking price/i), "100000");
+    await user.type(screen.getByLabelText(/maximum asking price/i), "900000");
+    await user.click(screen.getByRole("button", { name: "Search" }));
+    await waitFor(() =>
+      expect(apiMocks.getPublicListings).toHaveBeenLastCalledWith(
+        expect.objectContaining({ minPrice: "100000", maxPrice: "900000" }),
+      ),
+    );
+    expect(screen.getByTestId("location-search")).toHaveTextContent(
+      "minPrice=100000",
+    );
   });
 
   it("uses backend sorting and pagination while preserving filters in the URL", async () => {
@@ -345,16 +411,80 @@ describe("listing details", () => {
     expect(screen.queryByText("private@example.test")).not.toBeInTheDocument();
   });
 
+  it("submits a listing report through the existing reports API", async () => {
+    const user = userEvent.setup();
+    apiMocks.submitListingReport.mockResolvedValue({
+      created: true,
+      report: { id: 12 },
+    });
+    renderMarketplace("/listings/8", signedInAuth);
+    await screen.findByRole("button", { name: "Contact seller" });
+    await user.click(
+      screen.getByRole("button", { name: "Report this listing" }),
+    );
+    await user.selectOptions(
+      screen.getByLabelText("Reason"),
+      "misleading_information",
+    );
+    await user.type(
+      screen.getByLabelText(/tell us what is wrong/i),
+      "The stated business details are inaccurate.",
+    );
+    await user.click(screen.getByRole("button", { name: "Submit report" }));
+    await waitFor(() =>
+      expect(apiMocks.submitListingReport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          listingId: 8,
+          category: "misleading_information",
+        }),
+      ),
+    );
+    expect(
+      await screen.findByText(/sent to the DealFlow review team/),
+    ).toBeInTheDocument();
+  });
+
+  it("opens or retrieves the existing ordinary listing conversation", async () => {
+    const user = userEvent.setup();
+    apiMocks.startListingConversation.mockResolvedValue({
+      conversation: { id: 42 },
+    });
+    renderMarketplace("/listings/8", signedInAuth);
+    await user.click(
+      await screen.findByRole("button", { name: "Contact seller" }),
+    );
+    await waitFor(() =>
+      expect(apiMocks.startListingConversation).toHaveBeenCalledWith(8),
+    );
+    expect(await screen.findByText("Buyer inbox")).toBeInTheDocument();
+    expect(screen.getByTestId("location-search")).toHaveTextContent(
+      "conversation=42",
+    );
+  });
+
   it("saves and removes a published business through the favorites API", async () => {
     const user = userEvent.setup();
     apiMocks.savePublishedListing.mockResolvedValueOnce({ created: true });
     renderMarketplace("/listings/8", signedInAuth);
-    const saveButton = await screen.findByRole("button", { name: "Save business" });
-    apiMocks.getPublishedListing.mockResolvedValue({ ...listing, isFavorite: true });
+    const saveButton = await screen.findByRole("button", {
+      name: "Save business",
+    });
+    apiMocks.getPublishedListing.mockResolvedValue({
+      ...listing,
+      isFavorite: true,
+    });
     await user.click(saveButton);
-    await waitFor(() => expect(apiMocks.savePublishedListing).toHaveBeenCalledWith(8));
-    await user.click(await screen.findByRole("button", { name: "Remove from saved businesses" }));
-    await waitFor(() => expect(apiMocks.unsavePublishedListing).toHaveBeenCalledWith(8));
+    await waitFor(() =>
+      expect(apiMocks.savePublishedListing).toHaveBeenCalledWith(8),
+    );
+    await user.click(
+      await screen.findByRole("button", {
+        name: "Remove from saved businesses",
+      }),
+    );
+    await waitFor(() =>
+      expect(apiMocks.unsavePublishedListing).toHaveBeenCalledWith(8),
+    );
   });
 
   it("handles optional financial details that are not disclosed", async () => {

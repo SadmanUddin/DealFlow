@@ -15,7 +15,7 @@ import {
 import {
   createDealSchema,
   createOfferSchema,
-  dealDocumentIdSchema,
+  dealDocumentDownloadParamsSchema,
   dealIdSchema,
   dealListSchema,
   dealOfferIdSchema,
@@ -107,8 +107,9 @@ export const linkDocument = async (req, res) => {
   });
 };
 export const downloadDocument = async (req, res, next) => {
-  const { id } = dealIdSchema.parse(req.params);
-  const { documentId } = dealDocumentIdSchema.parse(req.params);
+  const { id, documentId } = dealDocumentDownloadParamsSchema.parse(
+    req.params
+  );
   const { row, stream } = await getDealDocumentDownload(
     id,
     documentId,

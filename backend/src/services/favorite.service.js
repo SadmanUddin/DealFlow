@@ -2,6 +2,7 @@ import { and, desc, eq, sql } from 'drizzle-orm';
 import { db } from '#config/database.js';
 import { businessListings } from '#models/listing.model.js';
 import { favorites } from '#models/phase6.model.js';
+import { users } from '#models/user.model.js';
 import { AppError } from '#utils/app-error.js';
 
 export const listFavorites = async (userId, { page, limit }) => {
@@ -19,6 +20,9 @@ export const listFavorites = async (userId, { page, limit }) => {
         description: businessListings.description,
         industry: businessListings.industry,
         location: businessListings.location,
+        sellerName: users.name,
+        website: businessListings.website,
+        imageUrl: sql`CASE WHEN ${businessListings.image_key} IS NULL THEN NULL ELSE '/api/listings/' || ${businessListings.id}::text || '/image?v=' || floor(extract(epoch from ${businessListings.updated_at}) * 1000)::bigint::text END`,
         askingPrice: businessListings.asking_price,
         currency: businessListings.currency,
         publishedAt: businessListings.published_at,
@@ -28,6 +32,7 @@ export const listFavorites = async (userId, { page, limit }) => {
         businessListings,
         eq(favorites.listing_id, businessListings.id)
       )
+      .innerJoin(users, eq(users.id, businessListings.seller_id))
       .where(where)
       .orderBy(desc(favorites.created_at), desc(favorites.id))
       .limit(limit)

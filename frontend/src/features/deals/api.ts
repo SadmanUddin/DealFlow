@@ -1,5 +1,7 @@
 import { z } from "zod";
+import axios from "axios";
 import { apiClient } from "@/lib/api-client";
+import { ApiError } from "@/lib/api-error";
 import {
   getValidated,
   parseValidated,
@@ -170,11 +172,51 @@ export const linkDealDocument = (
   );
 
 export async function downloadDealDocument(dealId: number, documentId: number) {
-  const response = await apiClient.get<Blob>(
-    `/deals/${dealId}/documents/${documentId}/download`,
-    { responseType: "blob" },
-  );
-  return response.data;
+  try {
+    const response = await apiClient.get<Blob>(
+      "/deals/" + dealId + "/documents/" + documentId + "/download",
+      { responseType: "blob" },
+    );
+    return response.data;
+  } catch (error) {
+    if (
+      axios.isAxiosError(error) &&
+      typeof Blob !== "undefined" &&
+      error.response?.data instanceof Blob
+    ) {
+      const raw =
+        typeof error.response.data.text === "function"
+          ? await error.response.data.text()
+          : await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(String(reader.result ?? ""));
+              reader.onerror = () => reject(reader.error);
+              reader.readAsText(error.response!.data as Blob);
+            });
+      try {
+        const payload: unknown = JSON.parse(raw);
+        const parsed = z
+          .object({
+            error: z.object({
+              code: z.string().optional(),
+              message: z.string(),
+              details: z.unknown().optional(),
+            }),
+          })
+          .safeParse(payload);
+        if (parsed.success) {
+          throw new ApiError(parsed.data.error.message, {
+            status: error.response.status,
+            code: parsed.data.error.code,
+            details: parsed.data.error.details,
+          });
+        }
+      } catch (parseError) {
+        if (parseError instanceof ApiError) throw parseError;
+      }
+    }
+    throw error;
+  }
 }
 
 const conversationSchema = z.object({
@@ -243,10 +285,7 @@ export const sendDealConversationMessage = async (
     { content },
     { headers: { "Idempotency-Key": idempotencyKey } },
   );
-  return parseValidated(
-    z.object({ message: conversationMessageSchema }),
-    data,
-  );
+  return parseValidated(z.object({ message: conversationMessageSchema }), data);
 };
 export const markDealConversationRead = (conversationId: number) =>
   patchValidated(

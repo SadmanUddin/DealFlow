@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { z } from "zod";
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -17,10 +18,17 @@ import { Badge } from "@/components/ui/badge";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { toApiError } from "@/lib/api-error";
 import { useAuth } from "@/features/auth/useAuth";
+import { startListingConversation } from "@/features/buyer/api";
+import { listingImageSrc } from "./listing-image-url";
 import { formatListingMoney } from "./marketplace-format";
 import { getPublishedListing } from "./marketplace-api";
 import { createDeal } from "@/features/deals/api";
-import { savePublishedListing, unsavePublishedListing } from "./marketplace-api";
+import {
+  listingReportCategories,
+  savePublishedListing,
+  submitListingReport,
+  unsavePublishedListing,
+} from "./marketplace-api";
 
 function ListingDetailSkeleton() {
   return (
@@ -98,6 +106,13 @@ export function ListingDetailsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [dealError, setDealError] = useState("");
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportCategory, setReportCategory] =
+    useState<(typeof listingReportCategories)[number]>("other");
+  const [reportDescription, setReportDescription] = useState("");
+  const [reportValidationError, setReportValidationError] = useState("");
+  const [reportNotice, setReportNotice] = useState("");
+  const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
   const favoriteMutation = useMutation({
     mutationFn: async (saved: boolean) => {
       if (saved) await unsavePublishedListing(id);
@@ -105,7 +120,9 @@ export function ListingDetailsPage() {
     },
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["marketplace", "listing", id] }),
+        queryClient.invalidateQueries({
+          queryKey: ["marketplace", "listing", id],
+        }),
         queryClient.invalidateQueries({ queryKey: ["buyer", "favorites"] }),
       ]);
     },
@@ -118,6 +135,34 @@ export function ListingDetailsPage() {
       await navigate(`/buyer/deals/${deal.id}`);
     },
     onError: (error) => setDealError(toApiError(error).message),
+  });
+  const inquiryMutation = useMutation({
+    mutationFn: () => startListingConversation(id),
+    onSuccess: async ({ conversation }) => {
+      await queryClient.invalidateQueries({
+        queryKey: ["workspace", "conversations", "buyer"],
+      });
+      navigate(`/buyer/conversations?conversation=${conversation.id}`, {
+        state: { notice: "Your private seller conversation is ready." },
+      });
+    },
+  });
+  const reportMutation = useMutation({
+    mutationFn: () =>
+      submitListingReport({
+        listingId: id,
+        category: reportCategory,
+        description: reportDescription.trim(),
+      }),
+    onSuccess: ({ created }) => {
+      setReportNotice(
+        created
+          ? "Thank you. Your report has been sent to the DealFlow review team."
+          : "A matching report is already under review.",
+      );
+      setReportDescription("");
+      setReportOpen(false);
+    },
   });
   const listingQuery = useQuery({
     queryKey: ["marketplace", "listing", validId ? id : null],
@@ -154,6 +199,7 @@ export function ListingDetailsPage() {
   }
 
   const listing = listingQuery.data;
+  const imageFailed = failedImageUrl === listing.imageUrl;
   const publishedDate = listing.publishedAt
     ? new Date(listing.publishedAt)
     : null;
@@ -174,8 +220,22 @@ export function ListingDetailsPage() {
       </Link>
 
       <div className="relative mt-5 flex min-h-56 items-end overflow-hidden rounded-[1.75rem] border border-emerald-900/[0.05] bg-[radial-gradient(ellipse_at_80%_5%,#d8eee1,transparent_40%),linear-gradient(135deg,#fff,#eef3f7_58%,#edf3f0)] p-6 sm:min-h-72 sm:p-10 lg:min-h-80">
-        <div className="absolute -right-12 -top-28 size-96 rounded-full border border-emerald-900/[0.07]" />
-        <div className="absolute -right-2 -top-16 size-64 rounded-full border border-emerald-900/[0.07]" />
+        {listing.imageUrl && !imageFailed ? (
+          <img
+            alt=""
+            className="absolute inset-0 size-full object-cover"
+            src={listingImageSrc(listing.imageUrl)}
+            onError={() => setFailedImageUrl(listing.imageUrl ?? null)}
+          />
+        ) : null}
+        {listing.imageUrl && !imageFailed ? (
+          <div className="absolute inset-0 bg-gradient-to-t from-white/95 via-white/25 to-transparent" />
+        ) : (
+          <>
+            <div className="absolute -right-12 -top-28 size-96 rounded-full border border-emerald-900/[0.07]" />
+            <div className="absolute -right-2 -top-16 size-64 rounded-full border border-emerald-900/[0.07]" />
+          </>
+        )}
         <div className="relative max-w-4xl">
           <Badge className="border-white bg-white/80">
             Published opportunity
@@ -224,6 +284,18 @@ export function ListingDetailsPage() {
           strokeWidth={1}
         />
       </div>
+      {listing.website ? (
+        <p className="mt-3 text-sm">
+          <a
+            className="font-semibold text-emerald-800 underline"
+            href={listing.website}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Visit business website
+          </a>
+        </p>
+      ) : null}
 
       <div className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_21rem]">
         <div className="space-y-6">
@@ -300,11 +372,27 @@ export function ListingDetailsPage() {
             {user?.role === "buyer" ? (
               <Button
                 disabled={favoriteMutation.isPending}
-                onClick={() => favoriteMutation.mutate(Boolean(listing.isFavorite))}
+                onClick={() =>
+                  favoriteMutation.mutate(Boolean(listing.isFavorite))
+                }
                 size="lg"
                 variant="outline"
               >
-                {listing.isFavorite ? "Remove from saved businesses" : "Save business"}
+                {listing.isFavorite
+                  ? "Remove from saved businesses"
+                  : "Save business"}
+              </Button>
+            ) : null}
+            {user?.role === "buyer" ? (
+              <Button
+                disabled={inquiryMutation.isPending}
+                onClick={() => inquiryMutation.mutate()}
+                size="lg"
+                variant="accent"
+              >
+                {inquiryMutation.isPending
+                  ? "Opening conversation…"
+                  : "Contact seller"}
               </Button>
             ) : null}
             {user?.role === "buyer" ? (
@@ -362,8 +450,135 @@ export function ListingDetailsPage() {
               {dealError}
             </p>
           ) : null}
+          {inquiryMutation.isError ? (
+            <p
+              className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-900"
+              role="alert"
+            >
+              {toApiError(inquiryMutation.error).message}
+            </p>
+          ) : null}
+          {reportNotice ? (
+            <p
+              className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-900"
+              role="status"
+            >
+              {reportNotice}
+            </p>
+          ) : null}
+          {user ? (
+            <div className="mt-4 border-t border-line pt-3">
+              {!reportOpen ? (
+                <button
+                  type="button"
+                  className="text-xs font-medium text-ink-soft underline"
+                  onClick={() => {
+                    setReportNotice("");
+                    setReportValidationError("");
+                    setReportOpen(true);
+                  }}
+                >
+                  Report this listing
+                </button>
+              ) : (
+                <form
+                  className="space-y-2"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    const valid = z
+                      .string()
+                      .trim()
+                      .min(10)
+                      .max(5000)
+                      .safeParse(reportDescription);
+                    if (valid.success) {
+                      setReportValidationError("");
+                      reportMutation.mutate();
+                    } else {
+                      setReportValidationError(
+                        "Describe the issue in at least 10 characters.",
+                      );
+                    }
+                  }}
+                >
+                  <label
+                    className="block text-xs font-semibold"
+                    htmlFor="report-category"
+                  >
+                    Reason
+                  </label>
+                  <select
+                    id="report-category"
+                    className="h-10 w-full rounded-lg border border-line bg-white px-3 text-sm"
+                    value={reportCategory}
+                    onChange={(event) =>
+                      setReportCategory(
+                        event.target
+                          .value as (typeof listingReportCategories)[number],
+                      )
+                    }
+                  >
+                    {listingReportCategories.map((category) => (
+                      <option key={category} value={category}>
+                        {category.replaceAll("_", " ")}
+                      </option>
+                    ))}
+                  </select>
+                  <label
+                    className="block text-xs font-semibold"
+                    htmlFor="report-description"
+                  >
+                    Tell us what is wrong (10–5,000 characters)
+                  </label>
+                  <textarea
+                    id="report-description"
+                    className="min-h-24 w-full rounded-lg border border-line px-3 py-2 text-sm"
+                    minLength={10}
+                    maxLength={5000}
+                    required
+                    value={reportDescription}
+                    onChange={(event) => {
+                      setReportDescription(event.target.value);
+                      setReportValidationError("");
+                    }}
+                  />
+                  {reportValidationError ? (
+                    <p role="alert" className="text-xs text-rose-800">
+                      {reportValidationError}
+                    </p>
+                  ) : null}
+                  {reportMutation.isError ? (
+                    <p role="alert" className="text-xs text-rose-800">
+                      {toApiError(reportMutation.error).message}
+                    </p>
+                  ) : null}
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="accent"
+                      disabled={
+                        reportMutation.isPending ||
+                        reportDescription.trim().length < 10
+                      }
+                    >
+                      {reportMutation.isPending ? "Sending…" : "Submit report"}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setReportOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              )}
+            </div>
+          ) : null}
           <p className="mt-4 border-t border-line pt-4 text-xs leading-5 text-ink-faint">
-            Public listing details are provided by {listing.sellerName || "the seller"}.
+            Public listing details are provided by{" "}
+            {listing.sellerName || "the seller"}.
           </p>
         </Card>
       </div>

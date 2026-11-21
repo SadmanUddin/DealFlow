@@ -10,6 +10,8 @@ const publicFields = {
   description: businessListings.description,
   industry: businessListings.industry,
   location: businessListings.location,
+  website: businessListings.website,
+  imageUrl: sql`CASE WHEN ${businessListings.image_key} IS NULL THEN NULL ELSE '/api/listings/' || ${businessListings.id}::text || '/image?v=' || floor(extract(epoch from ${businessListings.updated_at}) * 1000)::bigint::text END`,
   askingPrice: businessListings.asking_price,
   annualRevenue: businessListings.annual_revenue,
   ebitda: businessListings.ebitda,
@@ -111,8 +113,9 @@ export const getPublicListings = async ({
   }[sort];
   const [rows, countRows] = await Promise.all([
     db
-      .select(publicFields)
+      .select({ ...publicFields, sellerName: users.name })
       .from(businessListings)
+      .innerJoin(users, eq(users.id, businessListings.seller_id))
       .where(where)
       .orderBy(...ordering)
       .limit(limit)

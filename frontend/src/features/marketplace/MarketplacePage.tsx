@@ -24,10 +24,30 @@ import {
 import { ListingCard } from "./ListingCard";
 import { ListingCardSkeleton } from "./ListingCardSkeleton";
 
-type SearchDraft = { q: string; industry: string; location: string };
+type SearchDraft = {
+  q: string;
+  industry: string;
+  location: string;
+  minPrice: string;
+  maxPrice: string;
+  minRevenue: string;
+  maxRevenue: string;
+  minEbitda: string;
+  maxEbitda: string;
+};
 
 function hasCriteria(filters: MarketplaceFilters) {
-  return Boolean(filters.q || filters.industry || filters.location);
+  return Boolean(
+    filters.q ||
+    filters.industry ||
+    filters.location ||
+    filters.minPrice ||
+    filters.maxPrice ||
+    filters.minRevenue ||
+    filters.maxRevenue ||
+    filters.minEbitda ||
+    filters.maxEbitda,
+  );
 }
 
 function MarketplaceContent() {
@@ -40,10 +60,47 @@ function MarketplaceContent() {
     q: filters.q ?? "",
     industry: filters.industry ?? "",
     location: filters.location ?? "",
+    minPrice: filters.minPrice ?? "",
+    maxPrice: filters.maxPrice ?? "",
+    minRevenue: filters.minRevenue ?? "",
+    maxRevenue: filters.maxRevenue ?? "",
+    minEbitda: filters.minEbitda ?? "",
+    maxEbitda: filters.maxEbitda ?? "",
   });
+  const [filterError, setFilterError] = useState("");
 
   const applySearch = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setFilterError("");
+    const amountPattern = /^\d{1,16}(\.\d{1,2})?$/;
+    const amounts = [
+      draft.minPrice,
+      draft.maxPrice,
+      draft.minRevenue,
+      draft.maxRevenue,
+      draft.minEbitda,
+      draft.maxEbitda,
+    ];
+    if (amounts.some((value) => value && !amountPattern.test(value))) {
+      setFilterError(
+        "Enter a non-negative amount with up to two decimal places.",
+      );
+      return;
+    }
+    if (
+      (draft.minPrice &&
+        draft.maxPrice &&
+        Number(draft.minPrice) > Number(draft.maxPrice)) ||
+      (draft.minRevenue &&
+        draft.maxRevenue &&
+        Number(draft.minRevenue) > Number(draft.maxRevenue)) ||
+      (draft.minEbitda &&
+        draft.maxEbitda &&
+        Number(draft.minEbitda) > Number(draft.maxEbitda))
+    ) {
+      setFilterError("Each minimum must be less than or equal to its maximum.");
+      return;
+    }
     setSearchParams(
       serializeMarketplaceFilters({
         ...filters,
@@ -51,6 +108,12 @@ function MarketplaceContent() {
         q: draft.q.trim() || undefined,
         industry: draft.industry.trim() || undefined,
         location: draft.location.trim() || undefined,
+        minPrice: draft.minPrice || undefined,
+        maxPrice: draft.maxPrice || undefined,
+        minRevenue: draft.minRevenue || undefined,
+        maxRevenue: draft.maxRevenue || undefined,
+        minEbitda: draft.minEbitda || undefined,
+        maxEbitda: draft.maxEbitda || undefined,
       }),
     );
   };
@@ -69,7 +132,18 @@ function MarketplaceContent() {
   };
 
   const clearSearch = () => {
-    setDraft({ q: "", industry: "", location: "" });
+    setFilterError("");
+    setDraft({
+      q: "",
+      industry: "",
+      location: "",
+      minPrice: "",
+      maxPrice: "",
+      minRevenue: "",
+      maxRevenue: "",
+      minEbitda: "",
+      maxEbitda: "",
+    });
     setSearchParams(
       serializeMarketplaceFilters({
         page: 1,
@@ -114,6 +188,83 @@ function MarketplaceContent() {
                 </span>
                 Published opportunities, presented with clarity.
               </div>
+              <fieldset className="mt-3 border-t border-line pt-3">
+                <legend className="px-1 text-xs font-semibold text-navy-950">
+                  Financial ranges{" "}
+                  <span className="font-normal text-ink-faint">
+                    (amounts are compared in each listing’s stated currency,
+                    without conversion)
+                  </span>
+                </legend>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                  {(
+                    [
+                      ["minPrice", "maxPrice", "Asking price"],
+                      ["minRevenue", "maxRevenue", "Annual revenue"],
+                      ["minEbitda", "maxEbitda", "EBITDA"],
+                    ] as const
+                  ).map(([minKey, maxKey, label]) => (
+                    <div
+                      key={minKey}
+                      className="rounded-lg border border-line px-3 py-2"
+                    >
+                      <p className="mb-1 text-[0.68rem] font-semibold text-ink-soft">
+                        {label}
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <label className="sr-only" htmlFor={minKey}>
+                          Minimum {label}
+                        </label>
+                        <input
+                          id={minKey}
+                          aria-label={`Minimum ${label}`}
+                          inputMode="decimal"
+                          maxLength={19}
+                          pattern="\d{1,16}(\.\d{1,2})?"
+                          placeholder="Min"
+                          value={draft[minKey]}
+                          onChange={(event) =>
+                            setDraft((current) => ({
+                              ...current,
+                              [minKey]: event.target.value,
+                            }))
+                          }
+                          className="h-9 min-w-0 rounded-md border border-line px-2 text-sm"
+                        />
+                        <label className="sr-only" htmlFor={maxKey}>
+                          Maximum {label}
+                        </label>
+                        <input
+                          id={maxKey}
+                          aria-label={`Maximum ${label}`}
+                          inputMode="decimal"
+                          maxLength={19}
+                          pattern="\d{1,16}(\.\d{1,2})?"
+                          placeholder="Max"
+                          value={draft[maxKey]}
+                          onChange={(event) =>
+                            setDraft((current) => ({
+                              ...current,
+                              [maxKey]: event.target.value,
+                            }))
+                          }
+                          className="h-9 min-w-0 rounded-md border border-line px-2 text-sm"
+                        />
+                      </div>
+                      {draft[minKey] &&
+                      draft[maxKey] &&
+                      Number(draft[minKey]) > Number(draft[maxKey]) ? (
+                        <p className="mt-1 text-[0.68rem] text-rose-800">
+                          Minimum must not exceed maximum.
+                        </p>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-2 text-[0.68rem] text-ink-faint">
+                  Use non-negative amounts with up to two decimal places.
+                </p>
+              </fieldset>
             </div>
 
             <form
@@ -121,6 +272,11 @@ function MarketplaceContent() {
               className="rounded-2xl border border-white bg-white p-3 shadow-[0_18px_55px_-38px_rgba(11,31,54,0.4)] ring-1 ring-navy-950/[0.04] sm:p-4"
               onSubmit={applySearch}
             >
+              {filterError ? (
+                <p role="alert" className="mb-2 text-xs text-rose-800">
+                  {filterError}
+                </p>
+              ) : null}
               <div className="grid gap-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(9rem,0.85fr)_minmax(9rem,0.85fr)_auto]">
                 <label className="group flex min-w-0 items-center gap-3 rounded-xl border border-transparent px-3.5 transition focus-within:border-emerald-700/20 focus-within:bg-emerald-50/40">
                   <Search

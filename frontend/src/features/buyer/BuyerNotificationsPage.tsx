@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ExternalLink,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/shared/ErrorState";
@@ -22,6 +23,7 @@ import {
   listNotifications,
   markAllNotificationsRead,
   markNotificationRead,
+  deleteNotification,
   type DealFlowNotification,
 } from "./api";
 
@@ -41,9 +43,7 @@ function notificationTarget(
   const conversationId = idFromPayload(item.payload, "conversationId");
   if (dealId) return `/${audience}/deals/${dealId}`;
   if (conversationId)
-    return audience === "seller"
-      ? `/seller/inquiries/${conversationId}`
-      : `/buyer/deals`;
+    return `/${audience}/conversations?conversation=${conversationId}`;
   if (listingId) return `/listings/${listingId}`;
   return undefined;
 }
@@ -72,6 +72,7 @@ export function BuyerNotificationsPage() {
     Promise.all([
       client.invalidateQueries({ queryKey: ["buyer", "notifications"] }),
       client.invalidateQueries({ queryKey: ["buyer", "overview"] }),
+      client.invalidateQueries({ queryKey: ["notifications", "unread-count"] }),
     ]);
   const markOne = useMutation({
     mutationFn: (id: number) => markNotificationRead(id),
@@ -90,6 +91,13 @@ export function BuyerNotificationsPage() {
       );
       setPage(1);
       setUnreadOnly(false);
+      await refresh();
+    },
+  });
+  const remove = useMutation({
+    mutationFn: deleteNotification,
+    onSuccess: async () => {
+      setNotice("Notification deleted.");
       await refresh();
     },
   });
@@ -114,8 +122,8 @@ export function BuyerNotificationsPage() {
             <CheckCheck aria-hidden="true" size={16} /> Mark all read
           </Button>
         }
-        description="DealFlow updates and account activity, with direct links to the related business or deal when the notification provides one."
-        eyebrow="Buyer workspace · Inbox"
+        description="Marketplace updates and account activity, with direct links to related businesses, conversations, and deals."
+        eyebrow="Workspace · Inbox"
         title="Notifications"
       />
       {notice ? (
@@ -126,12 +134,12 @@ export function BuyerNotificationsPage() {
           {notice}
         </p>
       ) : null}
-      {markOne.isError || markAll.isError ? (
+      {markOne.isError || markAll.isError || remove.isError ? (
         <p
           className="mb-4 rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-900"
           role="alert"
         >
-          {toApiError(markOne.error ?? markAll.error).message}
+          {toApiError(markOne.error ?? markAll.error ?? remove.error).message}
         </p>
       ) : null}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -199,7 +207,10 @@ export function BuyerNotificationsPage() {
                     </div>
                     <p className="mt-1 break-words text-xs leading-5 text-ink-soft">
                       {target
-                        ? String(item.payload.listingTitle ?? "Open the related DealFlow item for details.")
+                        ? String(
+                            item.payload.listingTitle ??
+                              "Open the related DealFlow item for details.",
+                          )
                         : "This notification has no linked resource."}
                     </p>
                     <p className="mt-1.5 text-[0.68rem] text-ink-faint">
@@ -230,6 +241,15 @@ export function BuyerNotificationsPage() {
                         Mark read
                       </button>
                     ) : null}
+                    <button
+                      aria-label="Delete notification"
+                      className="text-[0.68rem] font-semibold text-ink-soft hover:text-rose-800"
+                      disabled={remove.isPending}
+                      onClick={() => remove.mutate(item.id)}
+                      type="button"
+                    >
+                      <Trash2 size={13} /> Delete
+                    </button>
                   </div>
                 </li>
               );

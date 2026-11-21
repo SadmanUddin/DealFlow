@@ -127,6 +127,20 @@
       "when": 1795215359000,
       "tag": "0017_phase11_existing_account_verification_backfill",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1795300000000,
+      "tag": "0018_listing_public_profile_media",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1795300100000,
+      "tag": "0019_fix_listing_event_key_ambiguity",
+      "breakpoints": true
     }
   ]
 }

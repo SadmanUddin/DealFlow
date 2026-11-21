@@ -3,6 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { useLocation } from "react-router";
+import { useNavigate } from "react-router";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,13 +13,25 @@ import { toApiError } from "@/lib/api-error";
 import { authQueryKeys, getProfile, updateProfile } from "@/features/auth/api";
 import { profileSchema, type ProfileValues } from "@/features/auth/schemas";
 import { useAuth } from "@/features/auth/useAuth";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { clearPrivateQueryCache } from "@/app/providers/query-cache";
+import {
+  deactivateAccount,
+  getEmailPreferences,
+  updateEmailPreferences,
+  type EmailPreferences,
+} from "@/features/auth/api";
 
 export function AccountPage() {
   const queryClient = useQueryClient();
   const location = useLocation();
+  const navigate = useNavigate();
   const { user: sessionUser } = useAuth();
   const [formError, setFormError] = useState("");
   const [savedMessage, setSavedMessage] = useState("");
+  const [deactivateOpen, setDeactivateOpen] = useState(false);
+  const [deactivatePassword, setDeactivatePassword] = useState("");
+  const [deactivateError, setDeactivateError] = useState("");
   const profileQuery = useQuery({
     queryKey: authQueryKeys.profile,
     queryFn: getProfile,
@@ -34,6 +47,33 @@ export function AccountPage() {
       setSavedMessage("Your profile has been updated.");
       setFormError("");
     },
+  });
+  const preferencesQuery = useQuery({
+    queryKey: ["account", "email-preferences"],
+    queryFn: getEmailPreferences,
+    retry: false,
+  });
+  const preferencesMutation = useMutation({
+    mutationFn: (value: EmailPreferences) => updateEmailPreferences(value),
+    onSuccess: (value) => {
+      queryClient.setQueryData(["account", "email-preferences"], value);
+      setSavedMessage("Notification preferences updated.");
+    },
+  });
+  const deactivateMutation = useMutation({
+    mutationFn: () => deactivateAccount(deactivatePassword),
+    onSuccess: async () => {
+      setDeactivateOpen(false);
+      setDeactivatePassword("");
+      queryClient.setQueryData(authQueryKeys.session, null);
+      await clearPrivateQueryCache(queryClient);
+      queryClient.removeQueries({ queryKey: authQueryKeys.profile });
+      navigate("/login", {
+        replace: true,
+        state: { notice: "Your account has been deactivated." },
+      });
+    },
+    onError: (reason) => setDeactivateError(toApiError(reason).message),
   });
   const form = useForm<ProfileValues>({
     resolver: zodResolver(profileSchema),
@@ -221,7 +261,111 @@ export function AccountPage() {
         <p className="mt-6 text-xs text-ink-faint">
           Signed in as {sessionUser?.email ?? profile.email}.
         </p>
+        <Card className="mt-6">
+          <CardContent className="p-6 sm:p-7">
+            <h2 className="text-lg font-semibold text-navy-950">
+              Email notification preferences
+            </h2>
+            <p className="mt-1 text-sm text-ink-soft">
+              Choose which marketplace and deal updates may be sent by email.
+            </p>
+            {preferencesQuery.isPending ? (
+              <p className="mt-4 text-sm text-ink-soft">Loading preferences…</p>
+            ) : null}
+            {preferencesQuery.isError ? (
+              <ErrorState
+                title="Preferences unavailable"
+                description={toApiError(preferencesQuery.error).message}
+                onRetry={() => void preferencesQuery.refetch()}
+              />
+            ) : null}
+            {preferencesQuery.data ? (
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {(
+                  [
+                    ["listingStatus", "Listing status changes"],
+                    ["listingPrice", "Listing price changes"],
+                    ["listingDetails", "Listing detail changes"],
+                    ["dealUpdates", "Deal updates"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <label
+                    key={key}
+                    className="flex items-center gap-3 rounded-lg border border-line p-3 text-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={preferencesQuery.data[key]}
+                      disabled={preferencesMutation.isPending}
+                      onChange={(event) =>
+                        preferencesMutation.mutate({
+                          ...preferencesQuery.data!,
+                          [key]: event.target.checked,
+                        })
+                      }
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            ) : null}
+            {preferencesMutation.isError ? (
+              <p role="alert" className="mt-3 text-sm text-rose-800">
+                {toApiError(preferencesMutation.error).message}
+              </p>
+            ) : null}
+            <div className="mt-7 border-t border-line pt-5">
+              <h3 className="text-sm font-semibold text-red-800">
+                Deactivate account
+              </h3>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-ink-soft">
+                Deactivation signs you out, revokes active sessions, and
+                prevents further account access. Your records may remain where
+                required for active marketplace transactions.
+              </p>
+              <Button
+                className="mt-3"
+                variant="outline"
+                onClick={() => {
+                  setDeactivateError("");
+                  setDeactivatePassword("");
+                  setDeactivateOpen(true);
+                }}
+              >
+                Deactivate account
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
+      {deactivateOpen ? (
+        <ConfirmDialog
+          title="Deactivate your account?"
+          description="You will be signed out immediately and cannot use this account again. Confirm with your current password."
+          confirmLabel="Deactivate account"
+          busyLabel="Deactivating…"
+          busy={deactivateMutation.isPending}
+          confirmDisabled={!deactivatePassword}
+          error={deactivateError}
+          onCancel={() => setDeactivateOpen(false)}
+          onConfirm={() => deactivateMutation.mutate()}
+        >
+          <label
+            className="block text-sm font-medium"
+            htmlFor="deactivate-password"
+          >
+            Current password
+          </label>
+          <input
+            autoComplete="current-password"
+            id="deactivate-password"
+            type="password"
+            value={deactivatePassword}
+            onChange={(event) => setDeactivatePassword(event.target.value)}
+            className="mt-2 h-11 w-full rounded-lg border border-line px-3 text-sm"
+          />
+        </ConfirmDialog>
+      ) : null}
     </section>
   );
 }

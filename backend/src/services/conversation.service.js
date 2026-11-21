@@ -235,7 +235,10 @@ export const getConversations = async (userId, { page, limit }) => {
         eq(conversations.listing_id, businessListings.id)
       )
       .where(where)
-      .orderBy(desc(conversations.created_at), desc(conversations.id))
+      .orderBy(
+        sql`COALESCE((SELECT message.created_at FROM messages AS message WHERE message.conversation_id = ${conversations.id} ORDER BY message.created_at DESC, message.id DESC LIMIT 1), ${conversations.created_at}) DESC`,
+        desc(conversations.id)
+      )
       .limit(limit)
       .offset(offset),
     db

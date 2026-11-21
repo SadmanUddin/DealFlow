@@ -2,7 +2,12 @@ import { AxiosError, type AxiosAdapter } from "axios";
 import { afterEach, describe, expect, it } from "vitest";
 import { toApiError } from "@/lib/api-error";
 import { apiClient } from "@/lib/api-client";
-import { getPublishedListing, getPublicListings } from "./marketplace-api";
+import {
+  getPublishedListing,
+  getPublicListings,
+  parseMarketplaceFilters,
+  serializeMarketplaceFilters,
+} from "./marketplace-api";
 
 const listing = {
   id: 4,
@@ -33,6 +38,24 @@ afterEach(() => {
 });
 
 describe("marketplace API boundary", () => {
+  it("round-trips all supported financial range filters in the URL", () => {
+    const filters = parseMarketplaceFilters(
+      "?q=cafe&minPrice=100000&maxPrice=900000&minRevenue=250000&maxRevenue=1000000&minEbitda=50000&maxEbitda=200000&page=3&sort=price_asc",
+    );
+    expect(filters).toMatchObject({
+      minPrice: "100000",
+      maxPrice: "900000",
+      minRevenue: "250000",
+      maxRevenue: "1000000",
+      minEbitda: "50000",
+      maxEbitda: "200000",
+      page: 3,
+      sort: "price_asc",
+    });
+    expect(
+      parseMarketplaceFilters(`?${serializeMarketplaceFilters(filters)}`),
+    ).toMatchObject(filters);
+  });
   it("calls the existing listing endpoint with supported filters and strips private fields", async () => {
     let requestUrl: string | undefined;
     let requestParams: unknown;

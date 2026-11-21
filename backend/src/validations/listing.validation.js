@@ -22,6 +22,17 @@ const fields = {
   description: z.string().trim().min(20).max(10000),
   industry: z.string().trim().max(120).optional().nullable(),
   location: z.string().trim().max(160).optional().nullable(),
+  website: z
+    .string()
+    .trim()
+    .max(2048)
+    .url()
+    .refine(
+      value => ['http:', 'https:'].includes(new URL(value).protocol),
+      'Website must use HTTPS or HTTP'
+    )
+    .optional()
+    .nullable(),
   asking_price: money,
   annual_revenue: money,
   ebitda: money,

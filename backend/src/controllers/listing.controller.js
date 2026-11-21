@@ -11,6 +11,11 @@ import {
 } from '#services/listing.service.js';
 import { AppError } from '#utils/app-error.js';
 import {
+  getListingImage,
+  removeListingImage,
+  uploadListingImage,
+} from '#services/listing-image.service.js';
+import {
   createListingSchema,
   emptyBodySchema,
   listingIdSchema,
@@ -20,6 +25,36 @@ import {
 } from '#validations/listing.validation.js';
 
 const listingId = req => listingIdSchema.parse(req.params).id;
+
+export const uploadListingImageController = async (req, res) => {
+  res
+    .status(200)
+    .json(await uploadListingImage(req, listingId(req), req.user.id));
+};
+
+export const removeListingImageController = async (req, res) => {
+  res
+    .status(200)
+    .json(await removeListingImage(listingId(req), req.user.id));
+};
+
+export const getListingImageController = async (req, res) => {
+  const { stream, mimeType, isPublic } = await getListingImage(
+    listingId(req),
+    req.user?.id
+  );
+  res.set({
+    'Content-Type': mimeType,
+    'Cache-Control': isPublic ? 'public, max-age=300' : 'private, no-store',
+    'Cross-Origin-Resource-Policy': 'cross-origin',
+    'X-Content-Type-Options': 'nosniff',
+  });
+  stream.on('error', error => {
+    if (!res.headersSent) res.status(502).end();
+    else res.destroy(error);
+  });
+  stream.pipe(res);
+};
 
 export const createListing = async (req, res) => {
   const input = createListingSchema.parse(req.body);
@@ -38,14 +73,12 @@ export const getPublicListings = async (req, res) => {
 };
 
 export const getPublishedListing = async (req, res) => {
-  res
-    .status(200)
-    .json({
-      listing: await getPublishedListingService(
-        listingId(req),
-        req.user?.id ?? null
-      ),
-    });
+  res.status(200).json({
+    listing: await getPublishedListingService(
+      listingId(req),
+      req.user?.id ?? null
+    ),
+  });
 };
 
 export const updateListing = async (req, res) => {

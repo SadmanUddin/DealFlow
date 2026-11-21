@@ -35,6 +35,9 @@ export const businessListings = pgTable(
     description: text('description').notNull(),
     industry: varchar('industry', { length: 120 }),
     location: varchar('location', { length: 160 }),
+    website: varchar('website', { length: 2048 }),
+    image_key: varchar('image_key', { length: 512 }),
+    image_mime_type: varchar('image_mime_type', { length: 32 }),
     asking_price: numeric('asking_price', { precision: 18, scale: 2 }),
     annual_revenue: numeric('annual_revenue', { precision: 18, scale: 2 }),
     ebitda: numeric('ebitda', { precision: 18, scale: 2 }),
@@ -110,6 +113,14 @@ export const businessListings = pgTable(
     check(
       'business_listings_currency_format',
       sql`${table.currency} ~ '^[A-Z]{3}$'`
+    ),
+    check(
+      'business_listings_image_mime_type_check',
+      sql`${table.image_mime_type} IS NULL OR ${table.image_mime_type} IN ('image/jpeg', 'image/png', 'image/webp')`
+    ),
+    check(
+      'business_listings_image_metadata_consistent_check',
+      sql`(${table.image_key} IS NULL) = (${table.image_mime_type} IS NULL)`
     ),
   ]
 );

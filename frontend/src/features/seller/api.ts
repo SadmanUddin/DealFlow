@@ -15,13 +15,22 @@ export const sellerListingSchema = z.object({
   description: z.string(),
   industry: z.string().nullable(),
   location: z.string().nullable(),
+  website: z.string().nullable().optional(),
+  imageUrl: z.string().nullable().optional(),
   askingPrice: z.string().nullable(),
   annualRevenue: z.string().nullable(),
   ebitda: z.string().nullable(),
   currency: z.string().length(3),
   publishedAt: dateValue.nullable(),
   createdAt: dateValue,
-  status: z.enum(["draft", "pending", "published", "rejected", "archived"]),
+  status: z.enum([
+    "draft",
+    "pending",
+    "published",
+    "rejected",
+    "archived",
+    "suspended",
+  ]),
   rejectionReason: z.string().nullable(),
   updatedAt: dateValue,
 });
@@ -38,6 +47,7 @@ export type ListingInput = {
   description: string;
   industry: string | null;
   location: string | null;
+  website?: string | null;
   asking_price: string | null;
   annual_revenue: string | null;
   ebitda: string | null;
@@ -56,6 +66,21 @@ export const archiveListing = (id: number) =>
   postValidated(`/listings/${id}/archive`, {}, listingResponse);
 export const deleteDraftListing = (id: number) =>
   deleteValidated(`/listings/${id}`, deletedResponse);
+export async function uploadListingImage(id: number, file: File) {
+  const body = new FormData();
+  body.append("image", file);
+  const { data } = await apiClient.post<unknown>(`/listings/${id}/image`, body);
+  return z
+    .object({ imageUrl: z.string(), status: sellerListingSchema.shape.status })
+    .parse(data);
+}
+const imageRemovalResponse = z.object({
+  removed: z.boolean(),
+  status: sellerListingSchema.shape.status,
+  imageUrl: z.null(),
+});
+export const removeListingImage = (id: number) =>
+  deleteValidated(`/listings/${id}/image`, imageRemovalResponse);
 
 const inquirySchema = z.object({
   id: z.number().int().positive(),

@@ -25,13 +25,7 @@ function formatBytes(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function DealDocumentsPanel({
-  dealId,
-  isBuyer,
-}: {
-  dealId: number;
-  isBuyer: boolean;
-}) {
+export function DealDocumentsPanel({ dealId }: { dealId: number }) {
   const client = useQueryClient();
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -41,12 +35,11 @@ export function DealDocumentsPanel({
     queryKey: ["deals", dealId, "documents", 1, 100],
     queryFn: () => listDealDocuments(dealId, 1, 100),
   });
-  // The API exposes no deal upload route. Buyers can link only files from their
-  // own listing conversation; sellers use their authorized inquiry workspace.
+  // Deal participants share the listing conversation for deal documents.
   const conversationsQuery = useQuery({
     queryKey: ["deals", dealId, "conversation"],
     queryFn: () => getDealConversation(dealId),
-    enabled: isBuyer,
+    enabled: true,
   });
   const conversation = conversationsQuery.data;
   const sourceDocumentsQuery = useQuery({
@@ -188,15 +181,14 @@ export function DealDocumentsPanel({
         </p>
       ) : null}
 
-      {isBuyer ? (
-        <div className="mt-5 border-t border-line pt-4">
+      <div className="mt-5 border-t border-line pt-4">
           <h3 className="text-sm font-semibold text-navy-950">
             Add a private document
           </h3>
           <p className="mt-1 max-w-2xl text-xs leading-5 text-ink-soft">
-            Upload permitted files to the existing private buyer conversation,
-            then link them to this deal room. Sellers can share files from the
-            related inquiry workspace.
+            Upload permitted files to the existing private listing conversation,
+            then link them to this deal room. Both deal participants can access
+            documents linked here.
           </p>
           {conversationsQuery.isPending ? (
             <div
@@ -232,7 +224,7 @@ export function DealDocumentsPanel({
           !conversationsQuery.isError &&
           !conversation ? (
             <p className="mt-3 rounded-lg bg-mist px-3 py-2 text-xs text-ink-soft">
-              Open the buyer conversation above before adding documents to this
+              Open the listing conversation above before adding documents to this
               deal.
             </p>
           ) : null}
@@ -292,8 +284,7 @@ export function DealDocumentsPanel({
               </p>
             </div>
           ) : null}
-        </div>
-      ) : null}
+      </div>
     </SectionCard>
   );
 }

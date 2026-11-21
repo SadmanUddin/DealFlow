@@ -63,6 +63,11 @@ const BuyerSavedPage = lazy(() =>
     default: module.BuyerSavedPage,
   })),
 );
+const BuyerConversationsPage = lazy(() =>
+  import("@/features/buyer/BuyerConversationsPage").then((module) => ({
+    default: module.BuyerConversationsPage,
+  })),
+);
 const BuyerOffersPage = lazy(() =>
   import("@/features/buyer/BuyerOffersPage").then((module) => ({
     default: module.BuyerOffersPage,
@@ -111,6 +116,11 @@ const SellerInquiriesPage = lazy(() =>
 const SellerInquiryDetailPage = lazy(() =>
   import("@/features/seller/SellerInquiryDetailPage").then((module) => ({
     default: module.SellerInquiryDetailPage,
+  })),
+);
+const SellerConversationsPage = lazy(() =>
+  import("@/features/seller/SellerConversationsPage").then((module) => ({
+    default: module.SellerConversationsPage,
   })),
 );
 const SellerOffersPage = lazy(() =>
@@ -232,6 +242,7 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: lazyPage(<BuyerOverviewPage />) },
       { path: "saved", element: lazyPage(<BuyerSavedPage />) },
+      { path: "conversations", element: lazyPage(<BuyerConversationsPage />) },
       { path: "offers", element: lazyPage(<BuyerOffersPage />) },
       { path: "deals", element: lazyPage(<BuyerDealsPage />) },
       { path: "deals/:id", element: lazyPage(<DealDetailPage />) },
@@ -256,6 +267,7 @@ const router = createBrowserRouter([
       },
       { path: "inquiries", element: lazyPage(<SellerInquiriesPage />) },
       { path: "inquiries/:id", element: lazyPage(<SellerInquiryDetailPage />) },
+      { path: "conversations", element: lazyPage(<SellerConversationsPage />) },
       { path: "deals", element: lazyPage(<SellerOffersPage />) },
       { path: "deals/:id", element: lazyPage(<DealDetailPage />) },
       { path: "notifications", element: lazyPage(<BuyerNotificationsPage />) },

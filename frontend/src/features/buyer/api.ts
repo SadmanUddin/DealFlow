@@ -6,7 +6,6 @@ import {
   patchValidated,
   postValidated,
 } from "@/features/workspace/api-core";
-import { apiClient } from "@/lib/api-client";
 
 const money = z
   .string()
@@ -20,6 +19,9 @@ export const favoriteSchema = z.object({
   description: z.string(),
   industry: z.string().nullable(),
   location: z.string().nullable(),
+  sellerName: z.string().nullable().optional(),
+  website: z.string().nullable().optional(),
+  imageUrl: z.string().nullable().optional(),
   askingPrice: money,
   currency: z.string().length(3),
   publishedAt: z.string().nullable(),
@@ -75,6 +77,8 @@ export const markNotificationRead = (id: number) =>
   patchValidated(`/notifications/${id}/read`, {}, notificationReadSchema);
 export const markAllNotificationsRead = () =>
   patchValidated("/notifications/read", {}, markAllSchema);
+export const deleteNotification = (id: number) =>
+  deleteValidated(`/notifications/${id}`, z.object({ deleted: z.boolean() }));
 
 const conversationSchema = z.object({
   id: z.number().int().positive(),
@@ -141,3 +145,8 @@ export const markBuyerConversationRead = (id: number) =>
     {},
     z.object({ conversationId: z.number(), readCount: z.number() }),
   );
+// These endpoints are participant-scoped and serve both buyer and seller inboxes.
+export const listConversations = listBuyerConversations;
+export const listConversationMessages = listBuyerConversationMessages;
+export const sendConversationMessage = sendBuyerConversationMessage;
+export const markConversationRead = markBuyerConversationRead;

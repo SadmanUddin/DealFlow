@@ -12,6 +12,8 @@ const moneySchema = z
 export const publicListingSchema = z.object({
   id: z.number().int().positive().safe(),
   sellerName: z.string().nullable().optional(),
+  website: z.string().nullable().optional(),
+  imageUrl: z.string().nullable().optional(),
   isFavorite: z.boolean().optional(),
   title: z.string(),
   description: z.string(),
@@ -47,6 +49,12 @@ export type MarketplaceFilters = {
   q?: string;
   industry?: string;
   location?: string;
+  minPrice?: string;
+  maxPrice?: string;
+  minRevenue?: string;
+  maxRevenue?: string;
+  minEbitda?: string;
+  maxEbitda?: string;
   sort: "newest" | "oldest" | "price_asc" | "price_desc";
 };
 
@@ -73,13 +81,32 @@ export function parseMarketplaceFilters(search: string): MarketplaceFilters {
     q: optionalText(params.get("q"), 200),
     industry: optionalText(params.get("industry"), 120),
     location: optionalText(params.get("location"), 160),
+    minPrice: optionalAmount(params.get("minPrice")),
+    maxPrice: optionalAmount(params.get("maxPrice")),
+    minRevenue: optionalAmount(params.get("minRevenue")),
+    maxRevenue: optionalAmount(params.get("maxRevenue")),
+    minEbitda: optionalAmount(params.get("minEbitda")),
+    maxEbitda: optionalAmount(params.get("maxEbitda")),
   };
   return filters;
 }
+const optionalAmount = (value: string | null) =>
+  value && /^\d{1,16}(\.\d{1,2})?$/.test(value) ? value : undefined;
 
 export function serializeMarketplaceFilters(filters: MarketplaceFilters) {
   const params = new URLSearchParams();
   for (const key of ["q", "industry", "location"] as const) {
+    const value = filters[key];
+    if (value) params.set(key, value);
+  }
+  for (const key of [
+    "minPrice",
+    "maxPrice",
+    "minRevenue",
+    "maxRevenue",
+    "minEbitda",
+    "maxEbitda",
+  ] as const) {
     const value = filters[key];
     if (value) params.set(key, value);
   }
@@ -120,4 +147,25 @@ export async function savePublishedListing(id: number) {
 export async function unsavePublishedListing(id: number) {
   const { removeFavorite } = await import("@/features/buyer/api");
   return removeFavorite(id);
+}
+
+export const listingReportCategories = [
+  "suspicious_activity",
+  "misleading_information",
+  "potential_scam",
+  "marketplace_violation",
+  "other",
+] as const;
+export async function submitListingReport(input: {
+  listingId: number;
+  category: (typeof listingReportCategories)[number];
+  description: string;
+}) {
+  const { data } = await apiClient.post<unknown>("/reports", input);
+  return z
+    .object({
+      report: z.object({ id: z.number().int().positive() }).passthrough(),
+      created: z.boolean(),
+    })
+    .parse(data);
 }

@@ -6,6 +6,9 @@ import {
   getMyListings,
   getPublicListings,
   getPublishedListing,
+  getListingImageController,
+  removeListingImageController,
+  uploadListingImageController,
   submitListing,
   updateListing,
 } from '#controllers/listing.controller.js';
@@ -17,6 +20,7 @@ import {
 
 const router = express.Router();
 router.get('/', getPublicListings);
+router.get('/:id/image', getListingImageController);
 router.get(
   '/mine',
   requireAuthentication,
@@ -29,6 +33,20 @@ router.post(
   authorizeRoles('seller'),
   requireCsrf,
   createListing
+);
+router.post(
+  '/:id/image',
+  requireAuthentication,
+  authorizeRoles('seller'),
+  requireCsrf,
+  uploadListingImageController
+);
+router.delete(
+  '/:id/image',
+  requireAuthentication,
+  authorizeRoles('seller'),
+  requireCsrf,
+  removeListingImageController
 );
 router.get('/:id', getPublishedListing);
 router.patch(
