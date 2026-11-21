@@ -263,6 +263,20 @@ const tableRows = target => databaseState[target.__name];
 
 const valueFor = (rowSet, column) => rowSet[column.table]?.[column.field];
 
+const orderValueFor = (rowSet, order) => {
+  if (order.column) return valueFor(rowSet, order.column);
+  if (order.__sql?.includes('COALESCE') && rowSet.conversations) {
+    const conversation = rowSet.conversations;
+    const latestMessage = databaseState.messages
+      .filter(message => message.conversation_id === conversation.id)
+      .sort((left, right) =>
+        right.created_at - left.created_at || right.id - left.id
+      )[0];
+    return latestMessage?.created_at ?? conversation.created_at;
+  }
+  return undefined;
+};
+
 const matches = (expression, rowSet) => {
   if (!expression) return true;
   if (expression.__sql) {
@@ -471,8 +485,8 @@ class Query {
     const matching = rowSets.filter(rowSet => matches(this.expression, rowSet));
     for (const order of [...(this.ordering ?? [])].reverse()) {
       matching.sort((left, right) => {
-        const a = valueFor(left, order.column);
-        const b = valueFor(right, order.column);
+        const a = orderValueFor(left, order);
+        const b = orderValueFor(right, order);
         if (a == null || b == null) return a == null ? (b == null ? 0 : 1) : -1;
         let comparison;
         if (a instanceof Date && b instanceof Date) {
@@ -484,7 +498,9 @@ class Query {
             numeric: true,
           });
         }
-        return order.operator === 'desc' ? -comparison : comparison;
+        const descending =
+          order.operator === 'desc' || order.__sql?.includes('DESC');
+        return descending ? -comparison : comparison;
       });
     }
     const selected = matching

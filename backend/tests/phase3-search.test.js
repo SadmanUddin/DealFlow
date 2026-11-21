@@ -58,6 +58,14 @@ const listing = (id, overrides = {}) => ({
 
 beforeEach(() => {
   mock.resetDatabase();
+  mock.databaseState.users.push(
+    ...[1, 2, 3, 4].map(id => ({
+      id: id + 100,
+      name: `Seller ${id}`,
+      role: 'seller',
+      is_active: true,
+    }))
+  );
   mock.databaseState.business_listings.push(
     listing(1, {
       title: 'Cloud Bakery',
