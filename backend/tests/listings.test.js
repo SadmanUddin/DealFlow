@@ -167,6 +167,7 @@ describe('public listing visibility', () => {
     expect(publicList.body.listings[0]).not.toHaveProperty('sellerId');
     expect(publicList.body.listings[0]).not.toHaveProperty('rejectionReason');
     expect(visible.status).toBe(200);
+    expect(visible.body.listing.sellerName).toBe('Test seller');
     expect(hiddenDetails.every(response => response.status === 404)).toBe(true);
   });
 

@@ -7,6 +7,7 @@ import {
   dealDocuments,
 } from '#models/deal.model.js';
 import { businessListings } from '#models/listing.model.js';
+import { users } from '#models/user.model.js';
 import { conversationDocuments } from '#models/conversation.model.js';
 import { AppError } from '#utils/app-error.js';
 import { canTransitionDeal } from '#utils/deal-rules.js';
@@ -60,7 +61,7 @@ export const createDeal = async (buyerId, listingId) => {
       INSERT INTO deal_activities(deal_id, actor_id, event_type, metadata)
       SELECT id, ${buyerId}, 'deal.created', jsonb_build_object('listingId', listing_id) FROM created RETURNING id
     ), notice AS (
-      INSERT INTO notifications(user_id, dedupe_key, type, payload)
+      INSERT INTO notifications AS inserted_notification(user_id, dedupe_key, type, payload)
       SELECT seller_id, 'deal:' || id || ':created:seller', 'deal.created', jsonb_build_object('dealId', id, 'listingId', listing_id) FROM created
       ON CONFLICT (dedupe_key) DO NOTHING RETURNING id
     ), email_event AS (
@@ -118,8 +119,22 @@ export const listDeals = async (userId, { page: pageNo, limit }) => {
   const where = participant(userId);
   const [rows, counts] = await Promise.all([
     db
-      .select()
+      .select({
+        id: deals.id,
+        deal_uid: deals.deal_uid,
+        listing_id: deals.listing_id,
+        buyer_id: deals.buyer_id,
+        seller_id: deals.seller_id,
+        status: deals.status,
+        accepted_at: deals.accepted_at,
+        created_at: deals.created_at,
+        updated_at: deals.updated_at,
+        listing_title: businessListings.title,
+        buyer_name: sql`(SELECT name FROM users WHERE id = ${deals.buyer_id})`,
+        seller_name: sql`(SELECT name FROM users WHERE id = ${deals.seller_id})`,
+      })
       .from(deals)
+      .innerJoin(businessListings, eq(deals.listing_id, businessListings.id))
       .where(where)
       .orderBy(desc(deals.updated_at), desc(deals.id))
       .limit(limit)
@@ -133,8 +148,25 @@ export const listDeals = async (userId, { page: pageNo, limit }) => {
   return { deals: rows, pagination: page(pageNo, limit, total) };
 };
 
-export const getDeal = async (dealId, userId, isAdmin = false) =>
-  participantDeal(dealId, userId, isAdmin);
+export const getDeal = async (dealId, userId, isAdmin = false) => {
+  const deal = await participantDeal(dealId, userId, isAdmin);
+  const participants = await db
+    .select({
+      id: users.id,
+      name: users.name,
+    })
+    .from(users)
+    .where(inArray(users.id, [deal.buyer_id, deal.seller_id]));
+  const buyerName = participants.find(user => user.id === deal.buyer_id)?.name;
+  const sellerName = participants.find(
+    user => user.id === deal.seller_id
+  )?.name;
+  return {
+    ...deal,
+    buyer_name: buyerName ?? null,
+    seller_name: sellerName ?? null,
+  };
+};
 
 export const updateDealStatus = async (dealId, userId, role, status) => {
   const current = await participantDeal(dealId, userId, role === 'admin');
@@ -159,8 +191,8 @@ export const updateDealStatus = async (dealId, userId, role, status) => {
       SELECT id, ${userId}, 'deal.status_changed', jsonb_build_object('from', ${current.status}, 'to', ${status}) FROM changed RETURNING id
     ), notifications_added AS (
       INSERT INTO notifications(user_id, dedupe_key, type, payload)
-      SELECT recipient, 'deal:' || changed.id || ':status:' || changed.updated_at::text || ':' || recipient, 'deal.status_changed', jsonb_build_object('dealId', changed.id, 'status', changed.status)
-      FROM changed CROSS JOIN LATERAL unnest(ARRAY[changed.buyer_id, changed.seller_id]) AS recipient WHERE recipient <> ${userId}
+      SELECT recipients.user_id, 'deal:' || changed.id || ':status:' || changed.updated_at::text || ':' || recipients.user_id, 'deal.status_changed', jsonb_build_object('dealId', changed.id, 'status', changed.status)
+      FROM changed CROSS JOIN LATERAL unnest(ARRAY[changed.buyer_id, changed.seller_id]) AS recipients(user_id) WHERE recipients.user_id <> ${userId}
       ON CONFLICT (dedupe_key) DO NOTHING RETURNING id
     ), email_event AS (
       INSERT INTO outbox_events(event_key, type, payload)
@@ -187,57 +219,101 @@ export const createOffer = async (dealId, userId, input) => {
     );
   const result = await executeDealWrite(sql`
     WITH deal_guard AS MATERIALIZED (
-      SELECT id, buyer_id, seller_id, status FROM deals
-      WHERE id = ${dealId} AND status IN ('proposed','negotiating','due_diligence')
-        AND ${userId} IN (buyer_id, seller_id)
+      SELECT deal.id, deal.buyer_id, deal.seller_id, deal.status FROM deals AS deal
+      WHERE deal.id = ${dealId} AND deal.status IN ('proposed','negotiating','due_diligence')
+        AND ${userId} IN (deal.buyer_id, deal.seller_id)
       FOR UPDATE
     ), countered AS (
       UPDATE deal_offers AS parent SET status = 'superseded', responded_at = now()
       FROM deal_guard
       WHERE ${input.parentOfferId ?? null}::integer IS NOT NULL AND parent.id = ${input.parentOfferId ?? null}
         AND parent.deal_id = deal_guard.id AND parent.status = 'pending' AND parent.created_by <> ${userId}
-      RETURNING id
+      RETURNING parent.id
     ), offer AS (
-      INSERT INTO deal_offers(deal_id, parent_offer_id, created_by, amount, currency, message)
+      INSERT INTO deal_offers AS inserted_offer(deal_id, parent_offer_id, created_by, amount, currency, message)
       SELECT deal_guard.id, ${input.parentOfferId ?? null}, ${userId}, ${input.amount}, ${input.currency}, ${input.message ?? null}
       FROM deal_guard
-      WHERE ${input.parentOfferId ?? null}::integer IS NULL OR EXISTS (SELECT 1 FROM countered)
-      RETURNING *
+      WHERE (${input.parentOfferId ?? null}::integer IS NULL OR EXISTS (SELECT 1 FROM countered))
+        AND (${input.parentOfferId ?? null}::integer IS NOT NULL OR NOT EXISTS (
+          SELECT 1 FROM deal_offers AS pending_offer
+          WHERE pending_offer.deal_id = deal_guard.id AND pending_offer.created_by = ${userId}
+            AND pending_offer.status = 'pending'
+        ))
+      RETURNING inserted_offer.*
     ), deal_progress AS (
-      UPDATE deals SET status = 'negotiating', updated_at = now()
-      WHERE id = ${dealId} AND status = 'proposed' AND EXISTS (SELECT 1 FROM offer) RETURNING id,buyer_id,seller_id
+      UPDATE deals AS current_deal SET status = 'negotiating', updated_at = now()
+      WHERE current_deal.id = ${dealId} AND current_deal.status = 'proposed' AND EXISTS (SELECT 1 FROM offer)
+      RETURNING current_deal.id, current_deal.buyer_id, current_deal.seller_id
     ), activity AS (
-      INSERT INTO deal_activities(deal_id, actor_id, event_type, metadata)
-      SELECT deal_id, created_by, CASE WHEN parent_offer_id IS NULL THEN 'offer.submitted' ELSE 'offer.countered' END, jsonb_build_object('offerId', id, 'amount', amount, 'currency', currency, 'parentOfferId', parent_offer_id) FROM offer
-      UNION ALL SELECT id, ${userId}, 'deal.status_changed', jsonb_build_object('from', 'proposed', 'to', 'negotiating') FROM deal_progress RETURNING id
+      INSERT INTO deal_activities AS inserted_activity(deal_id, actor_id, event_type, metadata)
+      SELECT offer.deal_id, offer.created_by, CASE WHEN offer.parent_offer_id IS NULL THEN 'offer.submitted' ELSE 'offer.countered' END, jsonb_build_object('offerId', offer.id, 'amount', offer.amount, 'currency', offer.currency, 'parentOfferId', offer.parent_offer_id) FROM offer
+      UNION ALL SELECT deal_progress.id, ${userId}, 'deal.status_changed', jsonb_build_object('from', 'proposed', 'to', 'negotiating') FROM deal_progress
+      RETURNING inserted_activity.id
+    ), notification_events AS (
+      SELECT
+        CASE WHEN offer.created_by = ${deal.buyer_id} THEN ${deal.seller_id} ELSE ${deal.buyer_id} END AS user_id,
+        'deal:' || ${dealId} || ':offer:' || offer.id AS dedupe_key,
+        CASE WHEN offer.parent_offer_id IS NULL THEN 'deal.offer' ELSE 'deal.counteroffer' END AS type,
+        jsonb_build_object(
+          'dealId', ${dealId},
+          'offerId', offer.id,
+          'senderName', (SELECT sender.name FROM users AS sender WHERE sender.id = offer.created_by),
+          'listingTitle', (SELECT listing.title FROM business_listings AS listing WHERE listing.id = ${deal.listing_id})
+        ) AS payload
+      FROM offer
+      UNION ALL
+      SELECT recipients.user_id,
+        'deal:' || deal_progress.id || ':negotiating:' || recipients.user_id,
+        'deal.status_changed',
+        jsonb_build_object('dealId', deal_progress.id, 'status', 'negotiating')
+      FROM deal_progress CROSS JOIN LATERAL unnest(ARRAY[deal_progress.buyer_id, deal_progress.seller_id]) AS recipients(user_id)
+      WHERE recipients.user_id <> ${userId}
     ), notify AS (
       INSERT INTO notifications(user_id, dedupe_key, type, payload)
-      SELECT CASE WHEN offer.created_by = ${deal.buyer_id} THEN ${deal.seller_id} ELSE ${deal.buyer_id} END,
-        'deal:' || ${dealId} || ':offer:' || offer.id, CASE WHEN offer.parent_offer_id IS NULL THEN 'deal.offer' ELSE 'deal.counteroffer' END,
-        jsonb_build_object('dealId', ${dealId}, 'offerId', offer.id)
-      FROM offer ON CONFLICT (dedupe_key) DO NOTHING RETURNING id
+      SELECT notification_events.user_id, notification_events.dedupe_key, notification_events.type, notification_events.payload
+      FROM notification_events
+      ON CONFLICT (dedupe_key) DO NOTHING RETURNING inserted_notification.id
+    ), email_events AS (
+      SELECT
+        'deal:' || ${dealId} || ':offer:' || offer.id AS event_key,
+        CASE WHEN offer.parent_offer_id IS NULL THEN 'deal.offer' ELSE 'deal.counteroffer' END AS type,
+        jsonb_build_object('dealId', ${dealId}, 'offerId', offer.id, 'recipientIds', jsonb_build_array(CASE WHEN offer.created_by = ${deal.buyer_id} THEN ${deal.seller_id} ELSE ${deal.buyer_id} END)) AS payload
+      FROM offer
+      UNION ALL
+      SELECT 'deal:' || deal_progress.id || ':negotiating',
+        'deal.status_changed',
+        jsonb_build_object('dealId', deal_progress.id, 'status', 'negotiating', 'recipientIds', jsonb_build_array(deal_progress.buyer_id,deal_progress.seller_id))
+      FROM deal_progress
     ), email_event AS (
-      INSERT INTO outbox_events(event_key, type, payload)
-      SELECT 'deal:' || ${dealId} || ':offer:' || offer.id, CASE WHEN offer.parent_offer_id IS NULL THEN 'deal.offer' ELSE 'deal.counteroffer' END,
-        jsonb_build_object('dealId', ${dealId}, 'offerId', offer.id, 'recipientIds', jsonb_build_array(CASE WHEN offer.created_by = ${deal.buyer_id} THEN ${deal.seller_id} ELSE ${deal.buyer_id} END))
-      FROM offer ON CONFLICT (event_key) DO NOTHING RETURNING id
-    ), status_notice AS (
-      INSERT INTO notifications(user_id, dedupe_key, type, payload)
-      SELECT recipient, 'deal:' || deal_progress.id || ':negotiating:' || recipient, 'deal.status_changed', jsonb_build_object('dealId', deal_progress.id, 'status', 'negotiating')
-      FROM deal_progress CROSS JOIN LATERAL unnest(ARRAY[deal_progress.buyer_id, deal_progress.seller_id]) AS recipient WHERE recipient <> ${userId}
-      ON CONFLICT (dedupe_key) DO NOTHING RETURNING id
-    ), status_email AS (
-      INSERT INTO outbox_events(event_key, type, payload)
-      SELECT 'deal:' || id || ':negotiating', 'deal.status_changed', jsonb_build_object('dealId', id, 'status', 'negotiating', 'recipientIds', jsonb_build_array(buyer_id,seller_id)) FROM deal_progress
-      ON CONFLICT (event_key) DO NOTHING RETURNING id
+      INSERT INTO outbox_events AS inserted_event(event_key, type, payload)
+      SELECT email_events.event_key, email_events.type, email_events.payload FROM email_events
+      ON CONFLICT (event_key) DO NOTHING RETURNING inserted_event.id
     ) SELECT offer.* FROM offer CROSS JOIN activity`);
   const rows = Array.isArray(result) ? result : (result?.rows ?? []);
-  if (!rows.length)
+  if (!rows.length) {
+    const [ownPending] = await db
+      .select({ id: dealOffers.id })
+      .from(dealOffers)
+      .where(
+        and(
+          eq(dealOffers.deal_id, dealId),
+          eq(dealOffers.created_by, userId),
+          eq(dealOffers.status, 'pending')
+        )
+      )
+      .limit(1);
+    if (ownPending)
+      throw new AppError(
+        409,
+        'DUPLICATE_PENDING_OFFER',
+        'You already have a pending offer on this deal'
+      );
     throw new AppError(
       409,
       'DEAL_NOT_NEGOTIATING',
       'Deal is no longer available for offers'
     );
+  }
   return rows[0];
 };
 
@@ -295,8 +371,8 @@ export const respondToOffer = async (dealId, offerId, userId, action) => {
       SELECT id, ${userId}, 'deal.status_changed', jsonb_build_object('from', old_deal_status, 'to', 'accepted') FROM accepted_deal RETURNING id
     ), status_notice AS (
       INSERT INTO notifications(user_id, dedupe_key, type, payload)
-      SELECT recipient, 'deal:' || accepted_deal.id || ':accepted:' || recipient, 'deal.status_changed', jsonb_build_object('dealId', accepted_deal.id, 'status', 'accepted')
-      FROM accepted_deal CROSS JOIN LATERAL unnest(ARRAY[accepted_deal.buyer_id, accepted_deal.seller_id]) AS recipient WHERE recipient <> ${userId}
+      SELECT recipients.user_id, 'deal:' || accepted_deal.id || ':accepted:' || recipients.user_id, 'deal.status_changed', jsonb_build_object('dealId', accepted_deal.id, 'status', 'accepted')
+      FROM accepted_deal CROSS JOIN LATERAL unnest(ARRAY[accepted_deal.buyer_id, accepted_deal.seller_id]) AS recipients(user_id) WHERE recipients.user_id <> ${userId}
       ON CONFLICT (dedupe_key) DO NOTHING RETURNING id
     ), status_email AS (
       INSERT INTO outbox_events(event_key, type, payload)
@@ -356,8 +432,21 @@ export const listOffers = async (dealId, userId, { page: pageNo, limit }) => {
   const where = eq(dealOffers.deal_id, dealId);
   const [offers, counts] = await Promise.all([
     db
-      .select()
+      .select({
+        id: dealOffers.id,
+        deal_id: dealOffers.deal_id,
+        parent_offer_id: dealOffers.parent_offer_id,
+        created_by: dealOffers.created_by,
+        created_by_name: users.name,
+        amount: dealOffers.amount,
+        currency: dealOffers.currency,
+        message: dealOffers.message,
+        status: dealOffers.status,
+        created_at: dealOffers.created_at,
+        responded_at: dealOffers.responded_at,
+      })
       .from(dealOffers)
+      .innerJoin(users, eq(dealOffers.created_by, users.id))
       .where(where)
       .orderBy(dealOffers.created_at, dealOffers.id)
       .limit(limit)
@@ -379,8 +468,17 @@ export const listDealActivities = async (
   await participantDeal(dealId, userId, isAdmin);
   const [activities, counts] = await Promise.all([
     db
-      .select()
+      .select({
+        id: dealActivities.id,
+        deal_id: dealActivities.deal_id,
+        actor_id: dealActivities.actor_id,
+        actor_name: users.name,
+        event_type: dealActivities.event_type,
+        metadata: dealActivities.metadata,
+        created_at: dealActivities.created_at,
+      })
       .from(dealActivities)
+      .leftJoin(users, eq(dealActivities.actor_id, users.id))
       .where(eq(dealActivities.deal_id, dealId))
       .orderBy(desc(dealActivities.created_at), desc(dealActivities.id))
       .limit(limit)

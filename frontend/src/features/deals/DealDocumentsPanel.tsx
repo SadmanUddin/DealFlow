@@ -15,7 +15,7 @@ import {
   linkDealDocument,
   listDealDocuments,
   listDealConversationDocuments,
-  listDealConversations,
+  getDealConversation,
   uploadDealConversationDocument,
 } from "./api";
 
@@ -27,11 +27,9 @@ function formatBytes(bytes: number) {
 
 export function DealDocumentsPanel({
   dealId,
-  listingId,
   isBuyer,
 }: {
   dealId: number;
-  listingId: number;
   isBuyer: boolean;
 }) {
   const client = useQueryClient();
@@ -46,13 +44,11 @@ export function DealDocumentsPanel({
   // The API exposes no deal upload route. Buyers can link only files from their
   // own listing conversation; sellers use their authorized inquiry workspace.
   const conversationsQuery = useQuery({
-    queryKey: ["deal-conversations", 1, 100],
-    queryFn: () => listDealConversations(1, 100),
+    queryKey: ["deals", dealId, "conversation"],
+    queryFn: () => getDealConversation(dealId),
     enabled: isBuyer,
   });
-  const conversation = conversationsQuery.data?.conversations.find(
-    (entry) => entry.listingId === listingId,
-  );
+  const conversation = conversationsQuery.data;
   const sourceDocumentsQuery = useQuery({
     queryKey: ["conversations", conversation?.id, "documents"],
     queryFn: () => listDealConversationDocuments(conversation!.id),

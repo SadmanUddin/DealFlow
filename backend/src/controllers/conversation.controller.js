@@ -4,8 +4,11 @@ import {
   markConversationRead as markConversationReadService,
   sendConversationMessage as sendConversationMessageService,
   startConversation as startConversationService,
+  getDealConversation as getDealConversationService,
+  startDealConversation as startDealConversationService,
   updateInquiryStatus as updateInquiryStatusService,
 } from '#services/conversation.service.js';
+import { dealIdSchema } from '#validations/deal.validation.js';
 import {
   conversationIdSchema,
   conversationListQuerySchema,
@@ -22,6 +25,21 @@ export const startConversation = async (req, res) => {
   res.status(result.created ? 201 : 200).json({
     conversation: result.conversation,
   });
+};
+
+export const getDealConversation = async (req, res) => {
+  const { id } = dealIdSchema.parse(req.params);
+  res
+    .status(200)
+    .json({ conversation: await getDealConversationService(id, req.user.id) });
+};
+
+export const startDealConversation = async (req, res) => {
+  const { id } = dealIdSchema.parse(req.params);
+  const result = await startDealConversationService(id, req.user.id);
+  res
+    .status(result.created ? 201 : 200)
+    .json({ conversation: result.conversation });
 };
 
 export const updateInquiryStatus = async (req, res) => {
@@ -51,7 +69,8 @@ export const sendConversationMessage = async (req, res) => {
   const message = await sendConversationMessageService(
     id,
     req.user.id,
-    content
+    content,
+    req.get('Idempotency-Key')
   );
   res.status(201).json({ message });
 };

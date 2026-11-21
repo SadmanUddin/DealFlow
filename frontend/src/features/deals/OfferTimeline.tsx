@@ -72,6 +72,9 @@ export function OfferTimeline({
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="text-sm font-semibold text-navy-950">
                         {byBuyer ? "Buyer" : "Seller"}
+                        {offer.created_by_name
+                          ? ` · ${offer.created_by_name}`
+                          : ""}
                         {isYou ? " · you" : ""}
                         {offer.parent_offer_id ? " counteroffer" : " offer"}
                       </h3>

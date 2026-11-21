@@ -20,6 +20,7 @@ import { useAuth } from "@/features/auth/useAuth";
 import { formatListingMoney } from "./marketplace-format";
 import { getPublishedListing } from "./marketplace-api";
 import { createDeal } from "@/features/deals/api";
+import { savePublishedListing, unsavePublishedListing } from "./marketplace-api";
 
 function ListingDetailSkeleton() {
   return (
@@ -97,6 +98,18 @@ export function ListingDetailsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [dealError, setDealError] = useState("");
+  const favoriteMutation = useMutation({
+    mutationFn: async (saved: boolean) => {
+      if (saved) await unsavePublishedListing(id);
+      else await savePublishedListing(id);
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["marketplace", "listing", id] }),
+        queryClient.invalidateQueries({ queryKey: ["buyer", "favorites"] }),
+      ]);
+    },
+  });
   const startDealMutation = useMutation({
     mutationFn: () => createDeal(id),
     onSuccess: async ({ deal }) => {
@@ -171,6 +184,7 @@ export function ListingDetailsPage() {
             {listing.title}
           </h1>
           <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm text-ink-soft">
+            <span>Published by {listing.sellerName || "Seller"}</span>
             {listing.industry ? (
               <span className="inline-flex items-center gap-1.5">
                 <Tag
@@ -285,6 +299,16 @@ export function ListingDetailsPage() {
           <div className="mt-5 flex flex-col gap-2.5">
             {user?.role === "buyer" ? (
               <Button
+                disabled={favoriteMutation.isPending}
+                onClick={() => favoriteMutation.mutate(Boolean(listing.isFavorite))}
+                size="lg"
+                variant="outline"
+              >
+                {listing.isFavorite ? "Remove from saved businesses" : "Save business"}
+              </Button>
+            ) : null}
+            {user?.role === "buyer" ? (
+              <Button
                 disabled={startDealMutation.isPending}
                 onClick={() => {
                   setDealError("");
@@ -339,8 +363,7 @@ export function ListingDetailsPage() {
             </p>
           ) : null}
           <p className="mt-4 border-t border-line pt-4 text-xs leading-5 text-ink-faint">
-            Public listing details are provided by the seller. Seller identity
-            and private documents are not displayed here.
+            Public listing details are provided by {listing.sellerName || "the seller"}.
           </p>
         </Card>
       </div>

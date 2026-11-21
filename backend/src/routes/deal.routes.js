@@ -14,6 +14,10 @@ import {
   withdraw,
 } from '#controllers/deal.controller.js';
 import {
+  getDealConversation,
+  startDealConversation,
+} from '#controllers/conversation.controller.js';
+import {
   authorizeRoles,
   requireAuthentication,
   requireCsrf,
@@ -24,6 +28,13 @@ router.use(requireAuthentication);
 router.get('/', list);
 router.post('/', authorizeRoles('buyer'), requireCsrf, create);
 router.get('/:id', detail);
+router.get('/:id/conversation', getDealConversation);
+router.post(
+  '/:id/conversation',
+  authorizeRoles('buyer'),
+  requireCsrf,
+  startDealConversation
+);
 router.patch('/:id/status', requireCsrf, changeStatus);
 router.get('/:id/offers', offers);
 router.post('/:id/offers', requireCsrf, offer);

@@ -23,6 +23,8 @@ import type { PublicListing } from "./marketplace-api";
 const apiMocks = vi.hoisted(() => ({
   getPublicListings: vi.fn(),
   getPublishedListing: vi.fn(),
+  savePublishedListing: vi.fn(),
+  unsavePublishedListing: vi.fn(),
 }));
 
 vi.mock("./marketplace-api", async (importOriginal) => {
@@ -32,6 +34,7 @@ vi.mock("./marketplace-api", async (importOriginal) => {
 
 const listing: PublicListing = {
   id: 8,
+  sellerName: "Actual Seller",
   title: "Independent neighborhood bakery",
   description:
     "A well-established bakery with a loyal local customer base and room to grow.",
@@ -116,6 +119,8 @@ function renderMarketplace(initialPath = "/marketplace", auth = guestAuth) {
 beforeEach(() => {
   apiMocks.getPublicListings.mockReset();
   apiMocks.getPublishedListing.mockReset();
+  apiMocks.savePublishedListing.mockReset();
+  apiMocks.unsavePublishedListing.mockReset();
   apiMocks.getPublicListings.mockResolvedValue(listingPage());
   apiMocks.getPublishedListing.mockResolvedValue(listing);
 });
@@ -322,7 +327,7 @@ describe("listing details", () => {
     expect(apiMocks.getPublishedListing).toHaveBeenCalledWith(8);
   });
 
-  it("shows the authenticated next step without exposing seller identity", async () => {
+  it("shows the publisher and authenticated buyer actions", async () => {
     renderMarketplace("/listings/8", signedInAuth);
     expect(
       await screen.findByText(/signed in as a buyer/i),
@@ -330,10 +335,26 @@ describe("listing details", () => {
     expect(
       screen.getByRole("button", { name: /start acquisition/i }),
     ).toBeInTheDocument();
+    expect(screen.getByText("Published by Actual Seller")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Save business" }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: /saved businesses/i }),
     ).toHaveAttribute("href", "/buyer/saved");
     expect(screen.queryByText("private@example.test")).not.toBeInTheDocument();
+  });
+
+  it("saves and removes a published business through the favorites API", async () => {
+    const user = userEvent.setup();
+    apiMocks.savePublishedListing.mockResolvedValueOnce({ created: true });
+    renderMarketplace("/listings/8", signedInAuth);
+    const saveButton = await screen.findByRole("button", { name: "Save business" });
+    apiMocks.getPublishedListing.mockResolvedValue({ ...listing, isFavorite: true });
+    await user.click(saveButton);
+    await waitFor(() => expect(apiMocks.savePublishedListing).toHaveBeenCalledWith(8));
+    await user.click(await screen.findByRole("button", { name: "Remove from saved businesses" }));
+    await waitFor(() => expect(apiMocks.unsavePublishedListing).toHaveBeenCalledWith(8));
   });
 
   it("handles optional financial details that are not disclosed", async () => {

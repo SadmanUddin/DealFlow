@@ -17,6 +17,7 @@ import {
   WorkspacePageHeader,
 } from "@/components/shared/workspace/WorkspaceUI";
 import { toApiError } from "@/lib/api-error";
+import { useAuth } from "@/features/auth/useAuth";
 import {
   listNotifications,
   markAllNotificationsRead,
@@ -31,12 +32,18 @@ function idFromPayload(payload: Record<string, unknown>, key: string) {
   return undefined;
 }
 
-function notificationTarget(item: DealFlowNotification) {
+function notificationTarget(
+  item: DealFlowNotification,
+  audience: "buyer" | "seller",
+) {
   const dealId = idFromPayload(item.payload, "dealId");
   const listingId = idFromPayload(item.payload, "listingId");
   const conversationId = idFromPayload(item.payload, "conversationId");
-  if (dealId) return `/buyer/offers?deal=${dealId}`;
-  if (conversationId) return `/buyer/messages/${conversationId}`;
+  if (dealId) return `/${audience}/deals/${dealId}`;
+  if (conversationId)
+    return audience === "seller"
+      ? `/seller/inquiries/${conversationId}`
+      : `/buyer/deals`;
   if (listingId) return `/listings/${listingId}`;
   return undefined;
 }
@@ -49,6 +56,8 @@ function humanize(value: string) {
 }
 
 export function BuyerNotificationsPage() {
+  const { user } = useAuth();
+  const audience = user?.role === "seller" ? "seller" : "buyer";
   const client = useQueryClient();
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
@@ -86,7 +95,7 @@ export function BuyerNotificationsPage() {
   });
   const navigateTo = async (item: DealFlowNotification) => {
     if (!item.readAt) await markOne.mutateAsync(item.id);
-    const target = notificationTarget(item);
+    const target = notificationTarget(item, audience);
     if (target) navigate(target);
   };
 
@@ -168,7 +177,7 @@ export function BuyerNotificationsPage() {
         <SectionCard className="p-0 sm:p-0">
           <ul className="divide-y divide-line">
             {query.data.notifications.map((item) => {
-              const target = notificationTarget(item);
+              const target = notificationTarget(item, audience);
               return (
                 <li
                   className={`flex gap-3 px-4 py-4 sm:gap-4 sm:px-5 ${item.readAt ? "" : "bg-emerald-50/35"}`}
@@ -182,13 +191,15 @@ export function BuyerNotificationsPage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <h2 className="text-sm font-semibold text-navy-950">
-                        {humanize(item.type)}
+                        {item.type === "conversation.message"
+                          ? `New message from ${String(item.payload.senderName ?? "a participant")}`
+                          : humanize(item.type)}
                       </h2>
                       {!item.readAt ? <StatusBadge status="pending" /> : null}
                     </div>
                     <p className="mt-1 break-words text-xs leading-5 text-ink-soft">
                       {target
-                        ? "Open the related DealFlow item for details."
+                        ? String(item.payload.listingTitle ?? "Open the related DealFlow item for details.")
                         : "This notification has no linked resource."}
                     </p>
                     <p className="mt-1.5 text-[0.68rem] text-ink-faint">

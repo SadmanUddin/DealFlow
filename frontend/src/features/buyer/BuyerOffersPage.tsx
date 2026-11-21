@@ -210,12 +210,12 @@ export function BuyerOffersPage() {
                 >
                   <span className="flex items-center justify-between gap-2">
                     <span className="text-xs font-semibold text-navy-950">
-                      Deal #{deal.id}
+                      {deal.listing_title ?? "Business offer"}
                     </span>
                     <StatusBadge status={deal.status} />
                   </span>
                   <span className="mt-1.5 block text-[0.68rem] text-ink-soft">
-                    Business listing #{deal.listing_id}
+                    {deal.buyer_name ?? "Buyer"} · {deal.seller_name ?? "Seller"}
                   </span>
                 </button>
               ))}
@@ -232,10 +232,9 @@ export function BuyerOffersPage() {
             <div className="space-y-5">
               <SectionCard>
                 <SectionHeading
-                  description={`Deal #${selectedDeal.id} · Created ${new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(selectedDeal.created_at))}`}
+                  description={`Created ${new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(selectedDeal.created_at))}`}
                   title={
-                    listingQuery.data?.title ??
-                    `Business listing #${selectedDeal.listing_id}`
+                    listingQuery.data?.title ?? selectedDeal.listing_title ?? "Business listing"
                   }
                 />
                 <div className="flex flex-wrap items-center justify-between gap-3">

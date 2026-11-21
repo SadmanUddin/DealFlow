@@ -241,8 +241,8 @@ export function DealDetailPage() {
     <>
       <WorkspacePageHeader
         description="A participant-only workspace for acquisition terms, negotiation, milestones, and private deal files."
-        eyebrow={`${isBuyer ? "Buyer" : "Seller"} workspace · Deal #${deal.id}`}
-        title={listing?.title ?? `Business listing #${deal.listing_id}`}
+        eyebrow={`${isBuyer ? "Buyer" : "Seller"} workspace`}
+        title={listing?.title ?? "Business deal"}
         action={
           <Button asChild size="sm" variant="outline">
             <Link to={backTo}>
@@ -332,12 +332,12 @@ export function DealDetailPage() {
               <div className="grid gap-3 sm:grid-cols-2">
                 <Participant
                   label="Buyer"
-                  id={deal.buyer_id}
+                  name={deal.buyer_name ?? "Buyer"}
                   isYou={deal.buyer_id === user?.id}
                 />
                 <Participant
                   label="Seller"
-                  id={deal.seller_id}
+                  name={deal.seller_name ?? "Seller"}
                   isYou={deal.seller_id === user?.id}
                 />
               </div>
@@ -622,7 +622,6 @@ export function DealDetailPage() {
 
             <DealDocumentsPanel
               dealId={deal.id}
-              listingId={deal.listing_id}
               isBuyer={isBuyer}
             />
           </div>
@@ -689,10 +688,12 @@ export function DealDetailPage() {
             <SectionCard>
               <SectionHeading title="Deal record" />
               <dl className="space-y-3 text-xs">
-                <Record label="Deal ID" value={`#${deal.id}`} />
-                <Record label="Listing ID" value={`#${deal.listing_id}`} />
-                <Record label="Buyer account" value={`#${deal.buyer_id}`} />
-                <Record label="Seller account" value={`#${deal.seller_id}`} />
+                <Record
+                  label="Business"
+                  value={listing?.title ?? "Business listing"}
+                />
+                <Record label="Buyer" value={deal.buyer_name ?? "Buyer"} />
+                <Record label="Seller" value={deal.seller_name ?? "Seller"} />
                 <Record label="Created" value={dateLabel(deal.created_at)} />
                 <Record
                   label="Last activity"
@@ -788,11 +789,11 @@ function Summary({
 
 function Participant({
   label,
-  id,
+  name,
   isYou,
 }: {
   label: string;
-  id: number;
+  name: string;
   isYou: boolean;
 }) {
   return (
@@ -801,7 +802,7 @@ function Participant({
         {label}
         {isYou ? " · you" : ""}
       </p>
-      <p className="mt-1 text-xs text-ink-soft">DealFlow account #{id}</p>
+      <p className="mt-1 text-xs text-ink-soft">{name}</p>
     </div>
   );
 }
@@ -881,9 +882,8 @@ function ActivityTimeline({
         const actor =
           activity.actor_id === null
             ? "DealFlow"
-            : activity.actor_id === buyerId
-              ? "Buyer"
-              : "Seller";
+            : (activity.actor_name ??
+              (activity.actor_id === buyerId ? "Buyer" : "Seller"));
         const timestamp = new Date(activity.created_at);
         return (
           <li className="relative flex gap-3 pb-5 last:pb-0" key={activity.id}>

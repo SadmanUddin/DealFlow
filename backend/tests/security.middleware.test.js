@@ -274,14 +274,17 @@ describe('Arcjet request middleware', () => {
   });
 
   it('makes one protect call for a read, with the authenticated user characteristic', async () => {
-    const { req, next } = await runMiddleware({
+    const { next } = await runMiddleware({
       path: '/api/deals',
       role: 'buyer',
       userId: 17,
     });
     expect(next).toHaveBeenCalledWith();
     expect(arcjetMocks.protect).toHaveBeenCalledOnce();
-    expect(arcjetMocks.protect).toHaveBeenCalledWith(req, { userId: '17' });
+    const characteristics = arcjetMocks.protect.mock.calls[0][1];
+    expect(characteristics.userId).toBe('17');
+    expect(characteristics.accountKey).toMatch(/^[a-f0-9]{64}$/);
+    expect(characteristics.accountKey).not.toBe('17');
     expect(arcjetMocks.rules).toHaveLength(2);
     expect(arcjetMocks.rules.every(rule => rule.mode === 'DRY_RUN')).toBe(true);
   });
@@ -293,10 +296,12 @@ describe('Arcjet request middleware', () => {
       ip: '192.0.2.10',
     });
     expect(req.ip).toBe('192.0.2.10');
-    expect(arcjetMocks.protect).toHaveBeenCalledWith(req, {});
+    const characteristics = arcjetMocks.protect.mock.calls[0][1];
+    expect(characteristics.accountKey).toMatch(/^[a-f0-9]{64}$/);
+    expect(characteristics.accountKey).not.toContain(req.ip);
   });
 
-  it('keeps simultaneous users on the same IP in separate user buckets', async () => {
+  it('keeps authenticated users on the same IP in separate pseudonymous buckets', async () => {
     const first = createRequest({
       path: '/api/deals',
       role: 'buyer',
@@ -313,13 +318,54 @@ describe('Arcjet request middleware', () => {
       securityMiddleware(first, res, next),
       securityMiddleware(second, res, next),
     ]);
-    expect(arcjetMocks.protect).toHaveBeenNthCalledWith(1, first, {
-      userId: '1',
-    });
-    expect(arcjetMocks.protect).toHaveBeenNthCalledWith(2, second, {
-      userId: '2',
-    });
+    const firstCharacteristics = arcjetMocks.protect.mock.calls[0][1];
+    const secondCharacteristics = arcjetMocks.protect.mock.calls[1][1];
+    expect(firstCharacteristics.userId).toBe('1');
+    expect(secondCharacteristics.userId).toBe('2');
+    expect(firstCharacteristics.accountKey).toMatch(/^[a-f0-9]{64}$/);
+    expect(secondCharacteristics.accountKey).toMatch(/^[a-f0-9]{64}$/);
+    expect(firstCharacteristics.accountKey).not.toBe(
+      secondCharacteristics.accountKey
+    );
     expect(arcjetMocks.protect).toHaveBeenCalledTimes(2);
+  });
+
+  it('generates the same non-empty account key for repeated requests from one user', async () => {
+    const first = await runMiddleware({
+      path: '/api/deals',
+      role: 'buyer',
+      userId: 17,
+    });
+    const repeated = await runMiddleware({
+      path: '/api/conversations',
+      role: 'buyer',
+      userId: 17,
+      ip: '192.0.2.99',
+    });
+    const firstKey = arcjetMocks.protect.mock.calls[0][1].accountKey;
+    const repeatedKey = arcjetMocks.protect.mock.calls[1][1].accountKey;
+    expect(first.next).toHaveBeenCalledWith();
+    expect(repeated.next).toHaveBeenCalledWith();
+    expect(firstKey).toMatch(/^[a-f0-9]{64}$/);
+    expect(repeatedKey).toBe(firstKey);
+  });
+
+  it('uses a stable pseudonymous IP fallback for unauthenticated requests', async () => {
+    const first = createRequest({ path: '/api/listings', ip: '192.0.2.20' });
+    const repeated = createRequest({ path: '/api/listings', ip: '192.0.2.20' });
+    const other = createRequest({ path: '/api/listings', ip: '192.0.2.21' });
+    const next = vi.fn();
+    const res = { setHeader: vi.fn() };
+    await Promise.all([
+      securityMiddleware(first, res, next),
+      securityMiddleware(repeated, res, next),
+      securityMiddleware(other, res, next),
+    ]);
+    const keys = arcjetMocks.protect.mock.calls.map(call => call[1].accountKey);
+    expect(keys[0]).toMatch(/^[a-f0-9]{64}$/);
+    expect(keys[0]).toBe(keys[1]);
+    expect(keys[2]).not.toBe(keys[0]);
+    expect(keys.join(' ')).not.toContain('192.0.2.20');
   });
 
   it('returns a consistent 429 with Retry-After and rate-limit headers', async () => {

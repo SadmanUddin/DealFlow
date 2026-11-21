@@ -11,6 +11,8 @@ const moneySchema = z
 
 export const publicListingSchema = z.object({
   id: z.number().int().positive().safe(),
+  sellerName: z.string().nullable().optional(),
+  isFavorite: z.boolean().optional(),
   title: z.string(),
   description: z.string(),
   industry: z.string().nullable(),
@@ -108,4 +110,14 @@ export async function getPublicListings(filters: MarketplaceFilters) {
 export async function getPublishedListing(id: number) {
   const { data } = await apiClient.get<unknown>(`/listings/${id}`);
   return parseApiResponse(listingResponseSchema, data).listing;
+}
+
+export async function savePublishedListing(id: number) {
+  const { addFavorite } = await import("@/features/buyer/api");
+  return addFavorite(id);
+}
+
+export async function unsavePublishedListing(id: number) {
+  const { removeFavorite } = await import("@/features/buyer/api");
+  return removeFavorite(id);
 }

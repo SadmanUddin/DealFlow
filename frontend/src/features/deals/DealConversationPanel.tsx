@@ -21,7 +21,7 @@ import {
 import { toApiError } from "@/lib/api-error";
 import {
   listDealConversationMessages,
-  listDealConversations,
+  getDealConversation,
   markDealConversationRead,
   sendDealConversationMessage,
   startDealConversation,
@@ -62,13 +62,10 @@ export function DealConversationPanel({
   const [notice, setNotice] = useState("");
   const [failure, setFailure] = useState("");
   const conversationsQuery = useQuery({
-    queryKey: ["deal-conversations", 1, 100],
-    queryFn: () => listDealConversations(1, 100),
+    queryKey: ["deals", deal.id, "conversation"],
+    queryFn: () => getDealConversation(deal.id),
   });
-  const conversations = (conversationsQuery.data?.conversations ?? []).filter(
-    (item) => item.listingId === deal.listing_id,
-  );
-  const conversation = conversations[0];
+  const conversation = conversationsQuery.data;
   const messagesQuery = useInfiniteQuery({
     queryKey: ["conversations", conversation?.id, "messages"],
     queryFn: ({ pageParam }) =>
@@ -86,11 +83,13 @@ export function DealConversationPanel({
   });
   const messageContent = useWatch({ control: form.control, name: "content" });
   const startMutation = useMutation({
-    mutationFn: () => startDealConversation(deal.listing_id),
+    mutationFn: () => startDealConversation(deal.id),
     onSuccess: async () => {
       setNotice("Your private buyer conversation is ready.");
       setFailure("");
-      await client.invalidateQueries({ queryKey: ["deal-conversations"] });
+      await client.invalidateQueries({
+        queryKey: ["deals", deal.id, "conversation"],
+      });
     },
     onError: (error) => setFailure(toApiError(error).message),
   });
@@ -151,7 +150,7 @@ export function DealConversationPanel({
           title="Conversation unavailable"
         />
       ) : null}
-      {conversationsQuery.data && conversations.length === 0 ? (
+      {conversationsQuery.data === null ? (
         <WorkspaceEmpty
           title="No conversation is linked to this deal yet"
           description="A buyer can open the private conversation for this listing. Messages and source documents stay within that participant-authorized thread."
@@ -175,7 +174,8 @@ export function DealConversationPanel({
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-mist/70 px-3 py-2.5">
             <div>
               <p className="text-xs font-semibold text-navy-950">
-                Conversation #{conversation.id}
+                Conversation with{" "}
+                {conversation.participantName ?? "participant"}
               </p>
               <p className="mt-1 text-[0.68rem] text-ink-soft">
                 {conversation.listingTitle}
@@ -237,9 +237,11 @@ export function DealConversationPanel({
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <p className="text-xs font-semibold text-navy-950">
-                            {message.senderId === currentUserId
-                              ? "You"
-                              : "Other participant"}
+                            {message.senderName ??
+                              (message.senderId === currentUserId
+                                ? "You"
+                                : "Other participant")}
+                            {message.senderId === currentUserId ? " · you" : ""}
                           </p>
                           <time
                             className="text-[0.65rem] text-ink-faint"
@@ -321,14 +323,6 @@ export function DealConversationPanel({
                 </div>
               </form>
             </div>
-          ) : null}
-          {conversationsQuery.data &&
-          conversationsQuery.data.pagination.total >
-            conversationsQuery.data.conversations.length ? (
-            <p className="text-[0.65rem] leading-5 text-ink-faint">
-              Showing the newest 100 participant conversations. This thread is
-              included when returned by the backend.
-            </p>
           ) : null}
         </div>
       ) : null}

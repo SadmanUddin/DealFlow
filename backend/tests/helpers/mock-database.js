@@ -58,6 +58,17 @@ export const modelTables = {
     'created_at',
     'updated_at',
   ]),
+  deals: table('deals', [
+    'id',
+    'listing_id',
+    'buyer_id',
+    'seller_id',
+    'status',
+    'accepted_at',
+    'created_at',
+    'updated_at',
+    'deal_uid',
+  ]),
   conversations: table('conversations', [
     'id',
     'listing_id',
@@ -167,6 +178,7 @@ export const databaseState = {
   auth_sessions: [],
   auth_tokens: [],
   business_listings: [],
+  deals: [],
   conversations: [],
   messages: [],
   conversation_documents: [],
@@ -196,6 +208,7 @@ export const resetDatabase = () => {
   databaseState.auth_sessions.length = 0;
   databaseState.auth_tokens.length = 0;
   databaseState.business_listings.length = 0;
+  databaseState.deals.length = 0;
   databaseState.conversations.length = 0;
   databaseState.messages.length = 0;
   databaseState.conversation_documents.length = 0;
@@ -302,10 +315,34 @@ const matches = (expression, rowSet) => {
 
 const project = (projection, rowSet, fallback) => {
   if (!projection) return { ...fallback };
+  const projectSql = column => {
+    const query = column?.__sql ?? column?.query ?? '';
+    const values = column?.values ?? [];
+    if (query.includes('SELECT name FROM users')) {
+      let userId;
+      if (query.includes('CASE WHEN')) {
+        const conversation = rowSet.conversations;
+        if (values[0]?.table) {
+          const viewerId = values[1];
+          userId =
+            conversation.buyer_id === viewerId
+              ? conversation.seller_id
+              : conversation.buyer_id;
+        } else {
+          const [viewerId, buyerId, sellerId] = values;
+          userId = viewerId === buyerId ? sellerId : buyerId;
+        }
+      } else {
+        userId = values[0];
+      }
+      return databaseState.users.find(user => user.id === userId)?.name ?? null;
+    }
+    return values[0];
+  };
   return Object.fromEntries(
     Object.entries(projection).map(([alias, column]) => [
       alias,
-      column?.__sql ? column.values?.[0] : valueFor(rowSet, column),
+      column?.__sql ? projectSql(column) : valueFor(rowSet, column),
     ])
   );
 };
@@ -463,6 +500,22 @@ class Query {
   executeInsert() {
     const rows = tableRows(this.target);
     if (this.source) {
+      if (this.target.__name === 'conversations') {
+        const insertColumns = Object.keys(this.target).filter(
+          key => key !== '__name'
+        );
+        const selectedColumns = Object.keys(this.source.projection ?? {});
+        if (
+          selectedColumns.length !== insertColumns.length ||
+          selectedColumns.some(
+            (column, index) => column !== insertColumns[index]
+          )
+        ) {
+          throw new Error(
+            'Insert select error: selected fields are not the same or are in a different order compared to the table definition'
+          );
+        }
+      }
       this.valuesToInsert = this.source.executeSelect();
       if (!Array.isArray(this.valuesToInsert))
         this.valuesToInsert = [this.valuesToInsert];

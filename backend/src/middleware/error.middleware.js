@@ -42,8 +42,18 @@ export const errorMiddleware = (error, req, res, next) => {
   }
 
   if (status >= 500) {
+    const databaseError = error?.cause?.cause ?? error?.cause ?? error;
     logger.error('Unhandled API error', {
+      requestId: req.requestId,
       error: error?.message,
+      database: {
+        code: databaseError?.code,
+        severity: databaseError?.severity,
+        constraint: databaseError?.constraint,
+        routine: databaseError?.routine,
+        detail: databaseError?.detail,
+        message: databaseError?.message,
+      },
       stack: error?.stack,
       method: req.method,
       path: req.path,

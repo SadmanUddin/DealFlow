@@ -135,10 +135,19 @@ const pagination = (page, limit, total) => ({
   totalPages: Math.ceil(total / limit),
 });
 
-export const getPublishedListing = async id => {
+export const getPublishedListing = async (id, viewerId = null) => {
+  const viewerFavorite =
+    viewerId === null
+      ? undefined
+      : sql`EXISTS (SELECT 1 FROM favorites WHERE favorites.listing_id = ${businessListings.id} AND favorites.user_id = ${viewerId})`;
   const [listing] = await db
-    .select(publicFields)
+    .select({
+      ...publicFields,
+      sellerName: users.name,
+      ...(viewerFavorite ? { isFavorite: viewerFavorite } : {}),
+    })
     .from(businessListings)
+    .innerJoin(users, eq(users.id, businessListings.seller_id))
     .where(
       and(eq(businessListings.id, id), eq(businessListings.status, 'published'))
     )

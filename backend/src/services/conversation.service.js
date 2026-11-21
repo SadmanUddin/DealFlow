@@ -12,7 +12,10 @@ import {
 } from 'drizzle-orm';
 import { db } from '#config/database.js';
 import { businessListings } from '#models/listing.model.js';
+import { users } from '#models/user.model.js';
 import { conversations, messages } from '#models/conversation.model.js';
+import { deals } from '#models/deal.model.js';
+import { notifications } from '#models/phase6.model.js';
 import { AppError } from '#utils/app-error.js';
 import { messageCursorSchema } from '#validations/conversation.validation.js';
 
@@ -57,10 +60,12 @@ export const startConversation = async (buyerId, listingId) => {
 
   const source = db
     .select({
-      id: sql`nextval(pg_get_serial_sequence('public.conversations', 'id'))`,
+      id: sql`nextval(pg_get_serial_sequence('public.conversations', 'id'))::integer`,
       listing_id: businessListings.id,
-      buyer_id: sql`${buyerId}`,
+      buyer_id: sql`${buyerId}::integer`,
       seller_id: businessListings.seller_id,
+      status: sql`'pending'::varchar`,
+      status_updated_at: sql`now()`,
       created_at: sql`now()`,
     })
     .from(businessListings)
@@ -97,6 +102,60 @@ export const startConversation = async (buyerId, listingId) => {
     'LISTING_NOT_FOUND',
     'Published listing was not found'
   );
+};
+
+const conversationForDeal = async (deal, viewerId) => {
+  const [row] = await db
+    .select({
+      ...conversationFields,
+      listingTitle: businessListings.title,
+      buyerId: conversations.buyer_id,
+      sellerId: conversations.seller_id,
+      participantName: sql`CASE WHEN ${viewerId} = ${deal.buyer_id} THEN (SELECT name FROM users WHERE id = ${deal.seller_id}) ELSE (SELECT name FROM users WHERE id = ${deal.buyer_id}) END`,
+    })
+    .from(conversations)
+    .innerJoin(
+      businessListings,
+      eq(conversations.listing_id, businessListings.id)
+    )
+    .where(
+      and(
+        eq(conversations.listing_id, deal.listing_id),
+        eq(conversations.buyer_id, deal.buyer_id),
+        eq(conversations.seller_id, deal.seller_id)
+      )
+    )
+    .limit(1);
+  return row ?? null;
+};
+
+export const getDealConversation = async (dealId, userId) => {
+  const [deal] = await db
+    .select()
+    .from(deals)
+    .where(
+      and(
+        eq(deals.id, dealId),
+        or(eq(deals.buyer_id, userId), eq(deals.seller_id, userId))
+      )
+    )
+    .limit(1);
+  if (!deal) throw notFound();
+  return conversationForDeal(deal, userId);
+};
+
+export const startDealConversation = async (dealId, buyerId) => {
+  const [deal] = await db
+    .select()
+    .from(deals)
+    .where(and(eq(deals.id, dealId), eq(deals.buyer_id, buyerId)))
+    .limit(1);
+  if (!deal) throw notFound();
+  const result = await startConversation(buyerId, deal.listing_id);
+  return {
+    conversation: await conversationForDeal(deal, buyerId),
+    created: result.created,
+  };
 };
 
 const inquiryTransitions = {
@@ -160,6 +219,9 @@ export const getConversations = async (userId, { page, limit }) => {
         id: conversations.id,
         listingId: conversations.listing_id,
         listingTitle: businessListings.title,
+        buyerId: conversations.buyer_id,
+        sellerId: conversations.seller_id,
+        participantName: sql`CASE WHEN ${conversations.buyer_id} = ${userId} THEN (SELECT name FROM users WHERE id = ${conversations.seller_id}) ELSE (SELECT name FROM users WHERE id = ${conversations.buyer_id}) END`,
         status: conversations.status,
         statusUpdatedAt: conversations.status_updated_at,
         createdAt: conversations.created_at,
@@ -247,8 +309,9 @@ export const getConversationMessages = async (
     );
   }
   const rows = await db
-    .select(messageFields)
+    .select({ ...messageFields, senderName: users.name })
     .from(messages)
+    .innerJoin(users, eq(messages.sender_id, users.id))
     .where(and(...filters))
     .orderBy(asc(messages.created_at), asc(messages.id))
     .limit(limit + 1);
@@ -267,7 +330,8 @@ export const getConversationMessages = async (
 export const sendConversationMessage = async (
   conversationId,
   senderId,
-  content
+  content,
+  requestKey
 ) => {
   const authorizedSource = db
     .select({
@@ -287,7 +351,63 @@ export const sendConversationMessage = async (
     .select(authorizedSource)
     .returning(messageFields);
   if (!message) throw notFound();
-  return message;
+  const [sender] = await db
+    .select({ name: users.name })
+    .from(users)
+    .where(eq(users.id, senderId))
+    .limit(1);
+  const recipientIdQuery = await db
+    .select({
+      buyerId: conversations.buyer_id,
+      sellerId: conversations.seller_id,
+      listingId: conversations.listing_id,
+      listingTitle: businessListings.title,
+    })
+    .from(conversations)
+    .innerJoin(
+      businessListings,
+      eq(businessListings.id, conversations.listing_id)
+    )
+    .where(
+      and(eq(conversations.id, conversationId), participantCondition(senderId))
+    )
+    .limit(1);
+  const conversation = recipientIdQuery[0];
+  if (!conversation) throw notFound();
+  const recipientId =
+    senderId === conversation.buyerId
+      ? conversation.sellerId
+      : conversation.buyerId;
+  const [deal] = await db
+    .select({ id: deals.id })
+    .from(deals)
+    .where(
+      and(
+        eq(deals.listing_id, conversation.listingId),
+        eq(deals.buyer_id, conversation.buyerId),
+        eq(deals.seller_id, conversation.sellerId)
+      )
+    )
+    .limit(1);
+  await db
+    .insert(notifications)
+    .values({
+      user_id: recipientId,
+      dedupe_key: requestKey
+        ? `message:${conversationId}:${senderId}:${requestKey}`
+        : `message:${message.id}:received`,
+      type: 'conversation.message',
+      payload: {
+        conversationId,
+        messageId: message.id,
+        senderName: sender?.name ?? 'A participant',
+        listingId: conversation.listingId,
+        listingTitle: conversation.listingTitle,
+        ...(deal ? { dealId: deal.id } : {}),
+      },
+    })
+    .onConflictDoNothing({ target: notifications.dedupe_key });
+  return { ...message, senderName: sender?.name ?? null };
 };
 
 export const markConversationRead = async (conversationId, userId) => {

@@ -212,13 +212,12 @@ export function SellerOffersPage() {
                   >
                     <span className="flex items-center justify-between gap-2">
                       <span className="truncate text-xs font-semibold text-navy-950">
-                        {listing?.title ??
-                          `Business listing #${deal.listing_id}`}
+                        {listing?.title ?? deal.listing_title ?? "Business listing"}
                       </span>
                       <StatusBadge status={deal.status} />
                     </span>
                     <span className="mt-1.5 flex items-center justify-between text-[0.68rem] text-ink-soft">
-                      <span>Deal #{deal.id}</span>
+                      <span>{deal.buyer_name ?? "Buyer"}</span>
                       {pending ? (
                         <span className="font-semibold text-emerald-800">
                           Response needed

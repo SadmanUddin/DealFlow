@@ -40,7 +40,12 @@ export const getPublicListings = async (req, res) => {
 export const getPublishedListing = async (req, res) => {
   res
     .status(200)
-    .json({ listing: await getPublishedListingService(listingId(req)) });
+    .json({
+      listing: await getPublishedListingService(
+        listingId(req),
+        req.user?.id ?? null
+      ),
+    });
 };
 
 export const updateListing = async (req, res) => {

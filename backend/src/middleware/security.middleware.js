@@ -44,15 +44,28 @@ const intervalLimits = (name, interval, perUser, perIp) => [
   ipLimit(`${name}-shared-ip`, interval, perIp),
 ];
 
+const accountFingerprint = value =>
+  createHmac('sha256', environment.JWT_SECRET).update(value).digest('hex');
+
+const requestAccountKey = req => {
+  const userId = req.user?.id;
+  if (userId !== null && userId !== undefined && String(userId).trim())
+    return accountFingerprint(`user:${String(userId)}`);
+
+  const ip =
+    typeof req.ip === 'string' && req.ip.trim()
+      ? req.ip.trim()
+      : req.socket?.remoteAddress || 'unknown';
+  return accountFingerprint(`ip:${ip}`);
+};
+
 const emailKey = req => {
   const email = req.body?.email;
   if (typeof email !== 'string' || !email.trim() || email.length > 320)
     return undefined;
   // Pseudonymize account identifiers before they are used as a custom Arcjet
   // characteristic. Neither the email nor this value is written to logs.
-  return createHmac('sha256', environment.JWT_SECRET)
-    .update(email.trim().toLowerCase())
-    .digest('hex');
+  return accountFingerprint(`email:${email.trim().toLowerCase()}`);
 };
 
 const isPublicListingRead = req =>
@@ -301,7 +314,7 @@ const securityMiddleware = async (req, res, next) => {
 
     const characteristics = {
       ...(req.user ? { userId: String(req.user.id) } : {}),
-      ...(policy.accountKey ? { accountKey: policy.accountKey } : {}),
+      accountKey: policy.accountKey || requestAccountKey(req),
     };
     const decision = await requestProtector.protect(req, characteristics);
 

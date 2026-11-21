@@ -2,6 +2,7 @@ import { z } from "zod";
 import { apiClient } from "@/lib/api-client";
 import {
   getValidated,
+  parseValidated,
   patchValidated,
   postValidated,
   paginationSchema,
@@ -23,6 +24,9 @@ export const dealSchema = z.object({
   listing_id: z.number().int().positive(),
   buyer_id: z.number().int().positive(),
   seller_id: z.number().int().positive(),
+  buyer_name: z.string().nullable().optional(),
+  seller_name: z.string().nullable().optional(),
+  listing_title: z.string().optional(),
   status: dealStatus,
   accepted_at: dateValue.nullable(),
   created_at: dateValue,
@@ -35,6 +39,7 @@ export const offerSchema = z.object({
   deal_id: z.number().int().positive(),
   parent_offer_id: z.number().int().positive().nullable(),
   created_by: z.number().int().positive(),
+  created_by_name: z.string().nullable().optional(),
   amount: z.string().regex(/^\d{1,16}(\.\d{1,2})?$/),
   currency: z.string().length(3),
   message: z.string().nullable(),
@@ -120,6 +125,7 @@ const activitySchema = z.object({
   id: z.number().int().positive(),
   deal_id: z.number().int().positive(),
   actor_id: z.number().int().positive().nullable(),
+  actor_name: z.string().nullable().optional(),
   event_type: z.string(),
   metadata: z.record(z.string(), z.unknown()),
   created_at: dateValue,
@@ -175,6 +181,9 @@ const conversationSchema = z.object({
   id: z.number().int().positive(),
   listingId: z.number().int().positive(),
   listingTitle: z.string(),
+  buyerId: z.number().int().positive(),
+  sellerId: z.number().int().positive(),
+  participantName: z.string().nullable(),
   status: z.enum(["pending", "in_review", "accepted", "rejected", "closed"]),
   statusUpdatedAt: dateValue,
   createdAt: dateValue,
@@ -186,22 +195,23 @@ const conversationPageSchema = z.object({
 export type DealConversation = z.infer<typeof conversationSchema>;
 export const listDealConversations = (page = 1, limit = 100) =>
   getValidated("/conversations", conversationPageSchema, { page, limit });
-export const startDealConversation = (listingId: number) =>
+export const getDealConversation = (dealId: number) =>
+  getValidated(
+    `/deals/${dealId}/conversation`,
+    z.object({ conversation: conversationSchema.nullable() }),
+  ).then((result) => result.conversation);
+export const startDealConversation = (dealId: number) =>
   postValidated(
-    "/conversations",
-    { listingId },
-    z.object({
-      conversation: conversationSchema.omit({
-        listingTitle: true,
-        createdAt: true,
-      }),
-    }),
-  );
+    `/deals/${dealId}/conversation`,
+    {},
+    z.object({ conversation: conversationSchema }),
+  ).then((result) => result.conversation);
 
 const conversationMessageSchema = z.object({
   id: z.number().int().positive(),
   conversationId: z.number().int().positive(),
   senderId: z.number().int().positive(),
+  senderName: z.string().nullable(),
   content: z.string(),
   createdAt: dateValue,
   readAt: dateValue.nullable(),
@@ -223,15 +233,21 @@ export const listDealConversationMessages = (
     limit: 50,
     cursor,
   });
-export const sendDealConversationMessage = (
+export const sendDealConversationMessage = async (
   conversationId: number,
   content: string,
-) =>
-  postValidated(
+) => {
+  const idempotencyKey = crypto.randomUUID();
+  const { data } = await apiClient.post(
     `/conversations/${conversationId}/messages`,
     { content },
-    z.object({ message: conversationMessageSchema }),
+    { headers: { "Idempotency-Key": idempotencyKey } },
   );
+  return parseValidated(
+    z.object({ message: conversationMessageSchema }),
+    data,
+  );
+};
 export const markDealConversationRead = (conversationId: number) =>
   patchValidated(
     `/conversations/${conversationId}/read`,

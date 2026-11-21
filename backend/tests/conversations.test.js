@@ -22,6 +22,9 @@ vi.mock('../src/models/listing.model.js', async () => ({
   businessListings: (await import('./helpers/mock-database.js')).modelTables
     .businessListings,
 }));
+vi.mock('../src/models/deal.model.js', async () => ({
+  deals: (await import('./helpers/mock-database.js')).modelTables.deals,
+}));
 vi.mock('../src/models/conversation.model.js', async () => {
   const { modelTables } = await import('./helpers/mock-database.js');
   return {
@@ -105,6 +108,13 @@ beforeEach(async () => {
   const listingRow = mock.databaseState.business_listings[0];
   listingRow.status = 'published';
   listingRow.published_at = new Date();
+  mock.databaseState.deals.push({
+    id: 1,
+    listing_id: listingId,
+    buyer_id: 1,
+    seller_id: 2,
+    status: 'proposed',
+  });
 });
 
 const startConversation = credentials =>
@@ -123,6 +133,67 @@ const sendMessage = (conversationId, credentials, content) =>
   ).send({ content });
 
 describe('conversation creation and listing', () => {
+  it('reproduces the Drizzle insert-select column mismatch before any write', async () => {
+    const oldProjection = mock.db
+      .select({
+        id: mock.modelTables.conversations.id,
+        listing_id: mock.modelTables.businessListings.id,
+        buyer_id: mock.modelTables.conversations.buyer_id,
+        seller_id: mock.modelTables.businessListings.seller_id,
+        created_at: mock.modelTables.conversations.created_at,
+      })
+      .from(mock.modelTables.businessListings);
+
+    await expect(
+      mock.db
+        .insert(mock.modelTables.conversations)
+        .select(oldProjection)
+        .returning()
+    ).rejects.toThrow(
+      'Insert select error: selected fields are not the same or are in a different order compared to the table definition'
+    );
+    expect(mock.databaseState.conversations).toHaveLength(0);
+  });
+
+  it('opens or retrieves the deal conversation for its participants only', async () => {
+    const dealPath = '/api/deals/1/conversation';
+    const initiallyMissing = await request(app)
+      .get(dealPath)
+      .set('Cookie', buyer.cookie);
+    expect(initiallyMissing.status).toBe(200);
+    expect(initiallyMissing.body.conversation).toBeNull();
+
+    mock.databaseState.business_listings[0].status = 'archived';
+    const failedCreation = await signed(
+      request(app).post(dealPath),
+      buyer
+    ).send({});
+    expect(failedCreation.status).toBe(404);
+    expect(mock.databaseState.conversations).toHaveLength(0);
+    mock.databaseState.business_listings[0].status = 'published';
+
+    const opened = await signed(request(app).post(dealPath), buyer).send({});
+    const duplicate = await signed(request(app).post(dealPath), buyer).send({});
+    const sellerView = await request(app)
+      .get(dealPath)
+      .set('Cookie', seller.cookie);
+    expect(opened.status).toBe(201);
+    expect(duplicate.status).toBe(200);
+    expect(duplicate.body.conversation.id).toBe(opened.body.conversation.id);
+    expect(sellerView.body.conversation.id).toBe(opened.body.conversation.id);
+    expect(sellerView.body.conversation.participantName).toBe('Test buyer');
+    expect(mock.databaseState.conversations).toHaveLength(1);
+
+    const outsiderView = await request(app)
+      .get(dealPath)
+      .set('Cookie', outsider.cookie);
+    expect(outsiderView.status).toBe(404);
+    expect(outsiderView.body.conversation).toBeUndefined();
+    expect(
+      (await signed(request(app).post(dealPath), seller).send({})).status
+    ).toBe(403);
+  });
+
   it('allows a buyer to initiate and returns the existing conversation on duplicates', async () => {
     const created = await startConversation(buyer);
     const duplicate = await startConversation(buyer);
@@ -194,6 +265,10 @@ describe('conversation creation and listing', () => {
     });
     expect(sellerList.body.conversations).toHaveLength(1);
     expect(outsiderList.body.conversations).toHaveLength(0);
+    expect(buyerList.body.conversations[0].participantName).toBe('Test seller');
+    expect(sellerList.body.conversations[0].participantName).toBe('Test buyer');
+    expect(buyerList.body.conversations[0]).not.toHaveProperty('email');
+    expect(buyerList.body.conversations[0]).not.toHaveProperty('password');
     expect(
       (
         await request(app)
@@ -223,6 +298,10 @@ describe('conversation messages and read status', () => {
     expect(firstPage.body.pagination.hasMore).toBe(true);
     expect(firstPage.body.pagination.nextCursor).toBeTruthy();
     expect(firstPage.body.messages[0]).toHaveProperty('senderId');
+    expect(firstPage.body.messages[0].senderName).toBe('Test buyer');
+    expect(firstPage.body.messages[1].senderName).toBe('Test seller');
+    expect(firstPage.body.messages[0]).not.toHaveProperty('email');
+    expect(firstPage.body.messages[0]).not.toHaveProperty('password');
     expect(firstPage.body.messages[0]).toHaveProperty('createdAt');
     expect(firstPage.body.messages[0].readAt).toBeNull();
 
@@ -321,6 +400,16 @@ describe('conversation messages and read status', () => {
     expect(accepted.status).toBe(201);
     expect(accepted.body.message.content).toBe('Valid content');
     expect(accepted.body.message.senderId).toBe(1);
+    const notification = mock.databaseState.notifications.find(
+      row => row.type === 'conversation.message'
+    );
+    expect(notification.user_id).toBe(2);
+    expect(notification.payload).toMatchObject({
+      conversationId,
+      senderName: 'Test buyer',
+      listingId,
+      listingTitle: listingInput.title,
+    });
   });
 
   it('keeps existing conversations accessible after listing archival', async () => {
@@ -335,6 +424,14 @@ describe('conversation messages and read status', () => {
       .get(`/api/conversations/${conversationId}/messages`)
       .set('Cookie', buyer.cookie);
     expect(message.status).toBe(201);
+    expect(
+      mock.databaseState.notifications.some(
+        row =>
+          row.type === 'conversation.message' &&
+          row.user_id === 1 &&
+          row.payload.senderName === 'Test seller'
+      )
+    ).toBe(true);
     expect(history.status, JSON.stringify(history.body)).toBe(200);
     expect(history.body.messages.map(row => row.content)).toEqual([
       'Still available',

@@ -13,6 +13,7 @@ const { db, rowsByTable, executed, tables, downloadObject } = vi.hoisted(() => {
       'created_at',
       'updated_at',
     ],
+    users: ['id', 'name'],
     dealOffers: [
       'id',
       'deal_id',
@@ -96,6 +97,7 @@ vi.mock('#models/deal.model.js', () => ({
 vi.mock('#models/listing.model.js', () => ({
   businessListings: tables.businessListings,
 }));
+vi.mock('#models/user.model.js', () => ({ users: tables.users }));
 vi.mock('#models/conversation.model.js', () => ({
   conversationDocuments: tables.conversationDocuments,
 }));
@@ -114,6 +116,7 @@ vi.mock('drizzle-orm', () => ({
 
 const {
   createDeal,
+  getDeal,
   updateDealStatus,
   createOffer,
   respondToOffer,
@@ -159,6 +162,70 @@ describe('Phase 8 deal service writes', () => {
       created: false,
       deal: { id: 31 },
     });
+  });
+
+  it('returns only participant names with an authorized deal detail', async () => {
+    rowsByTable.deals = [
+      { id: 31, listing_id: 8, buyer_id: 4, seller_id: 7, status: 'proposed' },
+    ];
+    rowsByTable.users = [
+      { id: 4, name: 'Buyer Name' },
+      { id: 7, name: 'Seller Name' },
+    ];
+    await expect(getDeal(31, 4)).resolves.toMatchObject({
+      buyer_name: 'Buyer Name',
+      seller_name: 'Seller Name',
+    });
+  });
+
+  it('builds an offer statement without ambiguous UPDATE FROM column references', async () => {
+    rowsByTable.deals = [
+      { id: 31, listing_id: 8, buyer_id: 4, seller_id: 7, status: 'proposed' },
+    ];
+    db.executeResults.push([
+      {
+        id: 51,
+        deal_id: 31,
+        parent_offer_id: null,
+        created_by: 4,
+        amount: '90000.00',
+        currency: 'EUR',
+        status: 'pending',
+      },
+    ]);
+    await expect(
+      createOffer(31, 4, { amount: '90000', currency: 'EUR' })
+    ).resolves.toMatchObject({ id: 51, created_by: 4, status: 'pending' });
+    expect(executed[0].query).toContain('INSERT INTO deal_offers');
+    expect(executed[0].query).toContain('INSERT INTO deal_activities');
+    expect(executed[0].query).toContain('INSERT INTO notifications');
+    expect(executed[0].query.match(/INSERT INTO notifications/g)).toHaveLength(1);
+    expect(executed[0].query.match(/INSERT INTO outbox_events/g)).toHaveLength(1);
+    expect(executed[0].query).toContain('UNION ALL');
+    expect(executed[0].query).toContain('AS recipients(user_id)');
+    expect(executed[0].query).toContain('recipients.user_id <> ?');
+    const counteredCte = executed[0].query.split('), countered AS (')[1];
+    expect(counteredCte).toContain('RETURNING parent.id');
+    expect(counteredCte).not.toMatch(/RETURNING\s+id\b/);
+    expect(executed[0].query).toContain('current_deal.id = ?');
+    expect(executed[0].query).toContain('RETURNING current_deal.id');
+    expect(executed[0].query).toContain('RETURNING inserted_offer.*');
+    expect(executed[0].query).toContain('RETURNING inserted_activity.id');
+    expect(executed[0].query).toContain('RETURNING inserted_notification.id');
+    expect(executed[0].query).toContain('RETURNING inserted_event.id');
+    expect(executed[0].query).not.toMatch(/RETURNING\s+id\b/);
+    expect(executed[0].query).not.toMatch(/WHERE\s+id\s*=/);
+    expect(executed[0].query).toContain('senderName');
+    expect(executed[0].query).toContain('listingTitle');
+    expect(executed[0].query).not.toContain('AS recipient WHERE recipient <>');
+  });
+
+  it('conceals an offer deal from an unauthorized participant', async () => {
+    rowsByTable.deals = [];
+    await expect(
+      createOffer(31, 99, { amount: '90000', currency: 'EUR' })
+    ).rejects.toMatchObject({ status: 404, code: 'DEAL_NOT_FOUND' });
+    expect(db.execute).not.toHaveBeenCalled();
   });
 
   it('rejects unauthorised deal status changes and stale concurrent updates', async () => {
@@ -207,6 +274,28 @@ describe('Phase 8 deal service writes', () => {
     ).resolves.toMatchObject({ id: 51, parent_offer_id: 50 });
     expect(executed.at(-1).query).toContain('status = \'superseded\'');
     expect(executed.at(-1).query).toContain('parent_offer_id');
+    expect(executed.at(-1).query).toContain('RETURNING parent.id');
+    expect(executed.at(-1).query).toContain('RETURNING inserted_offer.*');
+  });
+
+  it('rejects repeat pending submissions safely with a conflict response', async () => {
+    rowsByTable.deals = [
+      {
+        id: 31,
+        listing_id: 8,
+        buyer_id: 4,
+        seller_id: 7,
+        status: 'negotiating',
+      },
+    ];
+    rowsByTable.dealOffers = [
+      { id: 50, deal_id: 31, created_by: 4, status: 'pending' },
+    ];
+    db.executeResults.push([]);
+    await expect(
+      createOffer(31, 4, { amount: '90000', currency: 'EUR' })
+    ).rejects.toMatchObject({ status: 409, code: 'DUPLICATE_PENDING_OFFER' });
+    expect(executed[0].query).toContain('pending_offer.created_by');
   });
 
   it('conditions offer response and withdrawal on pending state and participant identity', async () => {

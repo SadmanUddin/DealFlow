@@ -177,7 +177,7 @@ export function BuyerOverviewPage() {
                     >
                       <span>
                         <span className="block text-sm font-semibold text-navy-950">
-                          Acquisition #{deal.id}
+                          {deal.listing_title ?? "Business acquisition"}
                         </span>
                         <span className="mt-1 block text-xs text-ink-soft">
                           Updated {shortDate(deal.updated_at)}

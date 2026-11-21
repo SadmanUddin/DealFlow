@@ -22,6 +22,10 @@ const mocks = vi.hoisted(() => ({
   createOffer: vi.fn(),
   listDealDocuments: vi.fn(),
   listDealConversations: vi.fn(),
+  getDealConversation: vi.fn(),
+  listDealConversationMessages: vi.fn(),
+  sendDealConversationMessage: vi.fn(),
+  startDealConversation: vi.fn(),
   getPublishedListing: vi.fn(),
 }));
 
@@ -72,6 +76,8 @@ const deal = {
   listing_id: 8,
   buyer_id: 11,
   seller_id: 12,
+  buyer_name: "Buyer Name",
+  seller_name: "Seller Name",
   status: "proposed" as const,
   accepted_at: null,
   created_at: "2026-10-20T12:00:00.000Z",
@@ -82,6 +88,7 @@ const offer = {
   deal_id: 40,
   parent_offer_id: null,
   created_by: 12,
+  created_by_name: "Seller Name",
   amount: "450000.00",
   currency: "EUR",
   message: "Seller proposal",
@@ -131,6 +138,7 @@ beforeEach(() => {
     conversations: [],
     pagination: { ...page, total: 0 },
   });
+  mocks.getDealConversation.mockResolvedValue(null);
 });
 
 describe("deal workflow", () => {
@@ -159,7 +167,9 @@ describe("deal workflow", () => {
       await screen.findByRole("heading", { name: listing.title }),
     ).toBeInTheDocument();
     expect(screen.getByText("Seller proposal")).toBeInTheDocument();
-    expect(screen.getByText("DealFlow account #12")).toBeInTheDocument();
+    expect(screen.getAllByText("Seller Name")).toHaveLength(2);
+    expect(screen.queryByText("#12")).not.toBeInTheDocument();
+    expect(screen.getByText("Seller · Seller Name offer")).toBeInTheDocument();
     expect(screen.queryByText("seller@example.test")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Accept" }));
     const dialog = await screen.findByRole("alertdialog");

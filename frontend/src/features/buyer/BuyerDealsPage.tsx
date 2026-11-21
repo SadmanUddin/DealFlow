@@ -98,14 +98,14 @@ export function BuyerDealsPage() {
                           className="block truncate text-sm font-semibold text-navy-950 hover:text-emerald-900"
                           to={`/buyer/deals/${deal.id}`}
                         >
-                          {listing?.title ??
+                          {deal.listing_title ?? listing?.title ??
                             (listingQuery?.isError
                               ? "Business no longer publicly listed"
-                              : `Loading business #${deal.listing_id}…`)}
+                              : "Loading business…")}
                         </Link>
                         <p className="mt-1 truncate text-xs text-ink-soft">
                           {listing?.industry ? `${listing.industry} · ` : ""}
-                          {listing?.location ?? `Listing #${deal.listing_id}`}
+                          {listing?.location ?? "Business listing"}
                         </p>
                         <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.68rem] text-ink-faint">
                           <span>Started {dateLabel(deal.created_at)}</span>
