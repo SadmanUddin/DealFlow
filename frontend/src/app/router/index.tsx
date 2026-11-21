@@ -43,6 +43,16 @@ const VerifyEmailPage = lazy(() =>
     default: module.VerifyEmailPage,
   })),
 );
+const MarketplacePage = lazy(() =>
+  import("@/features/marketplace/MarketplacePage").then((module) => ({
+    default: module.MarketplacePage,
+  })),
+);
+const ListingDetailsPage = lazy(() =>
+  import("@/features/marketplace/ListingDetailsPage").then((module) => ({
+    default: module.ListingDetailsPage,
+  })),
+);
 const BuyerOverviewPage = lazy(() =>
   import("@/features/buyer/BuyerOverviewPage").then((module) => ({
     default: module.BuyerOverviewPage,
@@ -89,6 +99,8 @@ const router = createBrowserRouter([
     errorElement: <RouteErrorPage />,
     children: [
       { index: true, element: <LandingPage /> },
+      { path: "marketplace", element: lazyPage(<MarketplacePage />) },
+      { path: "listings/:id", element: lazyPage(<ListingDetailsPage />) },
       {
         path: "account",
         element: lazyPage(
@@ -100,7 +112,7 @@ const router = createBrowserRouter([
       { path: "unauthorized", element: <UnauthorizedPage /> },
       {
         path: "buyers",
-        element: <PlaceholderPage audience="buyers" />,
+        element: lazyPage(<MarketplacePage />),
       },
       {
         path: "sellers",
