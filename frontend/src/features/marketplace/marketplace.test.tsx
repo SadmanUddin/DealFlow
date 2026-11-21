@@ -328,8 +328,11 @@ describe("listing details", () => {
       await screen.findByText(/signed in as a buyer/i),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: /explore more businesses/i }),
-    ).toHaveAttribute("href", "/marketplace");
+      screen.getByRole("button", { name: /start acquisition/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /saved businesses/i }),
+    ).toHaveAttribute("href", "/buyer/saved");
     expect(screen.queryByText("private@example.test")).not.toBeInTheDocument();
   });
 

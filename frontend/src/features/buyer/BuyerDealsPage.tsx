@@ -95,7 +95,7 @@ export function BuyerDealsPage() {
                       <div className="min-w-0">
                         <Link
                           className="block truncate text-sm font-semibold text-navy-950 hover:text-emerald-900"
-                          to={`/buyer/offers?deal=${deal.id}`}
+                          to={`/buyer/deals/${deal.id}`}
                         >
                           {listing?.title ??
                             (listingQuery?.isError
@@ -124,9 +124,7 @@ export function BuyerDealsPage() {
                     <div className="flex items-center justify-between gap-3 sm:justify-end">
                       <StatusBadge status={deal.status} />
                       <Button asChild size="sm" variant="outline">
-                        <Link to={`/buyer/offers?deal=${deal.id}`}>
-                          View offers
-                        </Link>
+                        <Link to={`/buyer/deals/${deal.id}`}>Open deal</Link>
                       </Button>
                     </div>
                   </div>

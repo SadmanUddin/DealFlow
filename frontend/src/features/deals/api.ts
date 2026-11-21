@@ -124,6 +124,7 @@ const activitySchema = z.object({
   metadata: z.record(z.string(), z.unknown()),
   created_at: dateValue,
 });
+export type DealActivity = z.infer<typeof activitySchema>;
 const historySchema = z.object({
   activities: z.array(activitySchema),
   pagination: paginationSchema,
@@ -139,6 +140,7 @@ const dealDocumentSchema = z.object({
   sizeBytes: z.number().int().nonnegative(),
   createdAt: dateValue,
 });
+export type DealDocument = z.infer<typeof dealDocumentSchema>;
 const documentListSchema = z.object({
   documents: z.array(dealDocumentSchema),
   pagination: paginationSchema,
@@ -167,4 +169,106 @@ export async function downloadDealDocument(dealId: number, documentId: number) {
     { responseType: "blob" },
   );
   return response.data;
+}
+
+const conversationSchema = z.object({
+  id: z.number().int().positive(),
+  listingId: z.number().int().positive(),
+  listingTitle: z.string(),
+  status: z.enum(["pending", "in_review", "accepted", "rejected", "closed"]),
+  statusUpdatedAt: dateValue,
+  createdAt: dateValue,
+});
+const conversationPageSchema = z.object({
+  conversations: z.array(conversationSchema),
+  pagination: paginationSchema,
+});
+export type DealConversation = z.infer<typeof conversationSchema>;
+export const listDealConversations = (page = 1, limit = 100) =>
+  getValidated("/conversations", conversationPageSchema, { page, limit });
+export const startDealConversation = (listingId: number) =>
+  postValidated(
+    "/conversations",
+    { listingId },
+    z.object({
+      conversation: conversationSchema.omit({
+        listingTitle: true,
+        createdAt: true,
+      }),
+    }),
+  );
+
+const conversationMessageSchema = z.object({
+  id: z.number().int().positive(),
+  conversationId: z.number().int().positive(),
+  senderId: z.number().int().positive(),
+  content: z.string(),
+  createdAt: dateValue,
+  readAt: dateValue.nullable(),
+});
+const messagePageSchema = z.object({
+  messages: z.array(conversationMessageSchema),
+  pagination: z.object({
+    limit: z.number().int().positive(),
+    hasMore: z.boolean(),
+    nextCursor: z.string().nullable(),
+  }),
+});
+export type DealConversationMessage = z.infer<typeof conversationMessageSchema>;
+export const listDealConversationMessages = (
+  conversationId: number,
+  cursor?: string,
+) =>
+  getValidated(`/conversations/${conversationId}/messages`, messagePageSchema, {
+    limit: 50,
+    cursor,
+  });
+export const sendDealConversationMessage = (
+  conversationId: number,
+  content: string,
+) =>
+  postValidated(
+    `/conversations/${conversationId}/messages`,
+    { content },
+    z.object({ message: conversationMessageSchema }),
+  );
+export const markDealConversationRead = (conversationId: number) =>
+  patchValidated(
+    `/conversations/${conversationId}/read`,
+    {},
+    z.object({ conversationId: z.number(), readCount: z.number() }),
+  );
+
+const conversationDocumentSchema = z.object({
+  id: z.number().int().positive(),
+  originalFilename: z.string(),
+  mimeType: z.string(),
+  sizeBytes: z.number().int().nonnegative(),
+  uploaderId: z.number().int().positive(),
+  createdAt: dateValue,
+});
+export type DealConversationDocument = z.infer<
+  typeof conversationDocumentSchema
+>;
+export const listDealConversationDocuments = (conversationId: number) =>
+  getValidated(
+    `/conversations/${conversationId}/documents`,
+    z.object({
+      documents: z.array(conversationDocumentSchema),
+      pagination: paginationSchema,
+    }),
+    { page: 1, limit: 100 },
+  );
+export async function uploadDealConversationDocument(
+  conversationId: number,
+  file: File,
+) {
+  const body = new FormData();
+  body.append("file", file);
+  const { data } = await apiClient.post<unknown>(
+    `/conversations/${conversationId}/documents`,
+    body,
+  );
+  return z.object({ document: conversationDocumentSchema }).parse(data)
+    .document;
 }

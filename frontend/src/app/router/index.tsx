@@ -73,6 +73,11 @@ const BuyerDealsPage = lazy(() =>
     default: module.BuyerDealsPage,
   })),
 );
+const DealDetailPage = lazy(() =>
+  import("@/features/deals/DealDetailPage").then((module) => ({
+    default: module.DealDetailPage,
+  })),
+);
 const BuyerNotificationsPage = lazy(() =>
   import("@/features/buyer/BuyerNotificationsPage").then((module) => ({
     default: module.BuyerNotificationsPage,
@@ -229,6 +234,7 @@ const router = createBrowserRouter([
       { path: "saved", element: lazyPage(<BuyerSavedPage />) },
       { path: "offers", element: lazyPage(<BuyerOffersPage />) },
       { path: "deals", element: lazyPage(<BuyerDealsPage />) },
+      { path: "deals/:id", element: lazyPage(<DealDetailPage />) },
       { path: "notifications", element: lazyPage(<BuyerNotificationsPage />) },
       { path: "analytics", element: lazyPage(<BuyerAnalyticsPage />) },
     ],
@@ -251,6 +257,7 @@ const router = createBrowserRouter([
       { path: "inquiries", element: lazyPage(<SellerInquiriesPage />) },
       { path: "inquiries/:id", element: lazyPage(<SellerInquiryDetailPage />) },
       { path: "deals", element: lazyPage(<SellerOffersPage />) },
+      { path: "deals/:id", element: lazyPage(<DealDetailPage />) },
       { path: "documents", element: lazyPage(<SellerDocumentsPage />) },
       { path: "analytics", element: lazyPage(<SellerAnalyticsPage />) },
     ],

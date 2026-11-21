@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -8,7 +9,7 @@ import {
   MapPin,
   Tag,
 } from "lucide-react";
-import { Link, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +18,7 @@ import { toApiError } from "@/lib/api-error";
 import { useAuth } from "@/features/auth/useAuth";
 import { formatListingMoney } from "./marketplace-format";
 import { getPublishedListing } from "./marketplace-api";
+import { createDeal } from "@/features/deals/api";
 
 function ListingDetailSkeleton() {
   return (
@@ -91,6 +93,18 @@ export function ListingDetailsPage() {
   const id = rawId && /^[1-9]\d*$/.test(rawId) ? Number(rawId) : NaN;
   const validId = Number.isSafeInteger(id) && id > 0;
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [dealError, setDealError] = useState("");
+  const startDealMutation = useMutation({
+    mutationFn: () => createDeal(id),
+    onSuccess: async ({ deal }) => {
+      setDealError("");
+      await queryClient.invalidateQueries({ queryKey: ["deals", "mine"] });
+      await navigate(`/buyer/deals/${deal.id}`);
+    },
+    onError: (error) => setDealError(toApiError(error).message),
+  });
   const listingQuery = useQuery({
     queryKey: ["marketplace", "listing", validId ? id : null],
     queryFn: () => getPublishedListing(id),
@@ -268,7 +282,22 @@ export function ListingDetailsPage() {
                 : "Sign in to continue with DealFlow, or create an account to get started."}
           </p>
           <div className="mt-5 flex flex-col gap-2.5">
-            {user ? (
+            {user?.role === "buyer" ? (
+              <Button
+                disabled={startDealMutation.isPending}
+                onClick={() => {
+                  setDealError("");
+                  startDealMutation.mutate();
+                }}
+                size="lg"
+                variant="accent"
+              >
+                {startDealMutation.isPending
+                  ? "Opening acquisition…"
+                  : "Start acquisition"}
+                <ArrowUpRight aria-hidden="true" size={16} />
+              </Button>
+            ) : user ? (
               <Button asChild size="lg" variant="accent">
                 <Link to="/marketplace">
                   Explore more businesses{" "}
@@ -300,6 +329,14 @@ export function ListingDetailsPage() {
               </Button>
             )}
           </div>
+          {dealError ? (
+            <p
+              className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-xs leading-5 text-rose-900"
+              role="alert"
+            >
+              {dealError}
+            </p>
+          ) : null}
           <p className="mt-4 border-t border-line pt-4 text-xs leading-5 text-ink-faint">
             Public listing details are provided by the seller. Seller identity
             and private documents are not displayed here.
