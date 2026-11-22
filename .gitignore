@@ -9,3 +9,7 @@ backend/docs
 .env
 
 /frontend/ASSET_ATTRIBUTION.md
+# Logs
+logs/
+*.log
+*.log.*
