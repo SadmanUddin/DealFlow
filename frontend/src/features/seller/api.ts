@@ -30,7 +30,9 @@ export const sellerListingSchema = z.object({
     "rejected",
     "archived",
     "suspended",
+    "sold",
   ]),
+  soldAt: dateValue.nullable().optional(),
   rejectionReason: z.string().nullable(),
   updatedAt: dateValue,
 });
@@ -38,6 +40,7 @@ export type SellerListing = z.infer<typeof sellerListingSchema>;
 const listingPage = z.object({
   listings: z.array(sellerListingSchema),
   pagination: paginationSchema,
+  soldCount: z.number().int().nonnegative().optional(),
 });
 const listingResponse = z.object({ listing: sellerListingSchema });
 const deletedResponse = z.object({ message: z.string() });

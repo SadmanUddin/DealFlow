@@ -2,7 +2,7 @@ const transitions = {
   proposed: ['negotiating', 'cancelled', 'rejected'],
   negotiating: ['due_diligence', 'cancelled', 'rejected'],
   due_diligence: ['cancelled', 'rejected'],
-  accepted: ['completed', 'cancelled'],
+  accepted: ['cancelled'],
   completed: [],
   cancelled: [],
   rejected: [],

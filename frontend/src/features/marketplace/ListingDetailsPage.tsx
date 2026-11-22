@@ -19,6 +19,7 @@ import { ErrorState } from "@/components/shared/ErrorState";
 import { toApiError } from "@/lib/api-error";
 import { useAuth } from "@/features/auth/useAuth";
 import { startListingConversation } from "@/features/buyer/api";
+import { SoldListingDetail } from "./SoldListingPresentation";
 import { listingImageSrc } from "./listing-image-url";
 import { formatListingMoney } from "./marketplace-format";
 import { getPublishedListing } from "./marketplace-api";
@@ -169,8 +170,8 @@ export function ListingDetailsPage() {
     queryFn: () => getPublishedListing(id),
     enabled: validId,
     retry: retryQuery,
-    staleTime: 30_000,
-    refetchOnWindowFocus: false,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 
   if (
@@ -200,6 +201,15 @@ export function ListingDetailsPage() {
 
   const listing = listingQuery.data;
   const imageFailed = failedImageUrl === listing.imageUrl;
+  if (listing.status === "sold") {
+    return (
+      <SoldListingDetail
+        listing={listing}
+        imageUrl={imageFailed ? null : (listing.imageUrl ?? null)}
+        onImageError={() => setFailedImageUrl(listing.imageUrl ?? null)}
+      />
+    );
+  }
   const publishedDate = listing.publishedAt
     ? new Date(listing.publishedAt)
     : null;

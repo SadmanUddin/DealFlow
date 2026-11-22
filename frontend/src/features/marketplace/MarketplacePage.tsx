@@ -149,6 +149,7 @@ function MarketplaceContent() {
         page: 1,
         limit: filters.limit,
         sort: "newest",
+        availability: filters.availability,
       }),
       { replace: true },
     );
@@ -158,8 +159,8 @@ function MarketplaceContent() {
     queryKey: ["marketplace", filters],
     queryFn: () => getPublicListings(filters),
     retry: retryQuery,
-    staleTime: 30_000,
-    refetchOnWindowFocus: false,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
     placeholderData: (previousData) => previousData,
   });
   const page = listingsQuery.data?.pagination;
@@ -365,7 +366,7 @@ function MarketplaceContent() {
               </div>
               <div className="mt-2 flex items-center justify-between border-t border-line px-2 pt-3">
                 <p className="text-xs text-ink-faint">
-                  Search published businesses by name, industry or location.
+                  Search businesses by name, industry or location.
                 </p>
                 {activeCriteria ? (
                   <button
@@ -393,14 +394,16 @@ function MarketplaceContent() {
             <h2 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-navy-950 sm:text-4xl">
               {filters.q
                 ? `Results for “${filters.q}”`
-                : "Explore opportunities"}
+                : filters.availability === "sold"
+                  ? "Sold businesses"
+                  : "Explore businesses"}
             </h2>
             <p aria-live="polite" className="mt-2 text-sm text-ink-soft">
               {listingsQuery.isFetching && listingsQuery.data
-                ? "Updating opportunities…"
+                ? "Updating listings…"
                 : page
-                  ? `${page.total.toLocaleString()} ${page.total === 1 ? "published business" : "published businesses"}`
-                  : "Discover businesses available for acquisition"}
+                  ? `${page.total.toLocaleString()} ${page.total === 1 ? "business" : "businesses"}`
+                  : "Browse marketplace listings"}
             </p>
             {activeCriteria ? (
               <div
@@ -420,34 +423,53 @@ function MarketplaceContent() {
               </div>
             ) : null}
           </div>
-          <label
-            className="flex items-center gap-2 text-sm font-medium text-ink-soft"
-            htmlFor="sort-listings"
-          >
-            Sort
-            <span className="relative">
+          <div className="flex flex-wrap gap-3">
+            <label className="flex flex-col gap-1 text-xs font-medium text-ink-soft">
+              Availability
               <select
-                className="h-11 appearance-none rounded-lg border border-line bg-white py-2 pl-3.5 pr-9 text-sm font-semibold text-navy-950 outline-none transition hover:border-emerald-300 focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/10"
-                id="sort-listings"
+                className="h-11 rounded-lg border border-line bg-white px-3 text-sm font-semibold text-navy-950 focus-visible:outline-2 focus-visible:outline-emerald-700"
+                value={filters.availability ?? "available"}
                 onChange={(event) =>
                   updateFilters({
-                    sort: event.target.value as MarketplaceFilters["sort"],
+                    availability: event.target
+                      .value as MarketplaceFilters["availability"],
                   })
                 }
-                value={filters.sort}
               >
-                <option value="newest">Newest first</option>
-                <option value="oldest">Oldest first</option>
-                <option value="price_asc">Price: low to high</option>
-                <option value="price_desc">Price: high to low</option>
+                <option value="available">Available Businesses</option>
+                <option value="sold">Sold Businesses</option>
+                <option value="all">All Businesses</option>
               </select>
-              <ChevronDown
-                aria-hidden="true"
-                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink-faint"
-                size={15}
-              />
-            </span>
-          </label>
+            </label>
+            <label
+              className="flex flex-col gap-1 text-xs font-medium text-ink-soft"
+              htmlFor="sort-listings"
+            >
+              Sort
+              <span className="relative">
+                <select
+                  className="h-11 appearance-none rounded-lg border border-line bg-white py-2 pl-3.5 pr-9 text-sm font-semibold text-navy-950 outline-none transition hover:border-emerald-300 focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/10"
+                  id="sort-listings"
+                  onChange={(event) =>
+                    updateFilters({
+                      sort: event.target.value as MarketplaceFilters["sort"],
+                    })
+                  }
+                  value={filters.sort}
+                >
+                  <option value="newest">Newest first</option>
+                  <option value="oldest">Oldest first</option>
+                  <option value="price_asc">Price: low to high</option>
+                  <option value="price_desc">Price: high to low</option>
+                </select>
+                <ChevronDown
+                  aria-hidden="true"
+                  className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink-faint"
+                  size={15}
+                />
+              </span>
+            </label>
+          </div>
         </div>
 
         {listingsQuery.isError && !listingsQuery.data ? (
@@ -497,12 +519,16 @@ function MarketplaceContent() {
             <h3 className="mt-5 text-xl font-semibold tracking-tight text-navy-950">
               {activeCriteria
                 ? "No businesses match your search"
-                : "New opportunities are on the way"}
+                : filters.availability === "sold"
+                  ? "No completed acquisitions yet"
+                  : "New opportunities are on the way"}
             </h3>
             <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-soft">
               {activeCriteria
                 ? "Try a broader business, industry or location search to discover more published listings."
-                : "There are no published listings to show right now. Check back soon for new opportunities."}
+                : filters.availability === "sold"
+                  ? "Completed acquisitions will appear here."
+                  : "Check back soon for new opportunities."}
             </p>
             {activeCriteria ? (
               <Button

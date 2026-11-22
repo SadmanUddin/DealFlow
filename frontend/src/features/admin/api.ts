@@ -90,6 +90,7 @@ const listingStatusSchema = z.enum([
   "rejected",
   "archived",
   "suspended",
+  "sold",
 ]);
 export type AdminListingStatus = z.infer<typeof listingStatusSchema>;
 const adminListingSchema = z.object({

@@ -11,6 +11,10 @@ const moneySchema = z
 
 export const publicListingSchema = z.object({
   id: z.number().int().positive().safe(),
+  status: z.enum(["published", "sold"]).optional(),
+  soldAt: z.string().nullable().optional(),
+  publicSalePrice: moneySchema.optional(),
+  publicSaleCurrency: z.string().length(3).nullable().optional(),
   sellerName: z.string().nullable().optional(),
   website: z.string().nullable().optional(),
   imageUrl: z.string().nullable().optional(),
@@ -55,6 +59,7 @@ export type MarketplaceFilters = {
   maxRevenue?: string;
   minEbitda?: string;
   maxEbitda?: string;
+  availability?: "available" | "sold" | "all";
   sort: "newest" | "oldest" | "price_asc" | "price_desc";
 };
 
@@ -70,7 +75,11 @@ const optionalText = (value: string | null, maximum: number) => {
 /** Read only supported, valid backend filters from a location search string. */
 export function parseMarketplaceFilters(search: string): MarketplaceFilters {
   const params = new URLSearchParams(search);
+  const availability = params.get("availability");
   const filters: MarketplaceFilters = {
+    ...(availability === "sold" || availability === "all"
+      ? { availability }
+      : {}),
     page: validPage(params.get("page"), 1),
     limit: Math.min(100, validPage(params.get("limit"), 12)),
     sort: ["newest", "oldest", "price_asc", "price_desc"].includes(
@@ -110,6 +119,8 @@ export function serializeMarketplaceFilters(filters: MarketplaceFilters) {
     const value = filters[key];
     if (value) params.set(key, value);
   }
+  if (filters.availability && filters.availability !== "available")
+    params.set("availability", filters.availability);
   if (filters.sort !== "newest") params.set("sort", filters.sort);
   if (filters.page > 1) params.set("page", String(filters.page));
   if (filters.limit !== 12) params.set("limit", String(filters.limit));

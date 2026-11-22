@@ -31,6 +31,21 @@ export const dealSchema = z.object({
   listing_title: z.string().optional(),
   status: dealStatus,
   accepted_at: dateValue.nullable(),
+  closing_revision: z.number().int().nonnegative().optional(),
+  closing_amount: z.string().nullable().optional(),
+  closing_currency: z.string().length(3).nullable().optional(),
+  closing_proposed_by: z.number().nullable().optional(),
+  closing_agreed_at: dateValue.nullable().optional(),
+  closing_disputed_by: z.number().nullable().optional(),
+  buyer_confirmed_at: dateValue.nullable().optional(),
+  seller_confirmed_at: dateValue.nullable().optional(),
+  buyer_price_consent: z.boolean().optional(),
+  seller_price_consent: z.boolean().optional(),
+  completed_at: dateValue.nullable().optional(),
+  agreed_offer: z
+    .object({ amount: z.string(), currency: z.string() })
+    .nullable()
+    .optional(),
   created_at: dateValue,
   updated_at: dateValue,
 });
@@ -79,8 +94,23 @@ export type CreateOfferInput = {
   parentOfferId?: number;
 };
 
-export const listDeals = (page = 1, limit = 100) =>
-  getValidated("/deals", dealPageSchema, { page, limit });
+export type DealView = "open" | "completed" | "ended";
+export const listDeals = (page = 1, limit = 100, view?: DealView) =>
+  getValidated("/deals", dealPageSchema, {
+    page,
+    limit,
+    ...(view ? { view } : {}),
+  });
+
+export type ClosingAction = { revision: number } & (
+  | { action: "propose"; amount: string }
+  | { action: "confirm"; publicPriceConsent: boolean }
+  | { action: "agree" | "dispute" | "resolve" }
+);
+export const updateAcquisitionClosing = (id: number, input: ClosingAction) =>
+  postValidated(`/deals/${id}/closing`, input, dealResponseSchema).then(
+    ({ deal }) => deal,
+  );
 
 export const getDeal = (id: number) =>
   getValidated(`/deals/${id}`, dealResponseSchema).then(

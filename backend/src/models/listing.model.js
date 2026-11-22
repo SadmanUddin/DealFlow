@@ -22,6 +22,7 @@ export const listingStatus = pgEnum('listing_status', [
   'rejected',
   'archived',
   'suspended',
+  'sold',
 ]);
 
 export const businessListings = pgTable(
@@ -43,6 +44,12 @@ export const businessListings = pgTable(
     ebitda: numeric('ebitda', { precision: 18, scale: 2 }),
     currency: varchar('currency', { length: 3 }).notNull().default('USD'),
     status: listingStatus('status').notNull().default('draft'),
+    sold_at: timestamp('sold_at', { withTimezone: true }),
+    public_sale_price: numeric('public_sale_price', {
+      precision: 18,
+      scale: 2,
+    }),
+    public_sale_currency: varchar('public_sale_currency', { length: 3 }),
     public_snapshot: jsonb('public_snapshot'),
     rejection_reason: text('rejection_reason'),
     moderation_reason: text('moderation_reason'),
@@ -59,6 +66,12 @@ export const businessListings = pgTable(
     updated_at: timestamp('updated_at').defaultNow().notNull(),
   },
   table => [
+    check(
+      'listing_sold_state_valid',
+      sql`(${table.status}::text = 'sold') = (${table.sold_at} IS NOT NULL)
+        AND (${table.public_sale_price} IS NULL) = (${table.public_sale_currency} IS NULL)
+        AND (${table.public_sale_price} IS NULL OR (${table.sold_at} IS NOT NULL AND ${table.public_sale_price} > 0))`
+    ),
     index('business_listings_seller_id_idx').on(table.seller_id),
     uniqueIndex('business_listings_id_seller_id_uidx').on(
       table.id,

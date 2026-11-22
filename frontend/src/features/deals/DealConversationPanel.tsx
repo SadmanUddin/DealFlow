@@ -66,6 +66,9 @@ export function DealConversationPanel({
     queryFn: () => getDealConversation(deal.id),
   });
   const conversation = conversationsQuery.data;
+  const canStartConversation =
+    currentUserId === deal.buyer_id &&
+    !["completed", "cancelled", "rejected"].includes(deal.status);
   const messagesQuery = useInfiniteQuery({
     queryKey: ["conversations", conversation?.id, "messages"],
     queryFn: ({ pageParam }) =>
@@ -155,17 +158,19 @@ export function DealConversationPanel({
           title="No conversation is linked to this deal yet"
           description="A buyer can open the private conversation for this listing. Messages and source documents stay within that participant-authorized thread."
           action={
-            <Button
-              disabled={startMutation.isPending}
-              onClick={() => startMutation.mutate()}
-              size="sm"
-              variant="accent"
-            >
-              <MessageSquareText aria-hidden="true" size={14} />{" "}
-              {startMutation.isPending
-                ? "Opening conversation…"
-                : "Open buyer conversation"}
-            </Button>
+            canStartConversation ? (
+              <Button
+                disabled={startMutation.isPending}
+                onClick={() => startMutation.mutate()}
+                size="sm"
+                variant="accent"
+              >
+                <MessageSquareText aria-hidden="true" size={14} />{" "}
+                {startMutation.isPending
+                  ? "Opening conversation…"
+                  : "Open buyer conversation"}
+              </Button>
+            ) : undefined
           }
         />
       ) : null}

@@ -15,8 +15,12 @@ import {
   getPublishedListing,
   type PublicListing,
 } from "@/features/marketplace/marketplace-api";
-import { formatListingMoney } from "@/features/marketplace/marketplace-format";
-import { listDeals } from "@/features/deals/api";
+import {
+  formatListingMoney,
+  formatSaleMoney,
+  formatSoldDate,
+} from "@/features/marketplace/marketplace-format";
+import { listDeals, type DealView } from "@/features/deals/api";
 
 function dateLabel(value: string | Date) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(
@@ -24,11 +28,18 @@ function dateLabel(value: string | Date) {
   );
 }
 
-export function BuyerDealsPage() {
+export function BuyerDealsPage({
+  audience = "buyer",
+}: {
+  audience?: "buyer" | "seller";
+}) {
   const [page, setPage] = useState(1);
+  const [view, setView] = useState<DealView>(
+    audience === "seller" ? "completed" : "open",
+  );
   const dealsQuery = useQuery({
-    queryKey: ["deals", "mine", page, 10],
-    queryFn: () => listDeals(page, 10),
+    queryKey: ["deals", "mine", page, 10, view],
+    queryFn: () => listDeals(page, 10, view),
     staleTime: 45_000,
   });
   const deals = useMemo(
@@ -57,10 +68,46 @@ export function BuyerDealsPage() {
   return (
     <>
       <WorkspacePageHeader
-        description="Every acquisition started by or shared with your buyer account, ordered by last activity."
-        eyebrow="Buyer workspace · Pipeline"
-        title="My deals"
+        description={
+          view === "completed"
+            ? "Review closing amounts, confirmations, and private deal records."
+            : "Review your acquisition pipeline and deal history."
+        }
+        eyebrow={audience === "buyer" ? "Buyer workspace" : "Seller workspace"}
+        title={audience === "seller" ? "Completed acquisitions" : "My deals"}
       />
+      {audience === "buyer" ? (
+        <div
+          className="mb-4 flex flex-wrap gap-2"
+          role="group"
+          aria-label="Deal views"
+        >
+          {(
+            [
+              ["open", "Active deals"],
+              ["completed", "Completed acquisitions"],
+              ["ended", "Ended negotiations"],
+            ] as const
+          ).map(([value, label]) => (
+            <Button
+              key={value}
+              size="sm"
+              variant={view === value ? "accent" : "outline"}
+              aria-pressed={view === value}
+              onClick={() => {
+                setView(value);
+                setPage(1);
+              }}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
+      ) : (
+        <Button asChild size="sm" variant="outline" className="mb-4">
+          <Link to="/seller/deals">Back to offers &amp; deals</Link>
+        </Button>
+      )}
       {dealsQuery.isPending ? <WorkspaceSkeleton rows={2} /> : null}
       {dealsQuery.isError ? (
         <ErrorState
@@ -96,9 +143,10 @@ export function BuyerDealsPage() {
                       <div className="min-w-0">
                         <Link
                           className="block truncate text-sm font-semibold text-navy-950 hover:text-emerald-900"
-                          to={`/buyer/deals/${deal.id}`}
+                          to={`/${audience}/deals/${deal.id}`}
                         >
-                          {deal.listing_title ?? listing?.title ??
+                          {deal.listing_title ??
+                            listing?.title ??
                             (listingQuery?.isError
                               ? "Business no longer publicly listed"
                               : "Loading business…")}
@@ -110,7 +158,7 @@ export function BuyerDealsPage() {
                         <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.68rem] text-ink-faint">
                           <span>Started {dateLabel(deal.created_at)}</span>
                           <span>Updated {dateLabel(deal.updated_at)}</span>
-                          {listing ? (
+                          {view !== "completed" && listing ? (
                             <span>
                               Ask{" "}
                               {formatListingMoney(
@@ -119,13 +167,38 @@ export function BuyerDealsPage() {
                               )}
                             </span>
                           ) : null}
+                          {view === "completed" && deal.completed_at && (
+                            <span>
+                              Closed {formatSoldDate(deal.completed_at)}
+                            </span>
+                          )}
+                          {view === "completed" &&
+                            deal.closing_amount &&
+                            deal.closing_currency && (
+                              <span className="font-semibold text-emerald-900">
+                                Final amount ·{" "}
+                                {formatSaleMoney(
+                                  deal.closing_amount,
+                                  deal.closing_currency,
+                                )}
+                              </span>
+                            )}
+                          {view === "completed" &&
+                            deal.buyer_confirmed_at &&
+                            deal.seller_confirmed_at && (
+                              <span>Both parties confirmed</span>
+                            )}
                         </div>
                       </div>
                     </div>
                     <div className="flex items-center justify-between gap-3 sm:justify-end">
                       <StatusBadge status={deal.status} />
                       <Button asChild size="sm" variant="outline">
-                        <Link to={`/buyer/deals/${deal.id}`}>Open deal</Link>
+                        <Link to={`/${audience}/deals/${deal.id}`}>
+                          {view === "completed"
+                            ? "History & documents"
+                            : "Open deal"}
+                        </Link>
                       </Button>
                     </div>
                   </div>
@@ -170,12 +243,26 @@ export function BuyerDealsPage() {
         <SectionCard>
           <WorkspaceEmpty
             action={
-              <Button asChild variant="accent">
-                <Link to="/marketplace">Find a business</Link>
-              </Button>
+              view === "open" ? (
+                <Button asChild variant="accent">
+                  <Link to="/marketplace">Find a business</Link>
+                </Button>
+              ) : undefined
             }
-            description="When you start a purchase from a published opportunity, the deal status and its next steps will appear here."
-            title="Your deal pipeline is empty"
+            description={
+              view === "completed"
+                ? "Acquisitions appear here once both parties confirm completion."
+                : view === "ended"
+                  ? "Cancelled and rejected negotiations appear here."
+                  : "When you start a purchase, the deal and its next steps will appear here."
+            }
+            title={
+              view === "completed"
+                ? "No completed acquisitions"
+                : view === "ended"
+                  ? "No ended negotiations"
+                  : "Your deal pipeline is empty"
+            }
           />
         </SectionCard>
       ) : null}

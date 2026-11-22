@@ -43,6 +43,7 @@ const statuses: Array<AdminListingStatus | "all"> = [
   "rejected",
   "suspended",
   "archived",
+  "sold",
 ];
 
 export function AdminModerationPage() {
@@ -170,6 +171,7 @@ export function AdminModerationPage() {
               <option value="rejected">Rejected</option>
               <option value="suspended">Suspended</option>
               <option value="archived">Archived</option>
+              <option value="sold">Sold</option>
             </select>
           </label>
           <Button type="submit">

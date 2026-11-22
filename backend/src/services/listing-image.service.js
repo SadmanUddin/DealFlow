@@ -221,7 +221,7 @@ export const removeListingImage = async (listingId, sellerId) => {
 export const getListingImage = async (listingId, viewerId) => {
   const access = viewerId
     ? or(
-      eq(businessListings.status, 'published'),
+      inArray(businessListings.status, ['published', 'sold']),
       and(
         eq(businessListings.seller_id, viewerId),
         inArray(businessListings.status, [
@@ -232,7 +232,7 @@ export const getListingImage = async (listingId, viewerId) => {
         ])
       )
     )
-    : eq(businessListings.status, 'published');
+    : inArray(businessListings.status, ['published', 'sold']);
   const [listing] = await db
     .select({
       imageKey: businessListings.image_key,
@@ -248,6 +248,6 @@ export const getListingImage = async (listingId, viewerId) => {
   return {
     stream,
     mimeType: listing.mimeType,
-    isPublic: listing.status === 'published',
+    isPublic: ['published', 'sold'].includes(listing.status),
   };
 };

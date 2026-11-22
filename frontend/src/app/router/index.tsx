@@ -269,6 +269,10 @@ const router = createBrowserRouter([
       { path: "inquiries/:id", element: lazyPage(<SellerInquiryDetailPage />) },
       { path: "conversations", element: lazyPage(<SellerConversationsPage />) },
       { path: "deals", element: lazyPage(<SellerOffersPage />) },
+      {
+        path: "deals/completed",
+        element: lazyPage(<BuyerDealsPage audience="seller" />),
+      },
       { path: "deals/:id", element: lazyPage(<DealDetailPage />) },
       { path: "notifications", element: lazyPage(<BuyerNotificationsPage />) },
       { path: "documents", element: lazyPage(<SellerDocumentsPage />) },

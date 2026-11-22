@@ -65,6 +65,7 @@ export const adminListingQuerySchema = z
         'rejected',
         'archived',
         'suspended',
+        'sold',
       ])
       .optional(),
     q: z.string().trim().min(1).max(200).optional(),

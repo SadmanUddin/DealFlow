@@ -74,6 +74,7 @@ const searchAmount = z
 
 export const publicListingQuerySchema = paginationSchema
   .extend({
+    availability: z.enum(['available', 'sold', 'all']).optional(),
     q: z.string().trim().min(1).max(200).optional(),
     industry: z.string().trim().min(1).max(120).optional(),
     location: z.string().trim().min(1).max(160).optional(),
@@ -111,7 +112,7 @@ export const publicListingQuerySchema = paginationSchema
 export const adminListingQuerySchema = paginationSchema
   .extend({
     status: z
-      .enum(['draft', 'pending', 'published', 'rejected', 'archived'])
+      .enum(['draft', 'pending', 'published', 'rejected', 'archived', 'sold'])
       .optional(),
   })
   .strict();

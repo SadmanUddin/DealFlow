@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, ne, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, ne, notInArray, sql } from 'drizzle-orm';
 import { db } from '#config/database.js';
 import {
   deals,
@@ -53,6 +53,7 @@ export const createDeal = async (buyerId, listingId) => {
     WITH eligible AS (
       SELECT id, seller_id FROM business_listings
       WHERE id = ${listingId} AND status = 'published' AND seller_id <> ${buyerId}
+      FOR SHARE
     ), created AS (
       INSERT INTO deals(listing_id, buyer_id, seller_id)
       SELECT id, ${buyerId}, seller_id FROM eligible
@@ -115,8 +116,17 @@ export const createDeal = async (buyerId, listingId) => {
   return { deal: created, created: true };
 };
 
-export const listDeals = async (userId, { page: pageNo, limit }) => {
-  const where = participant(userId);
+export const listDeals = async (userId, { page: pageNo, limit, view }) => {
+  const where = and(
+    participant(userId),
+    view === 'completed' ? eq(deals.status, 'completed') : undefined,
+    view === 'open'
+      ? notInArray(deals.status, ['completed', 'cancelled', 'rejected'])
+      : undefined,
+    view === 'ended'
+      ? inArray(deals.status, ['cancelled', 'rejected'])
+      : undefined
+  );
   const [rows, counts] = await Promise.all([
     db
       .select({
@@ -127,6 +137,11 @@ export const listDeals = async (userId, { page: pageNo, limit }) => {
         seller_id: deals.seller_id,
         status: deals.status,
         accepted_at: deals.accepted_at,
+        closing_amount: deals.closing_amount,
+        closing_currency: deals.closing_currency,
+        completed_at: deals.completed_at,
+        buyer_confirmed_at: deals.buyer_confirmed_at,
+        seller_confirmed_at: deals.seller_confirmed_at,
         created_at: deals.created_at,
         updated_at: deals.updated_at,
         listing_title: businessListings.title,
@@ -150,6 +165,18 @@ export const listDeals = async (userId, { page: pageNo, limit }) => {
 
 export const getDeal = async (dealId, userId, isAdmin = false) => {
   const deal = await participantDeal(dealId, userId, isAdmin);
+  const visibleDeal = { ...deal };
+  if (![deal.buyer_id, deal.seller_id].includes(userId)) {
+    for (const field of Object.keys(visibleDeal)) {
+      if (
+        field.startsWith('closing_') ||
+        field.endsWith('_confirmed_at') ||
+        field.endsWith('_price_consent')
+      ) {
+        delete visibleDeal[field];
+      }
+    }
+  }
   const participants = await db
     .select({
       id: users.id,
@@ -161,8 +188,22 @@ export const getDeal = async (dealId, userId, isAdmin = false) => {
   const sellerName = participants.find(
     user => user.id === deal.seller_id
   )?.name;
+  const [agreedOffer] =
+    visibleDeal.closing_revision !== undefined && deal.accepted_at
+      ? await db
+        .select({ amount: dealOffers.amount, currency: dealOffers.currency })
+        .from(dealOffers)
+        .where(
+          and(
+            eq(dealOffers.deal_id, dealId),
+            eq(dealOffers.status, 'accepted')
+          )
+        )
+        .limit(1)
+      : [];
   return {
-    ...deal,
+    ...visibleDeal,
+    agreed_offer: agreedOffer ?? null,
     buyer_name: buyerName ?? null,
     seller_name: sellerName ?? null,
   };
@@ -188,7 +229,7 @@ export const updateDealStatus = async (dealId, userId, role, status) => {
       RETURNING *
     ), activity AS (
       INSERT INTO deal_activities(deal_id, actor_id, event_type, metadata)
-      SELECT id, ${userId}, 'deal.status_changed', jsonb_build_object('from', ${current.status}, 'to', ${status}) FROM changed RETURNING id
+      SELECT id, ${userId}, 'deal.status_changed', jsonb_build_object('from', ${current.status}::text, 'to', ${status}::text) FROM changed RETURNING id
     ), notifications_added AS (
       INSERT INTO notifications(user_id, dedupe_key, type, payload)
       SELECT recipients.user_id, 'deal:' || changed.id || ':status:' || changed.updated_at::text || ':' || recipients.user_id, 'deal.status_changed', jsonb_build_object('dealId', changed.id, 'status', changed.status)
@@ -207,6 +248,36 @@ export const updateDealStatus = async (dealId, userId, role, status) => {
       'Deal status changed; reload and try again'
     );
   return rows[0];
+};
+
+const closingErrors = {
+  stale: 'Closing terms changed. Review the latest terms before trying again.',
+  unavailable: 'Closing requires an accepted deal and an available listing.',
+  disputed: 'Resolve the dispute before continuing with closing.',
+  dispute_owner: 'Only the participant who raised the dispute can clear it.',
+  agreement_required: 'Both parties must agree on the proposed closing amount.',
+  already_agreed: 'The final amount has been agreed. Report a dispute to pause closing and review the terms.',
+  invalid_amount:
+    'Enter a positive closing amount with up to two decimal places.',
+};
+
+export const updateAcquisitionClosing = async (dealId, userId, input) => {
+  const result = await executeDealWrite(sql`
+    SELECT apply_acquisition_closing(
+      ${dealId}::integer, ${userId}::integer, ${input.action}::text,
+      ${input.revision}::integer, ${input.amount ?? null}::numeric,
+      ${input.publicPriceConsent ?? null}::boolean
+    ) AS outcome
+  `);
+  const [{ outcome }] = Array.isArray(result) ? result : result.rows;
+  if (outcome === 'not_found') throw notFound();
+  if (outcome !== 'ok')
+    throw new AppError(
+      409,
+      'CLOSING_CONFLICT',
+      closingErrors[outcome] ?? 'Closing could not be updated.'
+    );
+  return getDeal(dealId, userId);
 };
 
 export const createOffer = async (dealId, userId, input) => {
@@ -468,7 +539,8 @@ export const listDealActivities = async (
   isAdmin,
   { page: pageNo, limit }
 ) => {
-  await participantDeal(dealId, userId, isAdmin);
+  const deal = await participantDeal(dealId, userId, isAdmin);
+  const canReadClosing = [deal.buyer_id, deal.seller_id].includes(userId);
   const [activities, counts] = await Promise.all([
     db
       .select({
@@ -492,7 +564,16 @@ export const listDealActivities = async (
       .where(eq(dealActivities.deal_id, dealId)),
   ]);
   const total = counts[0]?.count ?? 0;
-  return { activities, pagination: page(pageNo, limit, total) };
+  return {
+    activities: canReadClosing
+      ? activities
+      : activities.map(activity =>
+        activity.event_type.startsWith('deal.closing_')
+          ? { ...activity, metadata: {} }
+          : activity
+      ),
+    pagination: page(pageNo, limit, total),
+  };
 };
 
 export const linkDealDocument = async (dealId, userId, documentId) => {

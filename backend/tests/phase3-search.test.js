@@ -186,7 +186,8 @@ describe('Phase 3 public search and discovery', () => {
     for (const row of response.body.listings) {
       expect(row).not.toHaveProperty('sellerId');
       expect(row).not.toHaveProperty('seller_id');
-      expect(row).not.toHaveProperty('status');
+      expect(row.status).toBe('published');
+      expect(row).not.toHaveProperty('closing_amount');
       expect(row).not.toHaveProperty('rejectionReason');
       expect(row).not.toHaveProperty('rejection_reason');
     }

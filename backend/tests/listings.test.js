@@ -183,7 +183,7 @@ describe('public listing visibility', () => {
 
     const publicResponse = await request(app).get(`/api/listings/${listingId}`);
     expect(publicResponse.body.listing.isFavorite).toBeUndefined();
-    expect(publicResponse.headers['cache-control']).toBe('public, max-age=60');
+    expect(publicResponse.headers['cache-control']).toBe('public, no-cache');
 
     await signed(request(app).post(`/api/favorites/${listingId}`), buyer).send({});
     const savedResponse = await request(app)

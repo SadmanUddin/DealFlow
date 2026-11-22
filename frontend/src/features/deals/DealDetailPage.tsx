@@ -10,7 +10,6 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleDollarSign,
-  MessageSquareText,
   Workflow,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -41,6 +40,7 @@ import {
   type DealActivity,
   type Offer,
 } from "./api";
+import { AcquisitionClosingPanel } from "./AcquisitionClosingPanel";
 import { OfferComposer } from "./OfferComposer";
 import { OfferTimeline } from "./OfferTimeline";
 import { DealConversationPanel } from "./DealConversationPanel";
@@ -56,7 +56,7 @@ const allowedTransitions: Record<Deal["status"], Deal["status"][]> = {
   proposed: ["negotiating", "cancelled", "rejected"],
   negotiating: ["due_diligence", "cancelled", "rejected"],
   due_diligence: ["cancelled", "rejected"],
-  accepted: ["completed", "cancelled"],
+  accepted: ["cancelled"],
   completed: [],
   cancelled: [],
   rejected: [],
@@ -69,6 +69,12 @@ const eventLabels: Record<string, string> = {
   "offer.rejected": "Offer rejected",
   "offer.withdrawn": "Offer withdrawn",
   "deal.status_changed": "Deal status changed",
+  "deal.closing_proposed": "Closing amount proposed",
+  "deal.closing_agreed": "Closing amount agreed",
+  "deal.closing_confirmed": "Acquisition completion confirmed",
+  "deal.closing_disputed": "Closing disputed",
+  "deal.closing_resolved": "Closing dispute resolved",
+  "deal.listing_sold": "Negotiation ended because the listing sold",
   "deal.document_linked": "Document added to deal room",
 };
 
@@ -555,6 +561,16 @@ export function DealDetailPage() {
               </SectionCard>
             ) : null}
 
+            {(deal.status === "accepted" || deal.status === "completed") &&
+            user &&
+            [deal.buyer_id, deal.seller_id].includes(user.id) ? (
+              <AcquisitionClosingPanel
+                deal={deal}
+                userId={user.id}
+                acceptedOffer={acceptedOffer}
+              />
+            ) : null}
+
             <SectionCard>
               <SectionHeading
                 description="Backend events only; actor IDs are shown without exposing account contact details."
@@ -600,25 +616,9 @@ export function DealDetailPage() {
               ) : null}
             </SectionCard>
 
-            {isBuyer ? (
-              <DealConversationPanel
-                deal={deal}
-                currentUserId={user?.id ?? 0}
-              />
-            ) : (
-              <SectionCard>
-                <SectionHeading
-                  title="Buyer conversation"
-                  description="Conversation content stays inside its authorized private inquiry. Open the matching inquiry from your seller workspace to exchange messages and upload source documents."
-                />
-                <Button asChild size="sm" variant="outline">
-                  <Link to="/seller/inquiries">
-                    <MessageSquareText aria-hidden="true" size={14} /> Seller
-                    inquiries
-                  </Link>
-                </Button>
-              </SectionCard>
-            )}
+            {user && [deal.buyer_id, deal.seller_id].includes(user.id) ? (
+              <DealConversationPanel deal={deal} currentUserId={user.id} />
+            ) : null}
 
             <DealDocumentsPanel dealId={deal.id} />
           </div>
@@ -669,7 +669,7 @@ export function DealDetailPage() {
                         key={status}
                         onClick={() => setStatusConfirmation(status)}
                         size="sm"
-                        variant={status === "completed" ? "accent" : "outline"}
+                        variant="outline"
                       >
                         Mark {status.replaceAll("_", " ")}
                       </Button>

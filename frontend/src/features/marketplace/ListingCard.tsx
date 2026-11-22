@@ -3,7 +3,8 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { Card } from "@/components/ui/card";
 import type { PublicListing } from "./marketplace-api";
-import { formatListingMoney } from "./marketplace-format";
+import { PublicSalePrice, SoldBadge } from "./SoldListingPresentation";
+import { formatListingMoney, formatSoldDate } from "./marketplace-format";
 import { listingImageSrc } from "./listing-image-url";
 
 export function ListingCard({ listing }: { listing: PublicListing }) {
@@ -12,6 +13,7 @@ export function ListingCard({ listing }: { listing: PublicListing }) {
     listing.imageUrl && failedImageUrl !== listing.imageUrl
       ? listing.imageUrl
       : null;
+  const sold = listing.status === "sold";
   return (
     <Card className="group h-full overflow-hidden border-line/90 shadow-none transition duration-200 hover:-translate-y-0.5 hover:border-emerald-800/25 hover:shadow-card">
       <Link
@@ -52,9 +54,15 @@ export function ListingCard({ listing }: { listing: PublicListing }) {
               <Building2 aria-hidden="true" size={21} strokeWidth={1.7} />
             </span>
           ) : null}
-          <span className="absolute bottom-5 right-5 text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-navy-950/45 sm:bottom-6 sm:right-6">
-            Business opportunity
-          </span>
+          {sold ? (
+            <div className="absolute left-4 top-4">
+              <SoldBadge />
+            </div>
+          ) : (
+            <span className="absolute bottom-5 right-5 text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-navy-950/45 sm:bottom-6 sm:right-6">
+              Business opportunity
+            </span>
+          )}
         </div>
 
         <div className="flex flex-1 flex-col p-5 sm:p-6">
@@ -83,7 +91,7 @@ export function ListingCard({ listing }: { listing: PublicListing }) {
               {listing.location || "Location not disclosed"}
             </span>
           </p>
-          {listing.sellerName ? (
+          {!sold && listing.sellerName ? (
             <p className="mt-2 text-xs text-ink-faint">
               Published by{" "}
               <span className="font-semibold text-ink-soft">
@@ -91,39 +99,60 @@ export function ListingCard({ listing }: { listing: PublicListing }) {
               </span>
             </p>
           ) : null}
-          <p className="mt-4 line-clamp-3 min-h-[4.5rem] text-sm leading-6 text-ink-soft">
-            {listing.description}
-          </p>
+          {!sold && (
+            <p className="mt-4 line-clamp-3 min-h-[4.5rem] text-sm leading-6 text-ink-soft">
+              {listing.description}
+            </p>
+          )}
 
-          <div className="mt-auto grid grid-cols-2 gap-4 border-t border-line pt-5">
-            <div className="min-w-0">
-              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.11em] text-ink-faint">
-                Asking price
-              </p>
-              <p className="mt-1.5 truncate text-lg font-semibold tracking-tight text-navy-950">
-                {formatListingMoney(listing.askingPrice, listing.currency)}
-              </p>
+          {sold ? (
+            <div className="mt-auto pt-5">
+              <div className="rounded-xl border border-emerald-100 bg-emerald-50/70 p-4">
+                <PublicSalePrice listing={listing} />
+                {listing.soldAt && (
+                  <p className="mt-2 text-xs text-ink-soft">
+                    Completed{" "}
+                    <time dateTime={listing.soldAt}>
+                      {formatSoldDate(listing.soldAt)}
+                    </time>
+                  </p>
+                )}
+              </div>
             </div>
-            {listing.annualRevenue !== null ? (
-              <div className="min-w-0 border-l border-line pl-4">
+          ) : (
+            <div className="mt-auto grid grid-cols-2 gap-4 border-t border-line pt-5">
+              <div className="min-w-0">
                 <p className="text-[0.65rem] font-semibold uppercase tracking-[0.11em] text-ink-faint">
-                  Annual revenue
+                  Asking price
                 </p>
-                <p className="mt-1.5 truncate text-base font-semibold tracking-tight text-navy-950">
-                  {formatListingMoney(listing.annualRevenue, listing.currency)}
+                <p className="mt-1.5 truncate text-lg font-semibold tracking-tight text-navy-950">
+                  {formatListingMoney(listing.askingPrice, listing.currency)}
                 </p>
               </div>
-            ) : (
-              <div className="min-w-0 border-l border-line pl-4">
-                <p className="text-[0.65rem] font-semibold uppercase tracking-[0.11em] text-ink-faint">
-                  Annual revenue
-                </p>
-                <p className="mt-1.5 text-sm font-medium text-ink-faint">
-                  Not disclosed
-                </p>
-              </div>
-            )}
-          </div>
+              {listing.annualRevenue !== null ? (
+                <div className="min-w-0 border-l border-line pl-4">
+                  <p className="text-[0.65rem] font-semibold uppercase tracking-[0.11em] text-ink-faint">
+                    Annual revenue
+                  </p>
+                  <p className="mt-1.5 truncate text-base font-semibold tracking-tight text-navy-950">
+                    {formatListingMoney(
+                      listing.annualRevenue,
+                      listing.currency,
+                    )}
+                  </p>
+                </div>
+              ) : (
+                <div className="min-w-0 border-l border-line pl-4">
+                  <p className="text-[0.65rem] font-semibold uppercase tracking-[0.11em] text-ink-faint">
+                    Annual revenue
+                  </p>
+                  <p className="mt-1.5 text-sm font-medium text-ink-faint">
+                    Not disclosed
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </Link>
     </Card>

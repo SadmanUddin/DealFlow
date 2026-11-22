@@ -184,7 +184,7 @@ describe("public marketplace", () => {
     expect(within(card).getByText("Ghent, Belgium")).toBeInTheDocument();
     expect(within(card).getByText(/€485,000/)).toBeInTheDocument();
     expect(within(card).getByText(/€620,000/)).toBeInTheDocument();
-    expect(screen.getByText("1 published business")).toBeInTheDocument();
+    expect(screen.getByText("1 business")).toBeInTheDocument();
   });
 
   it("reads supported query parameters and submits search into the URL", async () => {
@@ -575,5 +575,57 @@ describe("listing details", () => {
     expect(screen.getByText(/\$1,250,000/)).toBeInTheDocument();
     expect(screen.getByText("Not disclosed")).toBeInTheDocument();
     expect(formatListingMoney("500000", "GBP")).toMatch(/£500,000/);
+  });
+});
+
+describe("sold businesses", () => {
+  const sold: PublicListing = {
+    ...listing,
+    status: "sold",
+    soldAt: "2026-11-20T12:00:00Z",
+    publicSalePrice: null,
+    publicSaleCurrency: null,
+  };
+
+  it("requests sold listings from the API and presents them as completed businesses", async () => {
+    const user = userEvent.setup();
+    apiMocks.getPublicListings.mockImplementation(async (filters) =>
+      listingPage(filters.availability === "sold" ? [sold] : [listing]),
+    );
+    renderMarketplace();
+    await screen.findByRole("link", { name: /view independent/i });
+    const availability = screen.getByLabelText("Availability");
+    expect(availability).toHaveValue("available");
+    await user.selectOptions(availability, "sold");
+    expect(await screen.findByText("Sold — Price Undisclosed")).toBeVisible();
+    expect(screen.getByText("SOLD")).toBeVisible();
+    expect(screen.queryByText("Business opportunity")).not.toBeInTheDocument();
+    expect(apiMocks.getPublicListings).toHaveBeenLastCalledWith(
+      expect.objectContaining({ availability: "sold", page: 1 }),
+    );
+    expect(screen.getByTestId("location-search")).toHaveTextContent(
+      "availability=sold",
+    );
+  });
+
+  it("shows the approved final price and replaces buyer actions on the sold detail", async () => {
+    apiMocks.getPublishedListing.mockResolvedValue({
+      ...sold,
+      publicSalePrice: "450000.25",
+      publicSaleCurrency: "EUR",
+    });
+    renderMarketplace("/listings/8", signedInAuth);
+    expect(
+      await screen.findByText("This Business Has Been Sold"),
+    ).toBeVisible();
+    expect(screen.getByText("Final sale price")).toBeVisible();
+    expect(screen.getByText(/450,000\.25/)).toBeVisible();
+    expect(screen.getByText(/original asking price/i)).toBeVisible();
+    expect(
+      screen.getByRole("link", { name: "Explore Available Businesses" }),
+    ).toHaveAttribute("href", "/marketplace");
+    expect(
+      screen.queryByRole("button", { name: /inquiry|offer/i }),
+    ).not.toBeInTheDocument();
   });
 });

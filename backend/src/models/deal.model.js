@@ -1,4 +1,5 @@
 import {
+  boolean,
   check,
   foreignKey,
   index,
@@ -39,6 +40,23 @@ export const deals = pgTable(
       .references(() => users.id, { onDelete: 'restrict' }),
     status: varchar('status', { length: 24 }).notNull().default('proposed'),
     accepted_at: timestamp('accepted_at', { withTimezone: true }),
+    closing_revision: integer('closing_revision').notNull().default(0),
+    closing_amount: numeric('closing_amount', { precision: 18, scale: 2 }),
+    closing_currency: varchar('closing_currency', { length: 3 }),
+    closing_proposed_by: integer('closing_proposed_by'),
+    closing_agreed_at: timestamp('closing_agreed_at', { withTimezone: true }),
+    buyer_confirmed_at: timestamp('buyer_confirmed_at', { withTimezone: true }),
+    seller_confirmed_at: timestamp('seller_confirmed_at', {
+      withTimezone: true,
+    }),
+    buyer_price_consent: boolean('buyer_price_consent')
+      .notNull()
+      .default(false),
+    seller_price_consent: boolean('seller_price_consent')
+      .notNull()
+      .default(false),
+    closing_disputed_by: integer('closing_disputed_by'),
+    completed_at: timestamp('completed_at', { withTimezone: true }),
     created_at: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -59,6 +77,17 @@ export const deals = pgTable(
       'deals_accepted_at_valid',
       sql`(${table.status} NOT IN ('accepted','completed') OR ${table.accepted_at} IS NOT NULL) AND (${table.accepted_at} IS NULL OR ${table.status} IN ('accepted','completed','cancelled'))`
     ),
+    check('deals_closing_amount_positive', sql`${table.closing_amount} > 0`),
+    check(
+      'deals_completion_valid',
+      sql`${table.completed_at} IS NULL OR (${table.status} = 'completed' AND
+        ${table.closing_amount} IS NOT NULL AND ${table.closing_currency} IS NOT NULL AND
+        ${table.closing_agreed_at} IS NOT NULL AND ${table.buyer_confirmed_at} IS NOT NULL AND
+        ${table.seller_confirmed_at} IS NOT NULL AND ${table.closing_disputed_by} IS NULL)`
+    ),
+    uniqueIndex('deals_one_confirmed_sale_per_listing_uidx')
+      .on(table.listing_id)
+      .where(sql`${table.completed_at} IS NOT NULL`),
     uniqueIndex('deals_listing_buyer_active_uidx')
       .on(table.listing_id, table.buyer_id)
       .where(sql`${table.status} NOT IN ('completed','cancelled','rejected')`),

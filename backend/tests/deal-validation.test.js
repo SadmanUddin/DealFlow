@@ -13,7 +13,7 @@ describe('Phase 8 deal rules and request validation', () => {
   it('allows only defined forward deal transitions', () => {
     expect(canTransitionDeal('proposed', 'negotiating')).toBe(true);
     expect(canTransitionDeal('negotiating', 'due_diligence')).toBe(true);
-    expect(canTransitionDeal('accepted', 'completed')).toBe(true);
+    expect(canTransitionDeal('accepted', 'completed')).toBe(false);
     expect(canTransitionDeal('negotiating', 'accepted')).toBe(false);
     expect(canTransitionDeal('completed', 'cancelled')).toBe(false);
     expect(canTransitionDeal('cancelled', 'negotiating')).toBe(false);
@@ -58,9 +58,9 @@ describe('Phase 8 deal rules and request validation', () => {
   it('rejects malformed ids and unsupported offer actions', () => {
     expect(dealIdSchema.safeParse({ id: '12' }).success).toBe(true);
     expect(dealIdSchema.safeParse({ id: '0' }).success).toBe(false);
-    expect(dealOfferIdSchema.safeParse({ id: '12', offerId: '4' }).success).toBe(
-      true
-    );
+    expect(
+      dealOfferIdSchema.safeParse({ id: '12', offerId: '4' }).success
+    ).toBe(true);
     expect(dealOfferIdSchema.safeParse({ offerId: '4' }).success).toBe(false);
     expect(respondOfferSchema.safeParse({ action: 'accept' }).success).toBe(
       true

@@ -27,7 +27,7 @@ export function ConfirmDialog({
   onConfirm,
 }: ConfirmDialogProps) {
   const cancelRef = useRef<HTMLButtonElement>(null);
-  const confirmRef = useRef<HTMLButtonElement>(null);
+
   const previouslyFocused = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -43,8 +43,11 @@ export function ConfirmDialog({
       return;
     }
     if (event.key !== "Tab") return;
-    const first = cancelRef.current;
-    const last = confirmRef.current;
+    const controls = event.currentTarget.querySelectorAll<HTMLElement>(
+      "button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href]",
+    );
+    const first = controls[0];
+    const last = controls[controls.length - 1];
     if (!first || !last) return;
     if (event.shiftKey && document.activeElement === first) {
       event.preventDefault();
@@ -109,7 +112,6 @@ export function ConfirmDialog({
           <Button
             disabled={busy || confirmDisabled}
             onClick={onConfirm}
-            ref={confirmRef}
             variant="accent"
           >
             {busy ? (busyLabel ?? "Please wait…") : confirmLabel}

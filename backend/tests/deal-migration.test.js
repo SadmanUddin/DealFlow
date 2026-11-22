@@ -52,12 +52,12 @@ describe('Phase 8 migration sequence', () => {
     expect(
       snapshot16.tables['public.deals'].checkConstraints.deals_accepted_at_valid
     ).toBeDefined();
-    expect(journal.entries.slice(-4, -1).map(entry => entry.tag)).toEqual([
+    expect(journal.entries.slice(16, 19).map(entry => entry.tag)).toEqual([
       '0016_phase8_deal_offer_invariants',
       '0017_phase11_existing_account_verification_backfill',
       '0018_listing_public_profile_media',
     ]);
-    expect(journal.entries.at(-1).tag).toBe(
+    expect(journal.entries[19].tag).toBe(
       '0019_fix_listing_event_key_ambiguity'
     );
   });

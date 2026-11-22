@@ -73,7 +73,7 @@ export const getPublicListings = async (req, res) => {
 };
 
 export const getPublishedListing = async (req, res) => {
-  res.set('Cache-Control', req.user ? 'private, no-store' : 'public, max-age=60');
+  if (req.user) res.set('Cache-Control', 'private, no-store');
   res.status(200).json({
     listing: await getPublishedListingService(
       listingId(req),

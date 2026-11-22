@@ -1,6 +1,7 @@
 import express from 'express';
 import {
   changeStatus,
+  closing,
   create,
   documents,
   detail,
@@ -36,6 +37,7 @@ router.post(
   startDealConversation
 );
 router.patch('/:id/status', requireCsrf, changeStatus);
+router.post('/:id/closing', requireCsrf, closing);
 router.get('/:id/offers', offers);
 router.post('/:id/offers', requireCsrf, offer);
 router.post('/:id/offers/:offerId/respond', requireCsrf, respond);

@@ -12,6 +12,7 @@ const statusStyles: Record<string, string> = {
   due_diligence: "bg-indigo-50 text-indigo-900 ring-1 ring-indigo-700/10",
   accepted: "bg-emerald-50 text-emerald-900 ring-1 ring-emerald-700/10",
   published: "bg-emerald-50 text-emerald-900 ring-1 ring-emerald-700/10",
+  sold: "bg-emerald-950 text-white",
   completed: "bg-emerald-50 text-emerald-900 ring-1 ring-emerald-700/10",
   rejected: "bg-rose-50 text-rose-900 ring-1 ring-rose-700/10",
   cancelled: "bg-slate-100 text-slate-700",
@@ -28,7 +29,7 @@ export function StatusBadge({ status }: { status: string }) {
     <span
       className={`inline-flex w-fit items-center rounded-full px-2.5 py-1 text-[0.68rem] font-semibold capitalize ${statusStyles[status] ?? "bg-slate-100 text-slate-700"}`}
     >
-      {status.replaceAll("_", " ")}
+      {status === "sold" ? "SOLD" : status.replaceAll("_", " ")}
     </span>
   );
 }

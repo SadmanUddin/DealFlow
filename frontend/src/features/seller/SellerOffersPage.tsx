@@ -134,6 +134,11 @@ export function SellerOffersPage() {
   return (
     <>
       <WorkspacePageHeader
+        action={
+          <Button asChild variant="outline">
+            <Link to="/seller/deals/completed">Completed acquisitions</Link>
+          </Button>
+        }
         description="Review inbound proposals and counteroffers within their acquisition records."
         eyebrow="Seller workspace · Negotiation"
         title="Offers & deals"
@@ -212,7 +217,9 @@ export function SellerOffersPage() {
                   >
                     <span className="flex items-center justify-between gap-2">
                       <span className="truncate text-xs font-semibold text-navy-950">
-                        {listing?.title ?? deal.listing_title ?? "Business listing"}
+                        {listing?.title ??
+                          deal.listing_title ??
+                          "Business listing"}
                       </span>
                       <StatusBadge status={deal.status} />
                     </span>

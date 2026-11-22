@@ -46,7 +46,7 @@ describe('API HTTP cache policy', () => {
 
       const first = await request(app).get(path).expect(200);
       expect(first.headers['cache-control']).toBe(
-        'public, max-age=30, s-maxage=60, stale-while-revalidate=120'
+        'public, no-cache'
       );
 
       const revalidated = await request(app)

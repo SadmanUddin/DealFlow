@@ -48,11 +48,25 @@ function notificationTarget(
   return undefined;
 }
 
+const notificationLabels: Record<string, string> = {
+  "deal.closing_proposed": "Review the proposed closing amount",
+  "deal.closing_agreed": "Closing amount agreed",
+  "deal.closing_confirmed":
+    "Your confirmation is needed to complete the acquisition",
+  "deal.closing_disputed": "Closing paused after a dispute",
+  "deal.closing_resolved": "Closing dispute resolved",
+  "deal.completed": "Acquisition completed and listing marked sold",
+  "listing.sold": "This business has been sold",
+};
+
 function humanize(value: string) {
-  return value
-    .replaceAll(".", " ")
-    .replaceAll("_", " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+  return (
+    notificationLabels[value] ??
+    value
+      .replaceAll(".", " ")
+      .replaceAll("_", " ")
+      .replace(/\b\w/g, (letter) => letter.toUpperCase())
+  );
 }
 
 export function BuyerNotificationsPage() {

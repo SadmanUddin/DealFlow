@@ -91,7 +91,8 @@ describe("marketplace API boundary", () => {
     expect(result.pagination).toEqual(page.pagination);
     expect(result.listings[0]).not.toHaveProperty("sellerId");
     expect(result.listings[0]).not.toHaveProperty("sellerEmail");
-    expect(result.listings[0]).not.toHaveProperty("status");
+    expect(result.listings[0].status).toBe("published");
+    expect(result.listings[0]).not.toHaveProperty("closing_amount");
   });
 
   it("fetches a published detail by ID and keeps only the public response fields", async () => {

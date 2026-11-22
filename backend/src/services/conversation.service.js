@@ -76,14 +76,28 @@ export const startConversation = async (buyerId, listingId) => {
         ne(businessListings.seller_id, buyerId)
       )
     );
-  const [created] = await db
-    .insert(conversations)
-    .select(source)
-    .onConflictDoNothing({
-      target: [conversations.listing_id, conversations.buyer_id],
-    })
-    .returning(conversationFields);
-  if (created) return { conversation: created, created: true };
+  try {
+    const [created] = await db
+      .insert(conversations)
+      .select(source)
+      .onConflictDoNothing({
+        target: [conversations.listing_id, conversations.buyer_id],
+      })
+      .returning(conversationFields);
+    if (created) return { conversation: created, created: true };
+  } catch (error) {
+    if (
+      (error?.cause?.constraint ?? error?.constraint) ===
+      'listing_available_for_inquiry'
+    ) {
+      throw new AppError(
+        409,
+        'LISTING_UNAVAILABLE',
+        'This business is no longer available'
+      );
+    }
+    throw error;
+  }
 
   // A concurrent request can win the unique constraint after the initial read.
   const [raced] = await db

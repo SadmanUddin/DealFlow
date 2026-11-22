@@ -10,14 +10,17 @@ import {
   listOffers,
   respondToOffer,
   updateDealStatus,
+  updateAcquisitionClosing,
   withdrawOffer,
 } from '#services/deal.service.js';
 import {
+  closingActionSchema,
   createDealSchema,
   createOfferSchema,
   dealDocumentDownloadParamsSchema,
   dealIdSchema,
   dealListSchema,
+  dealWorkspaceListSchema,
   dealOfferIdSchema,
   dealStatusSchema,
   linkDealDocumentSchema,
@@ -33,7 +36,9 @@ export const create = async (req, res) => {
 export const list = async (req, res) =>
   res
     .status(200)
-    .json(await listDeals(req.user.id, dealListSchema.parse(req.query)));
+    .json(
+      await listDeals(req.user.id, dealWorkspaceListSchema.parse(req.query))
+    );
 export const detail = async (req, res) => {
   const { id } = dealIdSchema.parse(req.params);
   res
@@ -105,9 +110,7 @@ export const linkDocument = async (req, res) => {
   });
 };
 export const downloadDocument = async (req, res, next) => {
-  const { id, documentId } = dealDocumentDownloadParamsSchema.parse(
-    req.params
-  );
+  const { id, documentId } = dealDocumentDownloadParamsSchema.parse(req.params);
   const { row, stream } = await getDealDocumentDownload(
     id,
     documentId,
@@ -126,4 +129,14 @@ export const downloadDocument = async (req, res, next) => {
   });
   stream.on('error', next);
   stream.pipe(res);
+};
+
+export const closing = async (req, res) => {
+  const { id } = dealIdSchema.parse(req.params);
+  const deal = await updateAcquisitionClosing(
+    id,
+    req.user.id,
+    closingActionSchema.parse(req.body)
+  );
+  res.status(200).json({ deal });
 };

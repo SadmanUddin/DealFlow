@@ -3,6 +3,7 @@ import { useQueries, useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import {
   BriefcaseBusiness,
+  Building2,
   FileText,
   Handshake,
   MessageSquareText,
@@ -124,6 +125,13 @@ export function SellerOverviewPage() {
               icon={<Handshake size={18} />}
               label="Recent active deals"
               value={activeDeals.length}
+            />
+            <MetricCard
+              detail="Completed acquisitions from your listings"
+              href="/seller/deals/completed"
+              icon={<Building2 size={18} aria-hidden="true" />}
+              label="Sold businesses"
+              value={listings.data?.soldCount ?? 0}
             />
             <MetricCard
               detail="Listings that need an action from you"

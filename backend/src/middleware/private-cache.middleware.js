@@ -9,10 +9,8 @@ export const privateCacheMiddleware = (req, res, next) => {
   if (!isApiRequest(req)) return next();
 
   if (isPublicListingRead(req)) {
-    res.set(
-      'Cache-Control',
-      'public, max-age=30, s-maxage=60, stale-while-revalidate=120'
-    );
+    // Availability can change as soon as both parties confirm closing.
+    res.set('Cache-Control', 'public, no-cache');
     return next();
   }
 

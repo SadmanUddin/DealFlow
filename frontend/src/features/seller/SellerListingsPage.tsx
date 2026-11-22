@@ -12,7 +12,10 @@ import {
   WorkspacePageHeader,
   WorkspaceSkeleton,
 } from "@/components/shared/workspace/WorkspaceUI";
-import { formatListingMoney } from "@/features/marketplace/marketplace-format";
+import {
+  formatListingMoney,
+  formatSoldDate,
+} from "@/features/marketplace/marketplace-format";
 import { toApiError } from "@/lib/api-error";
 import {
   archiveListing,
@@ -132,9 +135,13 @@ export function SellerListingsPage() {
         <div className="space-y-5">
           <section
             aria-label="Listing totals"
-            className="grid gap-3 sm:grid-cols-3"
+            className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
           >
             <Summary label="Published on this page" value={counts.published} />
+            <Summary
+              label="Sold businesses"
+              value={query.data?.soldCount ?? 0}
+            />
             <Summary label="Drafts on this page" value={counts.draft} />
             <Summary label="Pending on this page" value={counts.review} />
           </section>
@@ -286,6 +293,11 @@ function ListingRow({
               {formatListingMoney(listing.askingPrice, listing.currency)}
             </span>
           </p>
+          {listing.soldAt && (
+            <p className="mt-2 text-xs font-medium text-emerald-900">
+              Sold {formatSoldDate(listing.soldAt)}
+            </p>
+          )}
           {listing.rejectionReason ? (
             <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-xs leading-5 text-rose-900">
               <strong>Moderator feedback:</strong> {listing.rejectionReason}
@@ -332,10 +344,11 @@ function ListingRow({
               <Trash2 size={16} />
             </Button>
           ) : null}
-          {listing.status === "published" ? (
+          {["published", "sold"].includes(listing.status) ? (
             <Button asChild size="sm" variant="ghost">
               <Link to={`/listings/${listing.id}`}>
-                Preview <ArrowUpRight size={14} />
+                {listing.status === "sold" ? "View sold listing" : "Preview"}{" "}
+                <ArrowUpRight size={14} />
               </Link>
             </Button>
           ) : null}

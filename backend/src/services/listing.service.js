@@ -1,4 +1,15 @@
-import { and, asc, desc, eq, gte, ilike, lte, or, sql } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  ilike,
+  inArray,
+  lte,
+  or,
+  sql,
+} from 'drizzle-orm';
 import { db } from '#config/database.js';
 import { businessListings } from '#models/listing.model.js';
 import { users } from '#models/user.model.js';
@@ -19,9 +30,17 @@ const publicFields = {
   publishedAt: businessListings.published_at,
   createdAt: businessListings.created_at,
 };
+const saleFields = {
+  status: businessListings.status,
+  soldAt: businessListings.sold_at,
+  publicSalePrice: businessListings.public_sale_price,
+  publicSaleCurrency: businessListings.public_sale_currency,
+};
+const publicStatuses = ['published', 'sold'];
 const sellerFields = {
   ...publicFields,
   status: businessListings.status,
+  soldAt: businessListings.sold_at,
   rejectionReason: businessListings.rejection_reason,
   updatedAt: businessListings.updated_at,
 };
@@ -52,12 +71,16 @@ export const getMyListings = async (sellerId, { page, limit }) => {
       .limit(limit)
       .offset(offset),
     db
-      .select({ count: sql`count(*)::int` })
+      .select({
+        count: sql`count(*)::int`,
+        sold: sql`count(*) FILTER (WHERE ${businessListings.status} = 'sold')::int`,
+      })
       .from(businessListings)
       .where(eq(businessListings.seller_id, sellerId)),
   ]);
   return {
     listings: rows,
+    soldCount: countRows[0]?.sold ?? 0,
     pagination: pagination(page, limit, countRows[0]?.count ?? 0),
   };
 };
@@ -75,8 +98,16 @@ export const getPublicListings = async ({
   minEbitda,
   maxEbitda,
   sort = 'newest',
+  availability = 'available',
 }) => {
-  const filters = [eq(businessListings.status, 'published')];
+  const filters = [
+    availability === 'all'
+      ? inArray(businessListings.status, publicStatuses)
+      : eq(
+        businessListings.status,
+        availability === 'sold' ? 'sold' : 'published'
+      ),
+  ];
   if (q) {
     const keyword = `%${q.replace(/[\\%_]/g, '\\$&')}%`;
     filters.push(
@@ -97,23 +128,27 @@ export const getPublicListings = async ({
     if (maximum !== undefined) filters.push(lte(column, maximum));
   }
   const where = and(...filters);
+  const listingDate =
+    availability === 'available'
+      ? businessListings.published_at
+      : sql`coalesce(${businessListings.sold_at}, ${businessListings.published_at})`;
   const ordering = {
-    newest: [desc(businessListings.published_at), desc(businessListings.id)],
-    oldest: [asc(businessListings.published_at), asc(businessListings.id)],
+    newest: [desc(listingDate), desc(businessListings.id)],
+    oldest: [asc(listingDate), asc(businessListings.id)],
     price_asc: [
       asc(businessListings.asking_price),
-      desc(businessListings.published_at),
+      desc(listingDate),
       desc(businessListings.id),
     ],
     price_desc: [
       desc(businessListings.asking_price),
-      desc(businessListings.published_at),
+      desc(listingDate),
       desc(businessListings.id),
     ],
   }[sort];
   const [rows, countRows] = await Promise.all([
     db
-      .select({ ...publicFields, sellerName: users.name })
+      .select({ ...publicFields, ...saleFields, sellerName: users.name })
       .from(businessListings)
       .innerJoin(users, eq(users.id, businessListings.seller_id))
       .where(where)
@@ -146,13 +181,17 @@ export const getPublishedListing = async (id, viewerId = null) => {
   const [listing] = await db
     .select({
       ...publicFields,
+      ...saleFields,
       sellerName: users.name,
       ...(viewerFavorite ? { isFavorite: viewerFavorite } : {}),
     })
     .from(businessListings)
     .innerJoin(users, eq(users.id, businessListings.seller_id))
     .where(
-      and(eq(businessListings.id, id), eq(businessListings.status, 'published'))
+      and(
+        eq(businessListings.id, id),
+        inArray(businessListings.status, publicStatuses)
+      )
     )
     .limit(1);
   if (!listing) throw notFound();
