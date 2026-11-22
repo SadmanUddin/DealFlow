@@ -37,6 +37,7 @@ export function AcquisitionClosingPanel({
   const [dialog, setDialog] = useState<{
     action: "confirm" | "dispute" | "resolve";
     revision: number;
+    reviewedPrice: string | null;
   } | null>(null);
   const [consent, setConsent] = useState(false);
   const mutation = useMutation({
@@ -69,16 +70,22 @@ export function AcquisitionClosingPanel({
     userId === deal.buyer_id
       ? deal.buyer_confirmed_at
       : deal.seller_confirmed_at;
+  const dialogOutdated = Boolean(
+    dialog &&
+    (dialog.revision !== revision ||
+      completed ||
+      (dialog.action === "confirm" && ownConfirmed)),
+  );
   const error = mutation.isError ? toApiError(mutation.error).message : "";
   const ask = (action: "confirm" | "dispute" | "resolve") => {
     mutation.reset();
     setConsent(false);
-    setDialog({ action, revision });
+    setDialog({ action, revision, reviewedPrice: finalPrice });
   };
   const dialogText = {
     confirm: {
       title: "Confirm acquisition completion",
-      description: `Confirm that the acquisition is complete at ${finalPrice ?? "the agreed amount"}. When both parties confirm, this listing will be marked sold.`,
+      description: `Confirm that the acquisition is complete at ${dialog?.reviewedPrice ?? "the agreed amount"}. When both parties confirm, this listing will be marked sold.`,
       button: "Confirm completion",
     },
     dispute: {
@@ -294,7 +301,12 @@ export function AcquisitionClosingPanel({
           description={dialogText[dialog.action].description}
           confirmLabel={dialogText[dialog.action].button}
           busy={mutation.isPending}
-          error={error}
+          error={
+            dialogOutdated && !mutation.isPending
+              ? "Closing has changed. Dismiss this dialog and review the latest status."
+              : error
+          }
+          confirmDisabled={dialogOutdated}
           onCancel={() => setDialog(null)}
           onConfirm={() => {
             mutation.mutate(

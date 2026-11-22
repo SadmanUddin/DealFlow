@@ -66,3 +66,24 @@ it("shows the dispute and prevents confirmation while closing is paused", () => 
     screen.queryByRole("button", { name: "Resolve dispute" }),
   ).not.toBeInTheDocument();
 });
+
+it("disables a confirmation dialog if a refreshed deal has a newer closing revision", async () => {
+  const user = userEvent.setup();
+  const client = new QueryClient();
+  const panel = (deal: Deal) => (
+    <QueryClientProvider client={client}>
+      <AcquisitionClosingPanel deal={deal} userId={1} />
+    </QueryClientProvider>
+  );
+  const { rerender } = render(panel(accepted));
+  await user.click(screen.getByRole("button", { name: "Confirm completion" }));
+  rerender(
+    panel({ ...accepted, closing_revision: 2, closing_amount: "117000.00" }),
+  );
+  const dialog = within(screen.getByRole("alertdialog"));
+  expect(dialog.getByText(/116,500\.25/)).toBeVisible();
+  expect(dialog.getByRole("alert")).toHaveTextContent("Closing has changed");
+  expect(
+    dialog.getByRole("button", { name: "Confirm completion" }),
+  ).toBeDisabled();
+});

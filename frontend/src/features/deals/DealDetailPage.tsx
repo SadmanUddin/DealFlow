@@ -100,6 +100,10 @@ export function DealDetailPage() {
     queryFn: () => getDeal(id),
     enabled: validId,
     retry: false,
+    refetchOnWindowFocus: (query) =>
+      query.state.data?.status === "accepted" ? "always" : false,
+    refetchInterval: (query) =>
+      query.state.data?.status === "accepted" ? 10_000 : false,
   });
   const deal = dealQuery.data;
   const buyerListingQuery = useQuery({

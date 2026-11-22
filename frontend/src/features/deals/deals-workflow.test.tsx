@@ -1,4 +1,8 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  focusManager,
+  QueryClient,
+  QueryClientProvider,
+} from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
@@ -104,7 +108,10 @@ function Location() {
 
 function renderWithProviders(path: string) {
   const client = new QueryClient({
-    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    defaultOptions: {
+      queries: { retry: false, staleTime: 45_000, refetchOnWindowFocus: false },
+      mutations: { retry: false },
+    },
   });
   return render(
     <QueryClientProvider client={client}>
@@ -227,4 +234,33 @@ describe("deal workflow", () => {
       }),
     );
   });
+});
+
+it("refreshes an accepted closing room when the participant returns to the tab", async () => {
+  const acceptedDeal = {
+    ...deal,
+    status: "accepted",
+    accepted_at: "2026-10-21T13:00:00.000Z",
+    agreed_offer: { amount: "450000.00", currency: "EUR" },
+    closing_revision: 1,
+    closing_amount: "450000.00",
+    closing_currency: "EUR",
+    closing_proposed_by: 11,
+  };
+  mocks.getDeal.mockResolvedValue(acceptedDeal);
+  renderWithProviders("/buyer/deals/40");
+  await screen.findByText("Waiting for the other participant to agree.");
+  mocks.getDeal.mockResolvedValue({
+    ...acceptedDeal,
+    closing_agreed_at: "2026-10-21T14:00:00.000Z",
+  });
+  try {
+    focusManager.setFocused(false);
+    focusManager.setFocused(true);
+    expect(
+      await screen.findByRole("button", { name: "Confirm completion" }),
+    ).toBeVisible();
+  } finally {
+    focusManager.setFocused(undefined);
+  }
 });
