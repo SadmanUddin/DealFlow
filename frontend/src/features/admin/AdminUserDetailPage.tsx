@@ -192,8 +192,8 @@ export function AdminUserDetailPage() {
               </h2>
             </div>
             <p className="mt-2 text-xs leading-5 text-ink-soft">
-              Every change is validated and audited by the backend. Provide a
-              reason for the audit record.
+              Account changes are recorded in the audit log. Provide a reason
+              for the audit record.
             </p>
             <label className="mt-5 block text-xs font-semibold text-navy-950">
               Reason

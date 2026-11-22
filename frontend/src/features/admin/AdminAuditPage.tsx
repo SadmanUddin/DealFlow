@@ -82,7 +82,7 @@ export function AdminAuditPage() {
       />
       <SectionCard className="mb-5">
         <form
-          className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[7rem_minmax(12rem,1fr)_10rem_9rem_auto]"
+          className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[7rem_minmax(0,1fr)_9rem_8rem_auto]"
           onSubmit={(event) => {
             event.preventDefault();
             if (validActor)
@@ -177,7 +177,7 @@ export function AdminAuditPage() {
               <div className="divide-y divide-line">
                 {query.data.auditLogs.map((entry) => (
                   <article
-                    className="grid gap-3 px-5 py-4 md:grid-cols-[minmax(0,1fr)_12rem]"
+                    className="grid gap-3 px-5 py-4 transition-colors hover:bg-paper md:grid-cols-[minmax(0,1fr)_12rem]"
                     key={entry.id}
                   >
                     <div className="min-w-0">
@@ -202,7 +202,7 @@ export function AdminAuditPage() {
                       ) : null}
                     </div>
                     <time
-                      className="text-xs text-ink-faint md:text-right"
+                      className="text-xs text-ink-soft tabular-nums md:text-right"
                       dateTime={new Date(entry.createdAt).toISOString()}
                     >
                       {new Intl.DateTimeFormat(undefined, {
@@ -213,7 +213,7 @@ export function AdminAuditPage() {
                   </article>
                 ))}
               </div>
-              <div className="flex items-center justify-between gap-3 border-t border-line px-4 py-3 sm:px-5">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3 sm:px-5">
                 <p aria-live="polite" className="text-xs text-ink-soft">
                   Page {page} of {Math.max(1, query.data.pagination.totalPages)}
                 </p>

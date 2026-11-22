@@ -1,17 +1,29 @@
 @import "tailwindcss";
-@import "@fontsource-variable/inter";
+@import "@fontsource-variable/inter/wght.css";
+@font-face {
+  font-family: "Newsreader Variable";
+  src: url("@fontsource-variable/newsreader/files/newsreader-latin-standard-normal.woff2")
+    format("woff2");
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+}
 
 @theme {
   --font-sans: "Inter Variable", Inter, ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Newsreader Variable", Georgia, serif;
+  --color-forest: #143e32;
+  --color-ivory: #f7f6f0;
+  --color-champagne: #e8d8aa;
   --color-brand-navy: #0b1f36;
   --color-brand-emerald: #10b981;
-  --color-soft-mint: #f3f7f5;
-  --color-paper: #f3f7f5;
-  --color-mist: #edf3f0;
-  --color-line: #e3e9e4;
+  --color-soft-mint: #f7f6f0;
+  --color-paper: #f7f6f0;
+  --color-mist: #eeefe8;
+  --color-line: #dedfd5;
   --color-ink: #0b1f36;
-  --color-ink-soft: #607069;
-  --color-ink-faint: #87948d;
+  --color-ink-soft: #4e6057;
+  --color-ink-faint: #5d6c63;
   --color-navy-50: #eef3f7;
   --color-navy-100: #dce7ef;
   --color-navy-800: #173b56;
@@ -23,9 +35,9 @@
   --color-emerald-300: #85c4a2;
   --color-emerald-500: #10b981;
   --color-emerald-600: #059669;
-  --color-emerald-700: #10b981;
-  --color-emerald-800: #047857;
-  --color-emerald-900: #065f46;
+  --color-emerald-700: #267052;
+  --color-emerald-800: #216047;
+  --color-emerald-900: #144735;
   --shadow-soft: 0 1px 2px rgb(16 38 57 / 4%), 0 8px 26px rgb(16 38 57 / 4%);
   --shadow-card: 0 18px 48px -28px rgb(16 38 57 / 28%);
 }
@@ -33,7 +45,7 @@
 :root {
   font-family: "Inter Variable", Inter, ui-sans-serif, system-ui, sans-serif;
   color: #0b1f36;
-  background: #f3f7f5;
+  background: #f7f6f0;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -55,11 +67,11 @@ a {
 
 ::selection {
   color: #0b1f36;
-  background: #10b981;
+  background: #c4e1cf;
 }
 
 .page-container {
-  width: min(100% - 2.5rem, 80rem);
+  width: min(100% - 2rem, 80rem);
   margin-inline: auto;
 }
 
@@ -70,22 +82,8 @@ a {
   color: #0b1f36;
 }
 
-.brand-symbol-tile {
-  flex: none;
-  border-radius: 0.75rem;
-  background: #fff;
-  object-fit: cover;
-}
-
-.brand-wordmark {
-  display: block;
-  flex: none;
-  object-fit: cover;
-  object-position: center;
-}
-
 .eyebrow {
-  font-size: 0.67rem;
+  font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.15em;
   line-height: 1.4;
@@ -93,87 +91,11 @@ a {
 }
 
 .section-space {
-  padding-block: clamp(4.5rem, 9vw, 7.5rem);
+  padding-block: clamp(3.5rem, 6.5vw, 6rem);
 }
 
 .section-heading {
   max-width: 47rem;
-}
-
-.hero-grid {
-  background:
-    radial-gradient(
-      ellipse at 82% 47%,
-      rgb(208 231 216 / 38%),
-      transparent 38%
-    ),
-    radial-gradient(ellipse at 4% 5%, rgb(255 255 255 / 95%), transparent 43%),
-    #f3f7f5;
-}
-
-.hero-glow {
-  background:
-    radial-gradient(
-      ellipse 60% 50% at 85% 20%,
-      rgb(16 185 129 / 22%),
-      transparent 70%
-    ),
-    radial-gradient(
-      ellipse 50% 60% at 0% 100%,
-      rgb(16 185 129 / 10%),
-      transparent 70%
-    ),
-    linear-gradient(180deg, #0b1f36 0%, #0a1a2e 100%);
-}
-
-.hero-lines {
-  background-image:
-    linear-gradient(rgb(255 255 255 / 4%) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(255 255 255 / 4%) 1px, transparent 1px);
-  background-size: 64px 64px;
-  mask-image: radial-gradient(ellipse at 60% 40%, black 20%, transparent 75%);
-}
-
-@keyframes fade-up {
-  from {
-    opacity: 0;
-    transform: translateY(18px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes float {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-8px);
-  }
-}
-
-.animate-fade-up {
-  animation: fade-up 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.animate-float {
-  animation: float 6s ease-in-out infinite;
-}
-
-.reveal {
-  opacity: 0;
-  transform: translateY(20px);
-  transition:
-    opacity 700ms cubic-bezier(0.22, 1, 0.36, 1),
-    transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.reveal-visible {
-  opacity: 1;
-  transform: none;
 }
 
 .footer-link {
@@ -199,9 +121,20 @@ a {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
 
-  .reveal {
-    opacity: 1;
-    transform: none;
-  }
+:where(a, button, input, select, textarea, summary):focus-visible {
+  outline: 2px solid var(--color-emerald-700);
+  outline-offset: 3px;
+}
+
+[id] {
+  scroll-margin-top: 6rem;
+}
+
+.editorial-title {
+  font-family: var(--font-display);
+  font-weight: 475;
+  letter-spacing: -0.045em;
+  line-height: 0.98;
 }

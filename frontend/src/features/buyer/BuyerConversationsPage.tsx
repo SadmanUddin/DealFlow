@@ -159,18 +159,19 @@ function ConversationInboxPage({ role }: { role: "buyer" | "seller" }) {
         </SectionCard>
       ) : null}
       {active ? (
-        <div className="grid min-h-[32rem] min-w-0 grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(16rem,0.38fr)_minmax(0,1fr)]">
+        <div className="grid min-h-[32rem] min-w-0 grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(12rem,0.38fr)_minmax(0,1fr)]">
           <SectionCard className="min-w-0 p-2 sm:p-2">
-            <h2 className="px-3 py-2 text-sm font-semibold">
+            <h2 className="border-b border-line px-3 py-3 text-sm font-semibold">
               Your conversations
             </h2>
-            <ul className="space-y-1">
+            <ul className="mt-2 max-h-64 space-y-1 overflow-auto lg:max-h-[33rem]">
               {conversations.map((item) => (
                 <li key={item.id}>
                   <button
                     type="button"
                     onClick={() => setParams({ conversation: String(item.id) })}
-                    className={`w-full rounded-lg px-3 py-3 text-left ${active.id === item.id ? "bg-emerald-50" : "hover:bg-mist"}`}
+                    aria-pressed={active.id === item.id}
+                    className={`w-full rounded-lg border px-3 py-3 text-left focus-visible:outline-2 focus-visible:outline-emerald-800 ${active.id === item.id ? "border-emerald-100 bg-emerald-50" : "border-transparent hover:bg-mist"}`}
                   >
                     <span className="flex items-center justify-between gap-2">
                       <span className="truncate text-sm font-semibold">
@@ -199,9 +200,11 @@ function ConversationInboxPage({ role }: { role: "buyer" | "seller" }) {
               ))}
             </ul>
           </SectionCard>
-          <SectionCard className="flex min-h-[32rem] min-w-0 flex-col">
-            <div className="border-b border-line pb-3">
-              <h2 className="text-base font-semibold">{active.listingTitle}</h2>
+          <SectionCard className="flex min-h-[30rem] min-w-0 flex-col">
+            <div className="border-b border-line pb-4">
+              <h2 className="break-words text-lg font-semibold">
+                {active.listingTitle}
+              </h2>
               <p className="mt-1 text-xs text-ink-soft">
                 Conversation with{" "}
                 {active.participantName ??
@@ -242,12 +245,12 @@ function ConversationInboxPage({ role }: { role: "buyer" | "seller" }) {
             ) : null}
             <ol
               aria-label="Conversation messages"
-              className="my-4 flex-1 space-y-3 overflow-y-auto"
+              className="my-4 flex-1 space-y-3 overflow-y-auto lg:max-h-[28rem]"
             >
               {messages.map((message) => (
                 <li
                   key={message.id}
-                  className={`max-w-[88%] rounded-xl border p-3 ${message.senderId === user?.id ? "ml-auto border-emerald-200 bg-emerald-50" : "bg-mist"}`}
+                  className={`max-w-[88%] rounded-2xl border border-line px-4 py-3 ${message.senderId === user?.id ? "ml-auto rounded-br-sm border-emerald-100 bg-emerald-50" : "rounded-bl-sm bg-paper"}`}
                 >
                   <p className="mb-1 text-[0.68rem] font-semibold text-ink-soft">
                     {message.senderId === user?.id
@@ -280,7 +283,7 @@ function ConversationInboxPage({ role }: { role: "buyer" | "seller" }) {
             ) : null}
             <form
               onSubmit={submit}
-              className="flex gap-2 border-t border-line pt-3"
+              className="flex items-end gap-2 border-t border-line pt-3"
             >
               <label className="sr-only" htmlFor={role + "-message"}>
                 Write a message
@@ -291,7 +294,7 @@ function ConversationInboxPage({ role }: { role: "buyer" | "seller" }) {
                 onChange={(event) => setContent(event.target.value)}
                 maxLength={10000}
                 rows={2}
-                className="min-h-11 flex-1 resize-y rounded-lg border border-line px-3 py-2 text-sm"
+                className="min-h-11 min-w-0 flex-1 resize-y rounded-lg border border-line px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-emerald-800"
                 placeholder={
                   "Write a message to " +
                   (role === "buyer" ? "the seller" : "the buyer")

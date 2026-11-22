@@ -139,7 +139,7 @@ export function SellerOffersPage() {
             <Link to="/seller/deals/completed">Completed acquisitions</Link>
           </Button>
         }
-        description="Review inbound proposals and counteroffers within their acquisition records."
+        description="Review offers, compare terms, and return to an open deal."
         eyebrow="Seller workspace · Negotiation"
         title="Offers & deals"
       />
@@ -163,7 +163,7 @@ export function SellerOffersPage() {
       {dealsQuery.isError ? (
         <ErrorState
           error={dealsQuery.error}
-          description="Offers are returned within your deal records."
+          description="Reload your deal list to try again."
           onRetry={() => void dealsQuery.refetch()}
           title="Offers unavailable"
         />
@@ -305,7 +305,7 @@ export function SellerOffersPage() {
               {selectedOffersQuery?.data ? (
                 <SectionCard>
                   <SectionHeading
-                    description="Historical records are immutable and ordered by submission time."
+                    description="Review each proposal in the order it was submitted."
                     title="Negotiation history"
                   />
                   <OfferTimeline
@@ -318,7 +318,7 @@ export function SellerOffersPage() {
               {selectedOffersQuery?.data && negotiable.has(selected.status) ? (
                 <SectionCard>
                   <SectionHeading
-                    description="Counteroffers link to the latest pending proposal so the backend can enforce its negotiation rules."
+                    description="Choose a pending offer to propose revised terms."
                     title="Respond or counteroffer"
                   />
                   {incoming[0] && incoming[0].deal_id === selected.id ? (

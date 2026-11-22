@@ -3,38 +3,37 @@ export function formatListingMoney(
   currency: string,
 ) {
   if (amount === null || amount === "") return "Not disclosed";
-  const value = typeof amount === "number" ? amount : Number(amount);
+  const value = Number(amount);
   if (!Number.isFinite(value)) return "Not disclosed";
+  // PostgreSQL returns exact decimal strings. Format the integer separately to
+  // keep amounts beyond Number.MAX_SAFE_INTEGER and preserve disclosed cents.
+  const decimal = /^(-?)(\d+)(?:\.(\d{1,2}))?$/.exec(String(amount));
+  const cents = decimal ? Number((decimal[3] ?? "").padEnd(2, "0")) : 0;
+  const digits = cents || (!decimal && !Number.isInteger(value)) ? 2 : 0;
   try {
-    return new Intl.NumberFormat(undefined, {
+    const formatter = new Intl.NumberFormat(undefined, {
       style: "currency",
       currency,
-      maximumFractionDigits: 0,
-    }).format(value);
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    });
+    if (!decimal) return formatter.format(value);
+    const [, sign, whole] = decimal;
+    const integer = sign && Number(whole) === 0 ? -0 : BigInt(sign + whole);
+    const localizedCents = new Intl.NumberFormat(undefined, {
+      minimumIntegerDigits: 2,
+    }).format(cents);
+    return formatter
+      .formatToParts(integer)
+      .map(({ type, value }) => (type === "fraction" ? localizedCents : value))
+      .join("");
   } catch {
     return `${currency} ${value.toLocaleString()}`;
   }
 }
 
-// Transaction prices retain cents and the full precision of PostgreSQL numeric.
 export function formatSaleMoney(amount: string | number, currency: string) {
-  const [whole, fractional = ""] = String(amount).split(".");
-  if (!/^\d+$/.test(whole)) return formatListingMoney(amount, currency);
-  const cents = Number(fractional.padEnd(2, "0"));
-  const digits = cents ? 2 : 0;
-  const formatter = new Intl.NumberFormat(undefined, {
-    style: "currency",
-    currency,
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  });
-  const localizedCents = new Intl.NumberFormat(undefined, {
-    minimumIntegerDigits: 2,
-  }).format(cents);
-  return formatter
-    .formatToParts(BigInt(whole))
-    .map(({ type, value }) => (type === "fraction" ? localizedCents : value))
-    .join("");
+  return formatListingMoney(amount, currency);
 }
 
 export function formatSoldDate(value: string | Date) {

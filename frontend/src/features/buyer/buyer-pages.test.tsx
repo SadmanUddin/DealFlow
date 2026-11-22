@@ -99,10 +99,12 @@ describe("buyer workspace", () => {
       favorites: [favorite],
       pagination: pagination(7),
     });
-    vi.mocked(dealApi.listDeals).mockResolvedValue({
-      deals: [],
-      pagination: pagination(2),
-    });
+    vi.mocked(dealApi.listDeals).mockImplementation(
+      async (_page, _limit, view) => ({
+        deals: [],
+        pagination: pagination(view === "completed" ? 5 : 2),
+      }),
+    );
     vi.mocked(buyerApi.listNotifications).mockImplementation(
       async (_page, _limit, unread) => ({
         notifications: [],
@@ -116,6 +118,10 @@ describe("buyer workspace", () => {
     expect(await screen.findByText("7")).toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
     expect(screen.getByText("3")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /completed acquisitions/i }),
+    ).toHaveAttribute("href", "/buyer/deals?view=completed");
+    expect(screen.getByText("5")).toBeInTheDocument();
   });
 
   it("searches saved listings and removes one using the favorites endpoint", async () => {

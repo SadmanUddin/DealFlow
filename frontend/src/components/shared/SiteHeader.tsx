@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowUpRight, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { Link, NavLink, useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -7,35 +7,24 @@ import { useAuth } from "@/features/auth/useAuth";
 
 const navigation = [
   { label: "Marketplace", href: "/marketplace" },
+  { label: "Buy a business", href: "/buyers" },
+  { label: "Sell a business", href: "/sellers" },
   { label: "How it works", href: "/#how-it-works" },
-  { label: "Why DealFlow", href: "/#benefits" },
 ];
 
 function NavigationLinks({ onNavigate }: { onNavigate?: () => void }) {
-  return (
-    <>
-      {navigation.map((item) =>
-        item.href === "/marketplace" ? (
-          <NavLink
-            className="relative rounded-md py-2 text-sm font-medium text-ink-soft transition hover:text-navy-950 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-700/20 after:absolute after:inset-x-0 after:-bottom-[1.24rem] after:h-0.5 after:scale-x-0 after:bg-emerald-600 after:transition-transform md:after:content-[''] [&.active]:font-semibold [&.active]:text-emerald-800 [&.active]:after:scale-x-100"
-            key={item.label}
-            onClick={onNavigate}
-            to={item.href}
-          >
-            {item.label}
-          </NavLink>
-        ) : (
-          <a
-            className="rounded-md py-2 text-sm font-medium text-ink-soft transition hover:text-navy-950 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-700/20"
-            href={item.href}
-            key={item.label}
-            onClick={onNavigate}
-          >
-            {item.label}
-          </a>
-        ),
-      )}
-    </>
+  const base =
+    "inline-flex min-h-11 items-center rounded-lg px-2.5 text-sm font-medium text-ink-soft transition hover:bg-mist hover:text-ink [&.active]:bg-mist [&.active]:font-semibold [&.active]:text-forest";
+  return navigation.map(({ label, href }) =>
+    href.includes("#") ? (
+      <a className={base} key={href} href={href} onClick={onNavigate}>
+        {label}
+      </a>
+    ) : (
+      <NavLink className={base} key={href} to={href} onClick={onNavigate}>
+        {label}
+      </NavLink>
+    ),
   );
 }
 
@@ -62,8 +51,8 @@ export function SiteHeader() {
 
   return (
     <>
-      <header className="sticky top-0 z-30 border-b border-line/90 bg-white/95 backdrop-blur-xl">
-        <div className="page-container flex h-[4.35rem] items-center justify-between gap-3 lg:h-[4.75rem]">
+      <header className="sticky top-0 z-30 border-b border-line bg-ivory/95 backdrop-blur-xl">
+        <div className="page-container flex h-16 items-center justify-between gap-3 lg:h-[4.75rem]">
           <Link
             aria-label="DealFlow home"
             className="brand-lockup shrink-0"
@@ -71,23 +60,21 @@ export function SiteHeader() {
           >
             <img
               alt=""
-              className="brand-symbol-tile h-9 w-9 sm:h-10 sm:w-10"
-              height="1024"
+              className="size-8 rounded-lg sm:size-9"
+              width="36"
+              height="36"
               src="/brand/dealflow-symbol-recraft.png"
-              width="1024"
+              srcSet="/brand/dealflow-symbol-recraft-96.png 96w, /brand/dealflow-symbol-recraft.png 1024w"
+              sizes="40px"
             />
-            <img
-              alt=""
-              className="brand-wordmark h-7 w-[6.75rem] sm:w-[7.5rem]"
-              height="768"
-              src="/brand/dealflow-wordmark-dark.svg"
-              width="1536"
-            />
+            <span className="text-lg font-semibold tracking-tight sm:text-xl">
+              DealFlow
+            </span>
           </Link>
 
           <nav
             aria-label="Main navigation"
-            className="hidden items-center gap-8 md:flex"
+            className="hidden items-center gap-2 lg:flex"
           >
             <NavigationLinks />
           </nav>
@@ -132,7 +119,6 @@ export function SiteHeader() {
                   <Link className="px-2.5 sm:px-3.5" to="/register">
                     <span className="sm:hidden">Join</span>
                     <span className="hidden sm:inline">Create account</span>
-                    <ArrowUpRight aria-hidden="true" size={15} />
                   </Link>
                 </Button>
               </>
@@ -142,9 +128,10 @@ export function SiteHeader() {
               aria-label={
                 mobileOpen ? "Close navigation menu" : "Open navigation menu"
               }
-              className="grid size-9 place-items-center rounded-lg text-navy-950 transition hover:bg-mist focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-700/20 md:hidden"
+              className="grid size-11 place-items-center rounded-lg text-navy-950 transition hover:bg-mist focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-700/20 lg:hidden"
               onClick={() => setMobileOpen((open) => !open)}
               type="button"
+              aria-controls="public-mobile-navigation"
             >
               {mobileOpen ? (
                 <X aria-hidden="true" size={20} />
@@ -157,7 +144,8 @@ export function SiteHeader() {
         {mobileOpen ? (
           <nav
             aria-label="Mobile navigation"
-            className="border-t border-line bg-white px-5 py-3 md:hidden"
+            id="public-mobile-navigation"
+            className="border-t border-line bg-white px-5 py-3 lg:hidden"
           >
             <div className="page-container flex flex-col items-start gap-1">
               <NavigationLinks onNavigate={() => setMobileOpen(false)} />

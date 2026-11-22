@@ -1,7 +1,14 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router";
-import { Archive, ArrowUpRight, Plus, Search, Trash2 } from "lucide-react";
+import {
+  Archive,
+  ArrowUpRight,
+  Building2,
+  Plus,
+  Search,
+  Trash2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { ErrorState } from "@/components/shared/ErrorState";
@@ -16,6 +23,7 @@ import {
   formatListingMoney,
   formatSoldDate,
 } from "@/features/marketplace/marketplace-format";
+import { listingImageSrc } from "@/features/marketplace/listing-image-url";
 import { toApiError } from "@/lib/api-error";
 import {
   archiveListing,
@@ -102,7 +110,7 @@ export function SellerListingsPage() {
             </Link>
           </Button>
         }
-        description="Create a clear, credible profile for each business and manage its publication lifecycle."
+        description="Manage drafts, review status, and completed sales in one place."
         eyebrow="Seller workspace · Portfolio"
         title="Your listings"
       />
@@ -267,9 +275,23 @@ function ListingRow({
   onSubmit: () => void;
   onAction: (kind: "archive" | "delete") => void;
 }) {
+  const [failedImage, setFailedImage] = useState<string | null>(null);
   return (
     <SectionCard className="p-0">
       <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+        <div className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-xl border border-line bg-mist text-forest">
+          {listing.imageUrl && listing.imageUrl !== failedImage ? (
+            <img
+              className="size-full object-cover"
+              src={listingImageSrc(listing.imageUrl)}
+              alt=""
+              loading="lazy"
+              onError={() => setFailedImage(listing.imageUrl ?? null)}
+            />
+          ) : (
+            <Building2 aria-hidden="true" size={22} />
+          )}
+        </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={listing.status} />
@@ -280,7 +302,7 @@ function ListingRow({
               }).format(new Date(listing.updatedAt))}
             </span>
           </div>
-          <h2 className="mt-2 truncate text-lg font-semibold text-navy-950">
+          <h2 className="mt-2 break-words text-lg font-semibold text-navy-950">
             {listing.title}
           </h2>
           <p className="mt-1 line-clamp-2 text-sm leading-6 text-ink-soft">

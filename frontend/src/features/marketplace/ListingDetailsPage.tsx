@@ -6,13 +6,13 @@ import {
   ArrowUpRight,
   Building2,
   CalendarDays,
-  ChartNoAxesCombined,
+  Heart,
+  MessageSquare,
   MapPin,
   Tag,
 } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { retryQuery } from "@/app/providers/query-defaults";
 import { Badge } from "@/components/ui/badge";
 import { ErrorState } from "@/components/shared/ErrorState";
@@ -20,6 +20,7 @@ import { toApiError } from "@/lib/api-error";
 import { useAuth } from "@/features/auth/useAuth";
 import { startListingConversation } from "@/features/buyer/api";
 import { SoldListingDetail } from "./SoldListingPresentation";
+import { ListingMedia } from "./ListingMedia";
 import { listingImageSrc } from "./listing-image-url";
 import { formatListingMoney } from "./marketplace-format";
 import { getPublishedListing } from "./marketplace-api";
@@ -62,15 +63,13 @@ function DetailMetric({
   emphasized?: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-line bg-white p-4 sm:p-5">
-      <p className="text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-ink-faint">
-        {label}
-      </p>
-      <p
-        className={`mt-2 break-words text-lg font-semibold tracking-tight ${emphasized ? "text-emerald-800" : "text-navy-950"}`}
-      >
+    <div
+      className={`min-w-0 rounded-xl border p-4 ${emphasized ? "border-emerald-200 bg-emerald-50" : "border-line bg-paper"}`}
+    >
+      <dt className="text-sm font-medium text-ink-soft">{label}</dt>
+      <dd className="mt-1.5 break-words text-xl font-semibold tracking-tight text-navy-950 tabular-nums">
         {value}
-      </p>
+      </dd>
     </div>
   );
 }
@@ -229,170 +228,109 @@ export function ListingDetailsPage() {
         <ArrowLeft aria-hidden="true" size={16} /> Back to marketplace
       </Link>
 
-      <div className="relative mt-5 flex min-h-56 items-end overflow-hidden rounded-[1.75rem] border border-emerald-900/[0.05] bg-[radial-gradient(ellipse_at_80%_5%,#d8eee1,transparent_40%),linear-gradient(135deg,#fff,#eef3f7_58%,#edf3f0)] p-6 sm:min-h-72 sm:p-10 lg:min-h-80">
-        {listing.imageUrl && !imageFailed ? (
-          <img
-            alt={`Seller-provided image for ${listing.title}`}
-            className="absolute inset-0 size-full object-cover"
-            src={listingImageSrc(listing.imageUrl)}
-            onError={() => setFailedImageUrl(listing.imageUrl ?? null)}
-          />
-        ) : null}
-        {listing.imageUrl && !imageFailed ? (
-          <div className="absolute inset-0 bg-gradient-to-t from-white/95 via-white/25 to-transparent" />
-        ) : (
-          <>
-            <div className="absolute -right-12 -top-28 size-96 rounded-full border border-emerald-900/[0.07]" />
-            <div className="absolute -right-2 -top-16 size-64 rounded-full border border-emerald-900/[0.07]" />
-          </>
-        )}
-        <div className="relative max-w-4xl">
-          <Badge className="border-white bg-white/80">
-            Published opportunity
+      <header className="mt-5 mb-7 grid gap-5 border-b border-line pb-7 sm:mt-7 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)] lg:items-end">
+        <div className="min-w-0">
+          <Badge className="border-emerald-200 bg-emerald-50 text-emerald-900">
+            Available for acquisition
           </Badge>
-          <h1 className="mt-4 text-balance text-3xl font-semibold leading-tight tracking-[-0.05em] text-navy-950 sm:text-5xl lg:text-6xl">
+          <h1 className="mt-4 max-w-5xl break-words font-display text-5xl leading-[0.98] tracking-[-0.035em] text-navy-950 sm:text-6xl lg:text-7xl">
             {listing.title}
           </h1>
-          <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm text-ink-soft">
-            <span>Published by {listing.sellerName || "Seller"}</span>
-            {listing.industry ? (
-              <span className="inline-flex items-center gap-1.5">
+          <ul
+            className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm text-ink-soft"
+            aria-label="Listing details"
+          >
+            {listing.industry && (
+              <li className="inline-flex items-center gap-1.5">
                 <Tag
                   aria-hidden="true"
-                  className="text-emerald-800"
+                  className="shrink-0 text-emerald-800"
                   size={15}
                 />
                 {listing.industry}
-              </span>
-            ) : null}
-            {listing.location ? (
-              <span className="inline-flex items-center gap-1.5">
+              </li>
+            )}
+            {listing.location && (
+              <li className="inline-flex items-center gap-1.5">
                 <MapPin
                   aria-hidden="true"
-                  className="text-emerald-800"
+                  className="shrink-0 text-emerald-800"
                   size={15}
                 />
                 {listing.location}
-              </span>
-            ) : null}
-            {dateLabel ? (
-              <span className="inline-flex items-center gap-1.5">
+              </li>
+            )}
+            {dateLabel && (
+              <li className="inline-flex items-center gap-1.5">
                 <CalendarDays
                   aria-hidden="true"
-                  className="text-emerald-800"
+                  className="shrink-0 text-emerald-800"
                   size={15}
                 />
                 Published {dateLabel}
-              </span>
-            ) : null}
+              </li>
+            )}
+          </ul>
+        </div>
+        <dl className="w-full max-w-sm lg:max-w-none">
+          <DetailMetric
+            emphasized
+            label="Asking price"
+            value={formatListingMoney(listing.askingPrice, listing.currency)}
+          />
+        </dl>
+      </header>
+
+      <div className="grid min-w-0 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)]">
+        <figure className="min-w-0 lg:col-start-1 lg:row-start-1">
+          <div className="relative aspect-[16/9] overflow-hidden rounded-2xl border border-line">
+            <ListingMedia
+              industry={listing.industry}
+              title={listing.title}
+              imageUrl={imageFailed ? null : (listing.imageUrl ?? null)}
+              onImageError={() => setFailedImageUrl(listing.imageUrl ?? null)}
+              eager
+            />
           </div>
-        </div>
-        <Building2
-          aria-hidden="true"
-          className="absolute bottom-8 right-8 hidden text-emerald-900/10 sm:block"
-          size={100}
-          strokeWidth={1}
-        />
-      </div>
-      {listing.website ? (
-        <p className="mt-3 text-sm">
-          <a
-            className="font-semibold text-emerald-800 underline"
-            href={listing.website}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Visit business website
-          </a>
-        </p>
-      ) : null}
-
-      <div className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_21rem]">
-        <div className="space-y-6">
-          <Card className="p-5 sm:p-8">
-            <div className="flex items-center gap-3">
-              <span className="grid size-10 place-items-center rounded-xl bg-emerald-50 text-emerald-800">
-                <Building2 aria-hidden="true" size={18} />
-              </span>
-              <div>
-                <p className="eyebrow text-emerald-800">Business overview</p>
-                <h2 className="mt-1 text-xl font-semibold tracking-tight text-navy-950">
-                  About this business
-                </h2>
-              </div>
+          {listing.imageUrl && !imageFailed && (
+            <figcaption className="mt-2 flex flex-wrap items-center justify-between gap-x-4 text-xs text-ink-soft">
+              <span>Business photo provided by the seller</span>
+              <a
+                className="inline-flex min-h-9 items-center rounded-sm font-semibold text-emerald-900 underline underline-offset-4"
+                href={listingImageSrc(listing.imageUrl)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open full-size photo
+              </a>
+            </figcaption>
+          )}
+        </figure>
+        <aside className="min-w-0 rounded-2xl border border-emerald-900/15 bg-white p-5 shadow-card sm:p-6 lg:sticky lg:top-24 lg:col-start-2 lg:row-span-3 lg:row-start-1">
+          <div className="flex items-center gap-3 border-b border-line pb-4">
+            <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-900">
+              <Building2 aria-hidden="true" size={20} />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-900">
+                Seller
+              </p>
+              <p className="break-words text-sm font-medium text-ink-soft">
+                Published by {listing.sellerName || "the seller"}
+              </p>
             </div>
-            <p className="mt-6 whitespace-pre-line text-sm leading-7 text-ink-soft sm:text-base sm:leading-8">
-              {listing.description}
-            </p>
-          </Card>
-
-          <Card className="p-5 sm:p-8">
-            <div className="flex items-center gap-3">
-              <span className="grid size-10 place-items-center rounded-xl bg-emerald-50 text-emerald-800">
-                <ChartNoAxesCombined aria-hidden="true" size={18} />
-              </span>
-              <div>
-                <p className="eyebrow text-emerald-800">At a glance</p>
-                <h2 className="mt-1 text-xl font-semibold tracking-tight text-navy-950">
-                  Financial information
-                </h2>
-              </div>
-            </div>
-            <div className="mt-5 grid gap-3 sm:grid-cols-3">
-              <DetailMetric
-                emphasized
-                label="Asking price"
-                value={formatListingMoney(
-                  listing.askingPrice,
-                  listing.currency,
-                )}
-              />
-              <DetailMetric
-                label="Annual revenue"
-                value={formatListingMoney(
-                  listing.annualRevenue,
-                  listing.currency,
-                )}
-              />
-              <DetailMetric
-                label="EBITDA"
-                value={formatListingMoney(listing.ebitda, listing.currency)}
-              />
-            </div>
-            <p className="mt-3 text-xs leading-5 text-ink-faint">
-              Amounts are shown in the listing’s stated currency (
-              {listing.currency}).
-            </p>
-          </Card>
-        </div>
-
-        <Card className="sticky top-24 p-5 sm:p-6">
-          <p className="eyebrow text-emerald-800">Next step</p>
-          <h2 className="mt-2 text-xl font-semibold tracking-tight text-navy-950">
+          </div>
+          <h2 className="mt-5 font-display text-3xl leading-tight text-navy-950">
             Interested in this business?
           </h2>
           <p className="mt-2 text-sm leading-6 text-ink-soft">
             {user?.role === "buyer"
-              ? "You’re signed in as a buyer. Continue exploring the public marketplace or review your account."
+              ? "You’re signed in as a buyer. Ask the seller a question or start an acquisition when you’re ready."
               : user
-                ? `You’re signed in as a ${user.role}. Continue exploring the public marketplace or review your account.`
-                : "Sign in to continue with DealFlow, or create an account to get started."}
+                ? "Buyer accounts can contact sellers about this listing."
+                : "Sign in or create a buyer account to ask the seller a question or save this listing."}
           </p>
           <div className="mt-5 flex flex-col gap-2.5">
-            {user?.role === "buyer" ? (
-              <Button
-                disabled={favoriteMutation.isPending}
-                onClick={() =>
-                  favoriteMutation.mutate(Boolean(listing.isFavorite))
-                }
-                size="lg"
-                variant="outline"
-              >
-                {listing.isFavorite
-                  ? "Remove from saved businesses"
-                  : "Save business"}
-              </Button>
-            ) : null}
             {user?.role === "buyer" ? (
               <Button
                 disabled={inquiryMutation.isPending}
@@ -400,6 +338,7 @@ export function ListingDetailsPage() {
                 size="lg"
                 variant="accent"
               >
+                <MessageSquare aria-hidden="true" size={17} />
                 {inquiryMutation.isPending
                   ? "Opening conversation…"
                   : "Contact seller"}
@@ -413,7 +352,7 @@ export function ListingDetailsPage() {
                   startDealMutation.mutate();
                 }}
                 size="lg"
-                variant="accent"
+                variant="outline"
               >
                 {startDealMutation.isPending
                   ? "Opening acquisition…"
@@ -439,6 +378,25 @@ export function ListingDetailsPage() {
               </Button>
             )}
             {user?.role === "buyer" ? (
+              <Button
+                disabled={favoriteMutation.isPending}
+                onClick={() =>
+                  favoriteMutation.mutate(Boolean(listing.isFavorite))
+                }
+                size="lg"
+                variant="outline"
+              >
+                <Heart
+                  aria-hidden="true"
+                  size={16}
+                  fill={listing.isFavorite ? "currentColor" : "none"}
+                />
+                {listing.isFavorite
+                  ? "Remove from saved businesses"
+                  : "Save business"}
+              </Button>
+            ) : null}
+            {user?.role === "buyer" ? (
               <Button asChild size="lg" variant="outline">
                 <Link to="/buyer/saved">Saved businesses</Link>
               </Button>
@@ -458,6 +416,14 @@ export function ListingDetailsPage() {
               role="alert"
             >
               {dealError}
+            </p>
+          ) : null}
+          {favoriteMutation.isError ? (
+            <p
+              className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900"
+              role="alert"
+            >
+              {toApiError(favoriteMutation.error).message}
             </p>
           ) : null}
           {inquiryMutation.isError ? (
@@ -481,7 +447,7 @@ export function ListingDetailsPage() {
               {!reportOpen ? (
                 <button
                   type="button"
-                  className="text-xs font-medium text-ink-soft underline"
+                  className="min-h-10 rounded-sm text-sm font-medium text-ink-soft underline underline-offset-4"
                   onClick={() => {
                     setReportNotice("");
                     setReportValidationError("");
@@ -530,7 +496,8 @@ export function ListingDetailsPage() {
                   >
                     {listingReportCategories.map((category) => (
                       <option key={category} value={category}>
-                        {category.replaceAll("_", " ")}
+                        {category.charAt(0).toUpperCase() +
+                          category.slice(1).replaceAll("_", " ")}
                       </option>
                     ))}
                   </select>
@@ -586,11 +553,46 @@ export function ListingDetailsPage() {
               )}
             </div>
           ) : null}
-          <p className="mt-4 border-t border-line pt-4 text-xs leading-5 text-ink-faint">
-            Public listing details are provided by{" "}
-            {listing.sellerName || "the seller"}.
+        </aside>
+        <section className="lg:col-start-1 lg:row-start-2 min-w-0 rounded-2xl border border-line bg-white p-5 sm:p-7">
+          <h2 className="font-display text-3xl leading-tight text-navy-950">
+            Financial information
+          </h2>
+          <dl className="mt-4 grid gap-2.5 sm:grid-cols-2">
+            <DetailMetric
+              label="Annual revenue"
+              value={formatListingMoney(
+                listing.annualRevenue,
+                listing.currency,
+              )}
+            />
+            <DetailMetric
+              label="EBITDA"
+              value={formatListingMoney(listing.ebitda, listing.currency)}
+            />
+          </dl>
+          <p className="mt-3 text-sm leading-6 text-ink-soft">
+            The seller provided these figures in {listing.currency}.
           </p>
-        </Card>
+        </section>
+        <section className="lg:col-start-1 lg:row-start-3 min-w-0 rounded-2xl border border-line bg-white p-5 sm:p-7">
+          <h2 className="font-display text-3xl leading-tight text-navy-950">
+            About this business
+          </h2>
+          <p className="mt-4 max-w-prose whitespace-pre-line break-words text-base leading-7 text-ink-soft">
+            {listing.description}
+          </p>
+          {listing.website && (
+            <a
+              className="mt-4 inline-flex min-h-10 items-center font-semibold text-emerald-900 underline underline-offset-4"
+              href={listing.website}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Visit business website
+            </a>
+          )}
+        </section>
       </div>
     </article>
   );

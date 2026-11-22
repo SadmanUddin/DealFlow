@@ -38,6 +38,10 @@ export function SellerOverviewPage() {
     queryFn: () => listDeals(1, 20),
     staleTime: 45_000,
   });
+  const activeDeals = useQuery({
+    queryKey: ["deals", "mine", 1, 1, "open"],
+    queryFn: () => listDeals(1, 1, "open"),
+  });
   const dealRows = useMemo(() => deals.data?.deals ?? [], [deals.data?.deals]);
   const offerQueries = useQueries({
     queries: dealRows.map((deal) => ({
@@ -48,9 +52,6 @@ export function SellerOverviewPage() {
   });
   const listingRows = listings.data?.listings ?? [];
   const inquiryRows = inquiries.data?.conversations ?? [];
-  const activeDeals = dealRows.filter(
-    (deal) => !["completed", "cancelled", "rejected"].includes(deal.status),
-  );
   const pendingOffers = offerQueries
     .flatMap((query) => query.data?.offers ?? [])
     .filter((offer) => offer.status === "pending").length;
@@ -67,6 +68,7 @@ export function SellerOverviewPage() {
   return (
     <>
       <WorkspacePageHeader
+        featured
         description="Track the businesses you have brought to market and the buyer conversations that move them forward."
         eyebrow="Seller workspace"
         title="Seller overview"
@@ -113,18 +115,18 @@ export function SellerOverviewPage() {
               value={inquiries.data?.pagination.total ?? 0}
             />
             <MetricCard
-              detail="Offers awaiting a participant response"
-              href="/seller/offers"
+              detail="Awaiting a response in your latest 20 deals"
+              href="/seller/deals"
               icon={<Tag size={18} />}
               label="Pending offers"
               value={pendingOffers}
             />
             <MetricCard
-              detail="Active among your 20 most recently updated deals"
+              detail="Acquisitions still in progress"
               href="/seller/deals"
               icon={<Handshake size={18} />}
-              label="Recent active deals"
-              value={activeDeals.length}
+              label="Active deals"
+              value={activeDeals.data?.pagination.total ?? "—"}
             />
             <MetricCard
               detail="Completed acquisitions from your listings"
@@ -134,7 +136,7 @@ export function SellerOverviewPage() {
               value={listings.data?.soldCount ?? 0}
             />
             <MetricCard
-              detail="Listings that need an action from you"
+              detail="Draft or rejected listings among your latest 100"
               href="/seller/listings"
               icon={<FileText size={18} />}
               label="Drafts to complete"

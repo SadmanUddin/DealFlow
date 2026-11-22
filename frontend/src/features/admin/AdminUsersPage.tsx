@@ -63,13 +63,13 @@ export function AdminUsersPage() {
   return (
     <>
       <WorkspacePageHeader
-        description="Review account roles and status. Sensitive changes are sent to the backend and recorded in the administrative audit log."
+        description="Review account roles, verification, and access. Changes are recorded in the audit log."
         eyebrow="Platform operations · Accounts"
         title="User management"
       />
       <SectionCard className="mb-5">
         <form
-          className="grid gap-3 md:grid-cols-[minmax(15rem,1fr)_10rem_10rem_auto]"
+          className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_9rem_9rem_auto]"
           onSubmit={(event) => {
             event.preventDefault();
             update({ q: input.trim() });
@@ -141,23 +141,35 @@ export function AdminUsersPage() {
                 {query.data.pagination.total} matching users
               </p>
             </div>
-            <span className="text-xs text-ink-faint">
+            <span className="rounded-full bg-paper px-3 py-1 text-xs font-medium text-ink-soft">
               Newest accounts first
             </span>
           </div>
           {query.data.users.length ? (
             <>
               <div className="hidden overflow-x-auto md:block">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-mist/70 text-[0.68rem] uppercase tracking-[0.09em] text-ink-faint">
+                <table
+                  className="w-full text-left text-sm"
+                  aria-label="User accounts"
+                >
+                  <thead className="border-b border-line bg-paper text-xs font-semibold text-ink-soft">
                     <tr>
-                      <th className="px-5 py-3 font-semibold">User</th>
-                      <th className="px-4 py-3 font-semibold">Role</th>
-                      <th className="px-4 py-3 font-semibold">Status</th>
-                      <th className="px-4 py-3 font-semibold">
+                      <th scope="col" className="px-5 py-3 font-semibold">
+                        User
+                      </th>
+                      <th scope="col" className="px-4 py-3 font-semibold">
+                        Role
+                      </th>
+                      <th scope="col" className="px-4 py-3 font-semibold">
+                        Status
+                      </th>
+                      <th scope="col" className="px-4 py-3 font-semibold">
                         Email verification
                       </th>
-                      <th className="px-5 py-3 text-right font-semibold">
+                      <th
+                        scope="col"
+                        className="px-5 py-3 text-right font-semibold"
+                      >
                         Joined
                       </th>
                     </tr>
@@ -172,7 +184,7 @@ export function AdminUsersPage() {
                           >
                             {user.name}
                           </Link>
-                          <p className="mt-1 text-xs text-ink-soft">
+                          <p className="mt-1 break-all text-xs text-ink-soft">
                             {user.email}
                           </p>
                         </td>
@@ -219,7 +231,7 @@ export function AdminUsersPage() {
                   </Link>
                 ))}
               </div>
-              <div className="flex items-center justify-between gap-3 border-t border-line px-4 py-3 sm:px-5">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3 sm:px-5">
                 <p aria-live="polite" className="text-xs text-ink-soft">
                   Page {page} of {Math.max(1, totalPages)}
                 </p>

@@ -3,7 +3,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { useLocation } from "react-router";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
+import { WorkspacePageHeader } from "@/components/shared/workspace/WorkspaceUI";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -114,11 +115,19 @@ export function AccountPage() {
 
   return (
     <section className="page-container min-h-[65vh] py-12 sm:py-16">
-      <div className="mx-auto max-w-3xl">
-        <p className="eyebrow text-emerald-800">Your DealFlow account</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-navy-950">
-          Profile and account details
-        </h1>
+      <div className="mx-auto max-w-5xl">
+        <WorkspacePageHeader
+          eyebrow="Your DealFlow account"
+          title="Account settings"
+          description="Manage your profile, email preferences, and account access."
+          action={
+            sessionUser ? (
+              <Button asChild variant="outline">
+                <Link to={`/${sessionUser.role}`}>Back to workspace</Link>
+              </Button>
+            ) : undefined
+          }
+        />
         {notice && (
           <p
             className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
@@ -130,8 +139,8 @@ export function AccountPage() {
         {!profile.emailVerified && (
           <div className="mt-5 flex flex-col justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center">
             <p className="text-sm text-amber-950">
-              Verify your email to finish setting up your account. Use the
-              link in your verification email or request a new one.
+              Verify your email to finish setting up your account. Use the link
+              in your verification email or request a new one.
             </p>
             <a
               className="shrink-0 text-sm font-semibold text-emerald-900 underline"
@@ -141,7 +150,7 @@ export function AccountPage() {
             </a>
           </div>
         )}
-        <div className="mt-7 grid gap-6 md:grid-cols-[1fr_1.15fr]">
+        <div className="mt-7 grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
           <Card>
             <CardContent className="p-6 sm:p-7">
               <h2 className="text-lg font-semibold text-navy-950">
@@ -291,7 +300,7 @@ export function AccountPage() {
                 ).map(([key, label]) => (
                   <label
                     key={key}
-                    className="flex items-center gap-3 rounded-lg border border-line p-3 text-sm"
+                    className="flex min-h-12 items-center gap-3 rounded-lg border border-line bg-paper p-3 text-sm transition-colors hover:border-emerald-200"
                   >
                     <input
                       type="checkbox"

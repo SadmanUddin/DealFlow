@@ -11,6 +11,7 @@ import { ErrorState } from "@/components/shared/ErrorState";
 import {
   SectionCard,
   SectionHeading,
+  StatusBadge,
   WorkspacePageHeader,
   WorkspaceSkeleton,
 } from "@/components/shared/workspace/WorkspaceUI";
@@ -205,17 +206,14 @@ export function SellerListingFormPage() {
         title={id ? "Edit business listing" : "Create business listing"}
       />
       {listing ? (
-        <p className="mb-5 text-sm text-ink-soft">
-          Current status:{" "}
-          <strong className="text-navy-950">
-            {listing.status.replaceAll("_", " ")}
-          </strong>
+        <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-line bg-white px-4 py-3 text-sm text-ink-soft">
+          <StatusBadge status={listing.status} />
           {listing.status === "published"
-            ? " · Saving edits or changing its image sends the listing back to moderation."
+            ? "Saving edits or changing its image sends the listing back to moderation."
             : listing.status === "pending"
-              ? " · This listing is awaiting review. You can replace or remove its image; other listing changes remain locked until review is complete."
-              : ""}
-        </p>
+              ? "This listing is awaiting review. You can replace or remove its image; other listing changes remain locked until review is complete."
+              : null}
+        </div>
       ) : null}
       {save.isError ? (
         <p
@@ -225,232 +223,263 @@ export function SellerListingFormPage() {
           {toApiError(save.error).message}
         </p>
       ) : null}
-      <form className="space-y-5" noValidate onSubmit={submit}>
-        <SectionCard>
-          <SectionHeading
-            description="Keep the title concise and describe the business as it operates today."
-            title="Business overview"
-          />
-          <div className="mt-5 grid gap-5">
-            <Field
-              disabled={locked}
-              errors={form.formState.errors.title?.message}
-              label="Business name"
-              name="title"
-              register={form.register("title")}
-            />
-            <div>
-              <label className={labelClass} htmlFor="description">
-                Business description
-              </label>
-              <textarea
-                aria-describedby="description-help description-error"
-                className={textareaClass}
-                disabled={locked}
-                id="description"
-                maxLength={10000}
-                {...form.register("description")}
-              />
-              <p
-                className="mt-1.5 text-xs text-ink-faint"
-                id="description-help"
-              >
-                Describe the business, its customers, operations and
-                opportunity.
-              </p>
-              <FieldError id="description-error">
-                {form.formState.errors.description?.message}
-              </FieldError>
-            </div>
-          </div>
-        </SectionCard>
-        <SectionCard>
-          <SectionHeading
-            description="Only share information you are comfortable disclosing in a public listing."
-            title="Category and location"
-          />
-          <div className="mt-5 grid gap-4 sm:grid-cols-2">
-            <Field
-              errors={form.formState.errors.industry?.message}
-              label="Industry / category"
-              name="industry"
-              register={form.register("industry")}
-              disabled={locked}
-            />
-            <Field
-              errors={form.formState.errors.location?.message}
-              label="Location"
-              name="location"
-              register={form.register("location")}
-              disabled={locked}
-            />
-            <Field
-              errors={form.formState.errors.website?.message}
-              label="Business website"
-              name="website"
-              register={form.register("website")}
-              disabled={locked}
-              type="url"
-            />
-          </div>
-        </SectionCard>
-        {id && listing ? (
-          <SectionCard>
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_13rem]">
+        <form className="min-w-0 space-y-5" noValidate onSubmit={submit}>
+          <SectionCard id="listing-overview" className="scroll-mt-28">
             <SectionHeading
-              title="Listing image"
-              description="Add a public JPEG, PNG, or WebP image up to 5 MB. It is stored separately from private deal documents."
+              description="Keep the title concise and describe the business as it operates today."
+              title="Business overview"
             />
-            {listing.imageUrl && failedPreviewUrl !== listing.imageUrl ? (
-              <img
-                className="mt-4 aspect-[2/1] max-h-64 rounded-xl object-cover"
-                src={listingImageSrc(listing.imageUrl)}
-                alt={`Listing image for ${listing.title}`}
-                onError={() => setFailedPreviewUrl(listing.imageUrl ?? null)}
-                crossOrigin="use-credentials"
-              />
-            ) : listing.imageUrl ? (
-              <p className="mt-4 text-sm text-rose-800" role="alert">
-                The uploaded image could not be previewed. Try uploading it
-                again.
-              </p>
-            ) : (
-              <p className="mt-4 text-sm text-ink-soft">
-                No listing image uploaded. A branded fallback appears to buyers.
-              </p>
-            )}
-            <label
-              className="mt-4 block text-sm font-medium"
-              htmlFor="listing-image"
-            >
-              Upload or replace image
-            </label>
-            <input
-              id="listing-image"
-              className="mt-2 block w-full text-sm"
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              disabled={imageUpload.isPending || !canEditImage}
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) imageUpload.mutate(file);
-                event.currentTarget.value = "";
-              }}
-            />
-            {imageUpload.isPending ? (
-              <p role="status" className="mt-2 text-sm text-ink-soft">
-                Uploading image…
-              </p>
-            ) : null}
-            {imageUpload.isError ? (
-              <p role="alert" className="mt-2 text-sm text-rose-800">
-                {toApiError(imageUpload.error).message}
-              </p>
-            ) : null}
-            {imageUpload.isSuccess ? (
-              <p role="status" className="mt-2 text-sm text-emerald-800">
-                {imageUpload.data.status === "pending"
-                  ? "Image uploaded. This listing remains pending moderation; the updated image will be public after approval."
-                  : "Image uploaded."}
-              </p>
-            ) : null}
-            {listing.imageUrl ? (
-              <Button
-                className="mt-3"
-                disabled={imageRemoval.isPending || !canEditImage}
-                onClick={() => setConfirmRemoveImage(true)}
-                type="button"
-                variant="outline"
-              >
-                {imageRemoval.isPending ? "Removing image…" : "Remove image"}
-              </Button>
-            ) : null}
-            {imageRemoval.isError ? (
-              <p className="mt-2 text-sm text-rose-800" role="alert">
-                {toApiError(imageRemoval.error).message}
-              </p>
-            ) : null}
-            {imageRemoval.isSuccess ? (
-              <p className="mt-2 text-sm text-emerald-800" role="status">
-                Image removed.
-                {imageRemoval.data.status === "pending"
-                  ? " The listing remains pending moderation."
-                  : ""}
-              </p>
-            ) : null}
-          </SectionCard>
-        ) : null}
-        <SectionCard>
-          <SectionHeading
-            description="Enter values in the selected currency. Financial details are optional when unavailable."
-            title="Asking price and financials"
-          />
-          <div className="mt-5 grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className={labelClass} htmlFor="currency">
-                Currency
-              </label>
-              <select
-                className={inputClass}
+            <div className="mt-5 grid gap-5">
+              <Field
                 disabled={locked}
-                id="currency"
-                {...form.register("currency")}
-              >
-                {[...currencySet].sort().map((currency) => (
-                  <option key={currency} value={currency}>
-                    {currency}
-                  </option>
-                ))}
-              </select>
-              <FieldError>{form.formState.errors.currency?.message}</FieldError>
+                errors={form.formState.errors.title?.message}
+                label="Business name"
+                name="title"
+                register={form.register("title")}
+              />
+              <div>
+                <label className={labelClass} htmlFor="description">
+                  Business description
+                </label>
+                <textarea
+                  aria-describedby="description-help description-error"
+                  className={textareaClass}
+                  disabled={locked}
+                  id="description"
+                  maxLength={10000}
+                  {...form.register("description")}
+                />
+                <p
+                  className="mt-1.5 text-xs text-ink-faint"
+                  id="description-help"
+                >
+                  Describe the business, its customers, operations and
+                  opportunity.
+                </p>
+                <FieldError id="description-error">
+                  {form.formState.errors.description?.message}
+                </FieldError>
+              </div>
             </div>
-            <Field
-              errors={form.formState.errors.asking_price?.message}
-              label="Asking price"
-              name="asking_price"
-              register={form.register("asking_price")}
-              disabled={locked}
-              type="text"
+          </SectionCard>
+          <SectionCard id="listing-category" className="scroll-mt-28">
+            <SectionHeading
+              description="Only share information you are comfortable disclosing in a public listing."
+              title="Category and location"
             />
-            <Field
-              errors={form.formState.errors.annual_revenue?.message}
-              label="Annual revenue"
-              name="annual_revenue"
-              register={form.register("annual_revenue")}
-              disabled={locked}
-              type="text"
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <Field
+                errors={form.formState.errors.industry?.message}
+                label="Industry / category"
+                name="industry"
+                register={form.register("industry")}
+                disabled={locked}
+              />
+              <Field
+                errors={form.formState.errors.location?.message}
+                label="Location"
+                name="location"
+                register={form.register("location")}
+                disabled={locked}
+              />
+              <Field
+                errors={form.formState.errors.website?.message}
+                label="Business website"
+                name="website"
+                register={form.register("website")}
+                disabled={locked}
+                type="url"
+              />
+            </div>
+          </SectionCard>
+          {id && listing ? (
+            <SectionCard id="listing-media" className="scroll-mt-28">
+              <SectionHeading
+                title="Listing image"
+                description="Choose a JPEG, PNG, or WebP file up to 5 MB for your public listing."
+              />
+              {listing.imageUrl && failedPreviewUrl !== listing.imageUrl ? (
+                <img
+                  className="mt-4 aspect-[2/1] max-h-64 w-full rounded-xl object-cover"
+                  src={listingImageSrc(listing.imageUrl)}
+                  alt={`Listing image for ${listing.title}`}
+                  onError={() => setFailedPreviewUrl(listing.imageUrl ?? null)}
+                  crossOrigin="use-credentials"
+                />
+              ) : listing.imageUrl ? (
+                <p className="mt-4 text-sm text-rose-800" role="alert">
+                  The uploaded image could not be previewed. Try uploading it
+                  again.
+                </p>
+              ) : (
+                <p className="mt-4 text-sm text-ink-soft">
+                  A category illustration will appear until you add a photo.
+                </p>
+              )}
+              <label
+                className="mt-4 block text-sm font-medium"
+                htmlFor="listing-image"
+              >
+                Upload or replace image
+              </label>
+              <input
+                id="listing-image"
+                className="mt-2 block w-full min-w-0 rounded-xl border border-dashed border-line bg-paper p-3 text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-white file:px-3 file:py-2 file:font-semibold file:text-emerald-900"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                disabled={imageUpload.isPending || !canEditImage}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) imageUpload.mutate(file);
+                  event.currentTarget.value = "";
+                }}
+              />
+              {imageUpload.isPending ? (
+                <p role="status" className="mt-2 text-sm text-ink-soft">
+                  Uploading image…
+                </p>
+              ) : null}
+              {imageUpload.isError ? (
+                <p role="alert" className="mt-2 text-sm text-rose-800">
+                  {toApiError(imageUpload.error).message}
+                </p>
+              ) : null}
+              {imageUpload.isSuccess ? (
+                <p role="status" className="mt-2 text-sm text-emerald-800">
+                  {imageUpload.data.status === "pending"
+                    ? "Image uploaded. This listing remains pending moderation; the updated image will be public after approval."
+                    : "Image uploaded."}
+                </p>
+              ) : null}
+              {listing.imageUrl ? (
+                <Button
+                  className="mt-3"
+                  disabled={imageRemoval.isPending || !canEditImage}
+                  onClick={() => setConfirmRemoveImage(true)}
+                  type="button"
+                  variant="outline"
+                >
+                  {imageRemoval.isPending ? "Removing image…" : "Remove image"}
+                </Button>
+              ) : null}
+              {imageRemoval.isError ? (
+                <p className="mt-2 text-sm text-rose-800" role="alert">
+                  {toApiError(imageRemoval.error).message}
+                </p>
+              ) : null}
+              {imageRemoval.isSuccess ? (
+                <p className="mt-2 text-sm text-emerald-800" role="status">
+                  Image removed.
+                  {imageRemoval.data.status === "pending"
+                    ? " The listing remains pending moderation."
+                    : ""}
+                </p>
+              ) : null}
+            </SectionCard>
+          ) : null}
+          <SectionCard id="listing-financials" className="scroll-mt-28">
+            <SectionHeading
+              description="Enter values in the selected currency. Financial details are optional when unavailable."
+              title="Asking price and financials"
             />
-            <Field
-              errors={form.formState.errors.ebitda?.message}
-              label="EBITDA"
-              name="ebitda"
-              register={form.register("ebitda")}
-              disabled={locked}
-              type="text"
-            />
-          </div>
-        </SectionCard>
-        {locked ? (
-          <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-            This listing is {listing?.status} and its business details cannot be
-            edited until its status changes. Image replacement and removal
-            remain available while it is pending review.
-          </p>
-        ) : (
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button asChild variant="outline">
-              <Link to="/seller/listings">Cancel</Link>
-            </Button>
-            <Button
-              disabled={save.isPending || !form.formState.isDirty}
-              type="submit"
-              variant="accent"
-            >
-              <Save size={16} />
-              {save.isPending ? "Saving…" : "Save draft"}
-            </Button>
-          </div>
-        )}
-      </form>
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className={labelClass} htmlFor="currency">
+                  Currency
+                </label>
+                <select
+                  className={inputClass}
+                  disabled={locked}
+                  id="currency"
+                  {...form.register("currency")}
+                >
+                  {[...currencySet].sort().map((currency) => (
+                    <option key={currency} value={currency}>
+                      {currency}
+                    </option>
+                  ))}
+                </select>
+                <FieldError>
+                  {form.formState.errors.currency?.message}
+                </FieldError>
+              </div>
+              <Field
+                errors={form.formState.errors.asking_price?.message}
+                label="Asking price"
+                name="asking_price"
+                register={form.register("asking_price")}
+                disabled={locked}
+                type="text"
+              />
+              <Field
+                errors={form.formState.errors.annual_revenue?.message}
+                label="Annual revenue"
+                name="annual_revenue"
+                register={form.register("annual_revenue")}
+                disabled={locked}
+                type="text"
+              />
+              <Field
+                errors={form.formState.errors.ebitda?.message}
+                label="EBITDA"
+                name="ebitda"
+                register={form.register("ebitda")}
+                disabled={locked}
+                type="text"
+              />
+            </div>
+          </SectionCard>
+          {locked ? (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+              This listing is {listing?.status} and its business details cannot
+              be edited until its status changes. Image replacement and removal
+              remain available while it is pending review.
+            </p>
+          ) : (
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button asChild variant="outline">
+                <Link to="/seller/listings">Cancel</Link>
+              </Button>
+              <Button
+                disabled={save.isPending || !form.formState.isDirty}
+                type="submit"
+                variant="accent"
+              >
+                <Save size={16} />
+                {save.isPending
+                  ? "Saving…"
+                  : listing?.status === "published"
+                    ? "Save and send for review"
+                    : id
+                      ? "Save changes"
+                      : "Save draft"}
+              </Button>
+            </div>
+          )}
+        </form>
+        <aside
+          aria-label="Listing form sections"
+          className="order-first xl:order-last"
+        >
+          <nav className="flex flex-wrap gap-1 rounded-xl border border-line bg-white p-2 xl:sticky xl:top-24 xl:flex-col">
+            <a className={sectionLink} href="#listing-overview">
+              Overview
+            </a>
+            <a className={sectionLink} href="#listing-category">
+              Category &amp; location
+            </a>
+            {id && listing ? (
+              <a className={sectionLink} href="#listing-media">
+                Listing image
+              </a>
+            ) : null}
+            <a className={sectionLink} href="#listing-financials">
+              Financials
+            </a>
+          </nav>
+        </aside>
+      </div>
       {confirmRemoveImage ? (
         <ConfirmDialog
           title="Remove listing image?"
@@ -515,3 +544,6 @@ function FieldError({ children, id }: { children?: string; id?: string }) {
     </p>
   ) : null;
 }
+
+const sectionLink =
+  "inline-flex min-h-10 items-center rounded-lg px-3 text-sm font-medium text-ink-soft hover:bg-paper hover:text-emerald-900 focus-visible:outline-2 focus-visible:outline-emerald-800";

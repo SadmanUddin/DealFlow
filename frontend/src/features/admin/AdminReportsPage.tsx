@@ -116,7 +116,7 @@ export function AdminReportsPage() {
       />
       <SectionCard className="mb-5">
         <form
-          className="grid gap-3 md:grid-cols-[minmax(13rem,1fr)_11rem_13rem_auto]"
+          className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_10rem_12rem_auto]"
           onSubmit={(event) => {
             event.preventDefault();
             filter({ q: input.trim() });
@@ -216,7 +216,7 @@ export function AdminReportsPage() {
                     </div>
                     <TargetLink report={report} />
                   </header>
-                  <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-navy-900">
+                  <p className="mt-4 break-words whitespace-pre-wrap rounded-xl border border-line bg-paper p-4 text-sm leading-6 text-navy-900">
                     {report.description}
                   </p>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -285,7 +285,7 @@ export function AdminReportsPage() {
             </SectionCard>
           )}
           {query.data.pagination.totalPages > 1 ? (
-            <div className="flex justify-between">
+            <div className="flex flex-wrap justify-between gap-3">
               <Button
                 disabled={page <= 1 || query.isFetching}
                 onClick={() => filter({ page: page - 1 })}

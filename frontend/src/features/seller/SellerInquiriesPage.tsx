@@ -129,9 +129,6 @@ export function SellerInquiriesPage() {
                             dateStyle: "medium",
                           }).format(new Date(inquiry.createdAt))}
                         </p>
-                        <p className="mt-1 text-xs text-ink-faint">
-                          Buyer identity is not included in this API response.
-                        </p>
                       </div>
                     </div>
                     <div className="flex items-center justify-between gap-3 sm:justify-end">

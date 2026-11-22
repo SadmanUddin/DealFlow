@@ -13,7 +13,6 @@ import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/shared/ErrorState";
 import {
   SectionCard,
-  StatusBadge,
   WorkspaceEmpty,
   WorkspacePageHeader,
 } from "@/components/shared/workspace/WorkspaceUI";
@@ -136,7 +135,7 @@ export function BuyerNotificationsPage() {
             <CheckCheck aria-hidden="true" size={16} /> Mark all read
           </Button>
         }
-        description="Marketplace updates and account activity, with direct links to related businesses, conversations, and deals."
+        description="Updates on your businesses, conversations, and deals."
         eyebrow="Workspace · Inbox"
         title="Notifications"
       />
@@ -156,9 +155,10 @@ export function BuyerNotificationsPage() {
           {toApiError(markOne.error ?? markAll.error ?? remove.error).message}
         </p>
       ) : null}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <label className="inline-flex items-center gap-2 text-xs font-medium text-ink-soft">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-white px-4 py-2">
+        <label className="inline-flex min-h-10 items-center gap-2 text-sm font-medium text-ink">
           <input
+            className="size-4 accent-forest"
             checked={unreadOnly}
             onChange={(event) => {
               setUnreadOnly(event.target.checked);
@@ -202,7 +202,7 @@ export function BuyerNotificationsPage() {
               const target = notificationTarget(item, audience);
               return (
                 <li
-                  className={`flex gap-3 px-4 py-4 sm:gap-4 sm:px-5 ${item.readAt ? "" : "bg-emerald-50/35"}`}
+                  className={`grid grid-cols-[auto_minmax(0,1fr)] gap-3 px-4 py-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:gap-4 sm:px-5 ${item.readAt ? "" : "bg-emerald-50/35"}`}
                   key={item.id}
                 >
                   <span
@@ -217,15 +217,19 @@ export function BuyerNotificationsPage() {
                           ? `New message from ${String(item.payload.senderName ?? "a participant")}`
                           : humanize(item.type)}
                       </h2>
-                      {!item.readAt ? <StatusBadge status="pending" /> : null}
+                      {!item.readAt && (
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-900">
+                          Unread
+                        </span>
+                      )}
                     </div>
                     <p className="mt-1 break-words text-xs leading-5 text-ink-soft">
                       {target
                         ? String(
                             item.payload.listingTitle ??
-                              "Open the related DealFlow item for details.",
+                              "Open this update for details.",
                           )
-                        : "This notification has no linked resource."}
+                        : "Account activity"}
                     </p>
                     <p className="mt-1.5 text-[0.68rem] text-ink-faint">
                       {new Intl.DateTimeFormat(undefined, {
@@ -234,7 +238,7 @@ export function BuyerNotificationsPage() {
                       }).format(new Date(item.createdAt))}
                     </p>
                   </div>
-                  <div className="flex shrink-0 flex-col items-end gap-2">
+                  <div className="col-start-2 flex flex-wrap items-center gap-2 sm:col-start-3 sm:flex-col sm:items-end">
                     {target ? (
                       <Button
                         aria-label={`Open ${humanize(item.type)}`}

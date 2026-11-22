@@ -6,6 +6,7 @@ import {
   ChevronDown,
   MapPin,
   Search,
+  SlidersHorizontal,
   Tag,
   X,
 } from "lucide-react";
@@ -50,13 +51,13 @@ function hasCriteria(filters: MarketplaceFilters) {
   );
 }
 
-function MarketplaceContent() {
+export function MarketplacePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const filters = useMemo(
     () => parseMarketplaceFilters(searchParams.toString()),
     [searchParams],
   );
-  const [draft, setDraft] = useState<SearchDraft>({
+  const criteriaDraft: SearchDraft = {
     q: filters.q ?? "",
     industry: filters.industry ?? "",
     location: filters.location ?? "",
@@ -66,8 +67,34 @@ function MarketplaceContent() {
     maxRevenue: filters.maxRevenue ?? "",
     minEbitda: filters.minEbitda ?? "",
     maxEbitda: filters.maxEbitda ?? "",
-  });
+  };
+  const criteriaKey = JSON.stringify(criteriaDraft);
+  const [searchDraft, setSearchDraft] = useState<{
+    key: string;
+    draft: SearchDraft;
+  }>();
+  const draft =
+    searchDraft?.key === criteriaKey ? searchDraft.draft : criteriaDraft;
+  const setDraft = (update: (current: SearchDraft) => SearchDraft) =>
+    setSearchDraft((current) => ({
+      key: criteriaKey,
+      draft: update(
+        current?.key === criteriaKey ? current.draft : criteriaDraft,
+      ),
+    }));
   const [filterError, setFilterError] = useState("");
+  const [financialFiltersPreference, setFinancialFiltersPreference] =
+    useState<boolean>();
+  const financialFiltersOpen =
+    financialFiltersPreference ??
+    Boolean(
+      filters.minPrice ||
+      filters.maxPrice ||
+      filters.minRevenue ||
+      filters.maxRevenue ||
+      filters.minEbitda ||
+      filters.maxEbitda,
+    );
 
   const applySearch = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -101,6 +128,7 @@ function MarketplaceContent() {
       setFilterError("Each minimum must be less than or equal to its maximum.");
       return;
     }
+    setSearchDraft(undefined);
     setSearchParams(
       serializeMarketplaceFilters({
         ...filters,
@@ -133,17 +161,7 @@ function MarketplaceContent() {
 
   const clearSearch = () => {
     setFilterError("");
-    setDraft({
-      q: "",
-      industry: "",
-      location: "",
-      minPrice: "",
-      maxPrice: "",
-      minRevenue: "",
-      maxRevenue: "",
-      minEbitda: "",
-      maxEbitda: "",
-    });
+    setSearchDraft(undefined);
     setSearchParams(
       serializeMarketplaceFilters({
         page: 1,
@@ -161,43 +179,151 @@ function MarketplaceContent() {
     retry: retryQuery,
     staleTime: 0,
     refetchOnWindowFocus: true,
-    placeholderData: (previousData) => previousData,
   });
   const page = listingsQuery.data?.pagination;
   const activeCriteria = hasCriteria(filters);
 
   return (
     <>
-      <section className="relative overflow-hidden border-b border-line bg-[radial-gradient(ellipse_at_80%_30%,#d8eee1,transparent_36%),linear-gradient(115deg,#fff_0%,#f3f7f5_58%,#eaf2ed_100%)]">
-        <div className="page-container relative py-12 sm:py-16 lg:py-[4.5rem]">
-          <div className="grid items-end gap-9 lg:grid-cols-[minmax(0,1fr)_minmax(34rem,1.05fr)] lg:gap-14">
-            <div className="max-w-2xl">
-              <p className="eyebrow text-emerald-800">
-                A marketplace for what’s next
+      <section className="border-b border-emerald-950/15 bg-emerald-950 text-white">
+        <div className="page-container pt-12 pb-8 sm:pt-16 sm:pb-10">
+          <div className="grid gap-5 lg:grid-cols-[1fr_20rem] lg:items-end">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-200">
+                Marketplace
               </p>
-              <h1 className="mt-4 text-balance text-[2.65rem] font-semibold leading-[1.06] tracking-[-0.055em] text-navy-950 sm:text-5xl lg:text-[3.45rem]">
-                Find your next business opportunity.
+              <h1 className="mt-4 max-w-4xl text-balance font-display text-5xl leading-[0.98] tracking-[-0.035em] sm:text-6xl lg:text-7xl">
+                Businesses for sale.
               </h1>
-              <p className="mt-5 max-w-xl text-pretty text-base leading-7 text-ink-soft sm:text-lg sm:leading-8">
-                Explore established businesses, discover acquisition
-                opportunities and find the right next chapter for your
-                investment.
-              </p>
-              <div className="mt-6 flex items-center gap-3 text-sm text-ink-soft">
-                <span className="grid size-9 place-items-center rounded-full border border-emerald-900/10 bg-white/80 text-emerald-800">
-                  <Building2 aria-hidden="true" size={17} />
-                </span>
-                Published opportunities, presented with clarity.
-              </div>
-              <fieldset className="mt-3 border-t border-line pt-3">
-                <legend className="px-1 text-xs font-semibold text-navy-950">
-                  Financial ranges{" "}
-                  <span className="font-normal text-ink-faint">
-                    (amounts are compared in each listing’s stated currency,
-                    without conversion)
-                  </span>
+            </div>
+            <p className="max-w-sm text-base leading-7 text-emerald-50/85">
+              Compare asking prices and financials, find businesses in the
+              industries you know, and contact sellers directly.
+            </p>
+          </div>
+          <form
+            aria-label="Search marketplace"
+            className="mt-8 rounded-2xl border border-white/20 bg-white p-3 text-ink shadow-card sm:p-4"
+            onSubmit={applySearch}
+          >
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
+              {(
+                [
+                  [
+                    "q",
+                    "Business",
+                    "Search businesses",
+                    "Name or description",
+                    200,
+                    Search,
+                  ],
+                  [
+                    "industry",
+                    "Industry",
+                    "Industry / category",
+                    "Any industry",
+                    120,
+                    Tag,
+                  ],
+                  [
+                    "location",
+                    "Location",
+                    "Location",
+                    "Any city or country",
+                    160,
+                    MapPin,
+                  ],
+                ] as const
+              ).map(
+                ([
+                  key,
+                  title,
+                  accessibleName,
+                  placeholder,
+                  maxLength,
+                  Icon,
+                ]) => (
+                  <label
+                    key={key}
+                    className="flex min-w-0 items-center gap-3 rounded-xl border border-line bg-paper px-3.5 focus-within:border-emerald-700 focus-within:ring-2 focus-within:ring-emerald-700/15"
+                  >
+                    <Icon
+                      aria-hidden="true"
+                      className="shrink-0 text-emerald-800"
+                      size={18}
+                    />
+                    <span className="min-w-0 flex-1 py-2.5">
+                      <span className="block text-xs font-semibold text-ink">
+                        {title}
+                      </span>
+                      <input
+                        aria-label={accessibleName}
+                        className="w-full min-w-0 bg-transparent text-sm font-medium text-navy-950 outline-none placeholder:font-normal placeholder:text-ink-soft"
+                        maxLength={maxLength}
+                        onChange={(event) =>
+                          setDraft((current) => ({
+                            ...current,
+                            [key]: event.target.value,
+                          }))
+                        }
+                        placeholder={placeholder}
+                        type={key === "q" ? "search" : "text"}
+                        value={draft[key]}
+                      />
+                    </span>
+                  </label>
+                ),
+              )}
+              <Button
+                className="h-full min-h-12 rounded-xl px-6"
+                size="lg"
+                type="submit"
+                variant="accent"
+              >
+                <Search aria-hidden="true" size={17} /> Search
+              </Button>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line pt-2">
+              <button
+                aria-controls="marketplace-financial-filters"
+                aria-expanded={financialFiltersOpen}
+                className="inline-flex min-h-10 items-center gap-2 rounded-md px-2 text-sm font-semibold text-emerald-900 hover:bg-emerald-50"
+                onClick={() =>
+                  setFinancialFiltersPreference(!financialFiltersOpen)
+                }
+                type="button"
+              >
+                <SlidersHorizontal aria-hidden="true" size={16} /> Financial
+                filters
+                <ChevronDown
+                  aria-hidden="true"
+                  size={15}
+                  className={financialFiltersOpen ? "rotate-180" : ""}
+                />
+              </button>
+              {activeCriteria && (
+                <button
+                  className="inline-flex min-h-10 items-center gap-1 rounded-md px-2 text-sm font-semibold text-ink-soft hover:bg-mist"
+                  onClick={clearSearch}
+                  type="button"
+                >
+                  <X aria-hidden="true" size={15} /> Clear
+                </button>
+              )}
+            </div>
+            {financialFiltersOpen && (
+              <fieldset
+                id="marketplace-financial-filters"
+                className="rounded-xl border border-line bg-paper px-4 py-3"
+              >
+                <legend className="px-1 text-sm font-semibold text-ink">
+                  Financial ranges
                 </legend>
-                <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                <p className="text-xs leading-5 text-ink-soft">
+                  Ranges use each listing’s stated currency. Amounts are not
+                  converted.
+                </p>
+                <div className="mt-3 grid gap-3 md:grid-cols-3">
                   {(
                     [
                       ["minPrice", "maxPrice", "Asking price"],
@@ -205,193 +331,81 @@ function MarketplaceContent() {
                       ["minEbitda", "maxEbitda", "EBITDA"],
                     ] as const
                   ).map(([minKey, maxKey, label]) => (
-                    <div
-                      key={minKey}
-                      className="rounded-lg border border-line px-3 py-2"
-                    >
-                      <p className="mb-1 text-[0.68rem] font-semibold text-ink-soft">
+                    <div key={minKey}>
+                      <p className="mb-1.5 text-sm font-medium text-ink">
                         {label}
                       </p>
                       <div className="grid grid-cols-2 gap-2">
-                        <label className="sr-only" htmlFor={minKey}>
-                          Minimum {label}
-                        </label>
-                        <input
-                          id={minKey}
-                          aria-label={`Minimum ${label}`}
-                          inputMode="decimal"
-                          maxLength={19}
-                          pattern="\d{1,16}(\.\d{1,2})?"
-                          placeholder="Min"
-                          value={draft[minKey]}
-                          onChange={(event) =>
-                            setDraft((current) => ({
-                              ...current,
-                              [minKey]: event.target.value,
-                            }))
-                          }
-                          className="h-9 min-w-0 rounded-md border border-line px-2 text-sm"
-                        />
-                        <label className="sr-only" htmlFor={maxKey}>
-                          Maximum {label}
-                        </label>
-                        <input
-                          id={maxKey}
-                          aria-label={`Maximum ${label}`}
-                          inputMode="decimal"
-                          maxLength={19}
-                          pattern="\d{1,16}(\.\d{1,2})?"
-                          placeholder="Max"
-                          value={draft[maxKey]}
-                          onChange={(event) =>
-                            setDraft((current) => ({
-                              ...current,
-                              [maxKey]: event.target.value,
-                            }))
-                          }
-                          className="h-9 min-w-0 rounded-md border border-line px-2 text-sm"
-                        />
+                        {(
+                          [
+                            ["Minimum", minKey],
+                            ["Maximum", maxKey],
+                          ] as const
+                        ).map(([bound, key]) => (
+                          <input
+                            key={key}
+                            aria-label={`${bound} ${label}`}
+                            inputMode="decimal"
+                            maxLength={19}
+                            placeholder={bound}
+                            value={draft[key]}
+                            onChange={(event) =>
+                              setDraft((current) => ({
+                                ...current,
+                                [key]: event.target.value,
+                              }))
+                            }
+                            className="h-11 min-w-0 rounded-lg border border-line bg-white px-2.5 text-sm tabular-nums focus:border-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-700/15"
+                          />
+                        ))}
                       </div>
-                      {draft[minKey] &&
-                      draft[maxKey] &&
-                      Number(draft[minKey]) > Number(draft[maxKey]) ? (
-                        <p className="mt-1 text-[0.68rem] text-rose-800">
-                          Minimum must not exceed maximum.
-                        </p>
-                      ) : null}
                     </div>
                   ))}
                 </div>
-                <p className="mt-2 text-[0.68rem] text-ink-faint">
-                  Use non-negative amounts with up to two decimal places.
-                </p>
               </fieldset>
-            </div>
-
-            <form
-              aria-label="Search marketplace"
-              className="rounded-2xl border border-white bg-white p-3 shadow-[0_18px_55px_-38px_rgba(11,31,54,0.4)] ring-1 ring-navy-950/[0.04] sm:p-4"
-              onSubmit={applySearch}
-            >
-              {filterError ? (
-                <p role="alert" className="mb-2 text-xs text-rose-800">
-                  {filterError}
-                </p>
-              ) : null}
-              <div className="grid gap-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(9rem,0.85fr)_minmax(9rem,0.85fr)_auto]">
-                <label className="group flex min-w-0 items-center gap-3 rounded-xl border border-transparent px-3.5 transition focus-within:border-emerald-700/20 focus-within:bg-emerald-50/40">
-                  <Search
-                    aria-hidden="true"
-                    className="shrink-0 text-emerald-800"
-                    size={19}
-                  />
-                  <span className="min-w-0 flex-1 py-2.5">
-                    <span className="block text-[0.65rem] font-semibold uppercase tracking-[0.1em] text-ink-faint">
-                      Business
-                    </span>
-                    <input
-                      aria-label="Search businesses"
-                      className="mt-0.5 w-full min-w-0 bg-transparent text-sm font-medium text-navy-950 outline-none placeholder:font-normal placeholder:text-ink-faint"
-                      maxLength={200}
-                      onChange={(event) =>
-                        setDraft((current) => ({
-                          ...current,
-                          q: event.target.value,
-                        }))
-                      }
-                      placeholder="Name or description"
-                      type="search"
-                      value={draft.q}
-                    />
-                  </span>
-                </label>
-                <label className="flex min-w-0 items-center gap-2.5 rounded-xl border border-transparent px-3.5 transition focus-within:border-emerald-700/20 focus-within:bg-emerald-50/40">
-                  <Tag
-                    aria-hidden="true"
-                    className="shrink-0 text-emerald-800"
-                    size={17}
-                  />
-                  <span className="min-w-0 flex-1 py-2.5">
-                    <span className="block text-[0.65rem] font-semibold uppercase tracking-[0.1em] text-ink-faint">
-                      Industry
-                    </span>
-                    <input
-                      aria-label="Industry / category"
-                      className="mt-0.5 w-full min-w-0 bg-transparent text-sm font-medium text-navy-950 outline-none placeholder:font-normal placeholder:text-ink-faint"
-                      maxLength={120}
-                      onChange={(event) =>
-                        setDraft((current) => ({
-                          ...current,
-                          industry: event.target.value,
-                        }))
-                      }
-                      placeholder="Any industry"
-                      value={draft.industry}
-                    />
-                  </span>
-                </label>
-                <label className="flex min-w-0 items-center gap-2.5 rounded-xl border border-transparent px-3.5 transition focus-within:border-emerald-700/20 focus-within:bg-emerald-50/40">
-                  <MapPin
-                    aria-hidden="true"
-                    className="shrink-0 text-emerald-800"
-                    size={18}
-                  />
-                  <span className="min-w-0 flex-1 py-2.5">
-                    <span className="block text-[0.65rem] font-semibold uppercase tracking-[0.1em] text-ink-faint">
-                      Location
-                    </span>
-                    <input
-                      aria-label="Location"
-                      className="mt-0.5 w-full min-w-0 bg-transparent text-sm font-medium text-navy-950 outline-none placeholder:font-normal placeholder:text-ink-faint"
-                      maxLength={160}
-                      onChange={(event) =>
-                        setDraft((current) => ({
-                          ...current,
-                          location: event.target.value,
-                        }))
-                      }
-                      placeholder="Anywhere"
-                      value={draft.location}
-                    />
-                  </span>
-                </label>
-                <Button
-                  className="h-[3.65rem] rounded-xl px-5 lg:self-center"
-                  size="lg"
-                  type="submit"
-                  variant="accent"
-                >
-                  <Search aria-hidden="true" size={17} /> Search
-                </Button>
-              </div>
-              <div className="mt-2 flex items-center justify-between border-t border-line px-2 pt-3">
-                <p className="text-xs text-ink-faint">
-                  Search businesses by name, industry or location.
-                </p>
-                {activeCriteria ? (
-                  <button
-                    className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-50"
-                    onClick={clearSearch}
-                    type="button"
-                  >
-                    <X aria-hidden="true" size={13} /> Clear
-                  </button>
-                ) : null}
-              </div>
-            </form>
-          </div>
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute -right-24 -top-44 size-[26rem] rounded-full border border-emerald-950/[0.05]"
-          />
+            )}
+            {filterError && (
+              <p
+                role="alert"
+                className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800"
+              >
+                {filterError}
+              </p>
+            )}
+          </form>
         </div>
       </section>
 
-      <section className="page-container py-10 sm:py-14">
+      <section className="page-container py-8 sm:py-12">
+        <div
+          className="mb-6 flex flex-wrap items-center gap-2 border-b border-line pb-5"
+          aria-label="Browse by industry"
+        >
+          <span className="mr-2 text-sm font-semibold text-ink">
+            Browse by industry
+          </span>
+          {["Technology", "Food", "Retail", "Services", "Manufacturing"].map(
+            (industry) => (
+              <button
+                key={industry}
+                aria-pressed={filters.industry === industry}
+                className={`min-h-10 rounded-full border px-3 text-sm transition-colors ${filters.industry === industry ? "border-emerald-900 bg-emerald-900 text-white" : "border-line bg-white text-ink-soft hover:border-emerald-700 hover:text-emerald-900"}`}
+                onClick={() =>
+                  updateFilters({
+                    industry:
+                      filters.industry === industry ? undefined : industry,
+                  })
+                }
+                type="button"
+              >
+                {industry}
+              </button>
+            ),
+          )}
+        </div>
         <div className="flex flex-col justify-between gap-5 border-b border-line pb-6 sm:flex-row sm:items-end">
           <div>
-            <p className="eyebrow text-emerald-800">The marketplace</p>
-            <h2 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-navy-950 sm:text-4xl">
+            <h2 className="font-display text-4xl leading-[1.08] tracking-[-0.025em] text-navy-950 sm:text-5xl">
               {filters.q
                 ? `Results for “${filters.q}”`
                 : filters.availability === "sold"
@@ -426,20 +440,27 @@ function MarketplaceContent() {
           <div className="flex flex-wrap gap-3">
             <label className="flex flex-col gap-1 text-xs font-medium text-ink-soft">
               Availability
-              <select
-                className="h-11 rounded-lg border border-line bg-white px-3 text-sm font-semibold text-navy-950 focus-visible:outline-2 focus-visible:outline-emerald-700"
-                value={filters.availability ?? "available"}
-                onChange={(event) =>
-                  updateFilters({
-                    availability: event.target
-                      .value as MarketplaceFilters["availability"],
-                  })
-                }
-              >
-                <option value="available">Available Businesses</option>
-                <option value="sold">Sold Businesses</option>
-                <option value="all">All Businesses</option>
-              </select>
+              <span className="relative">
+                <select
+                  className="h-11 appearance-none rounded-lg border border-line bg-white py-2 pl-3.5 pr-9 text-sm font-semibold text-navy-950 focus-visible:outline-2 focus-visible:outline-emerald-700"
+                  value={filters.availability ?? "available"}
+                  onChange={(event) =>
+                    updateFilters({
+                      availability: event.target
+                        .value as MarketplaceFilters["availability"],
+                    })
+                  }
+                >
+                  <option value="available">Available Businesses</option>
+                  <option value="sold">Sold Businesses</option>
+                  <option value="all">All Businesses</option>
+                </select>
+                <ChevronDown
+                  aria-hidden="true"
+                  className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink-soft"
+                  size={15}
+                />
+              </span>
             </label>
             <label
               className="flex flex-col gap-1 text-xs font-medium text-ink-soft"
@@ -459,8 +480,8 @@ function MarketplaceContent() {
                 >
                   <option value="newest">Newest first</option>
                   <option value="oldest">Oldest first</option>
-                  <option value="price_asc">Price: low to high</option>
-                  <option value="price_desc">Price: high to low</option>
+                  <option value="price_asc">Asking price: low to high</option>
+                  <option value="price_desc">Asking price: high to low</option>
                 </select>
                 <ChevronDown
                   aria-hidden="true"
@@ -525,10 +546,10 @@ function MarketplaceContent() {
             </h3>
             <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-soft">
               {activeCriteria
-                ? "Try a broader business, industry or location search to discover more published listings."
+                ? "Clear a filter or search for a different business, industry, or location."
                 : filters.availability === "sold"
                   ? "Completed acquisitions will appear here."
-                  : "Check back soon for new opportunities."}
+                  : "Check back for new listings or view all businesses."}
             </p>
             {activeCriteria ? (
               <Button
@@ -538,6 +559,22 @@ function MarketplaceContent() {
                 variant="outline"
               >
                 Clear search
+              </Button>
+            ) : filters.availability === "sold" ? (
+              <Button
+                className="mt-5"
+                onClick={() => updateFilters({ availability: "available" })}
+                variant="outline"
+              >
+                Browse available businesses
+              </Button>
+            ) : filters.availability !== "all" ? (
+              <Button
+                className="mt-5"
+                onClick={() => updateFilters({ availability: "all" })}
+                variant="outline"
+              >
+                Browse all businesses
               </Button>
             ) : null}
           </Card>
@@ -577,9 +614,4 @@ function MarketplaceContent() {
       </section>
     </>
   );
-}
-
-export function MarketplacePage() {
-  const [searchParams] = useSearchParams();
-  return <MarketplaceContent key={searchParams.toString()} />;
 }

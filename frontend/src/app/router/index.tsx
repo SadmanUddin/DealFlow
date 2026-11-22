@@ -3,15 +3,27 @@ import { createBrowserRouter, RouterProvider } from "react-router";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { MarketingLayout } from "@/components/shared/MarketingLayout";
 import { NotFoundPage } from "@/features/landing/NotFoundPage";
-import { LandingPage } from "@/features/landing/LandingPage";
-import { AudienceLandingPage } from "@/features/landing/AudienceLandingPage";
 import { RouteErrorPage } from "@/features/landing/RouteErrorPage";
 import {
   RequireAuth,
   RequireGuest,
   UnauthorizedPage,
 } from "@/features/auth/RouteGuards";
-import { WorkspaceLayout } from "@/components/shared/workspace/WorkspaceLayout";
+const WorkspaceLayout = lazy(() =>
+  import("@/components/shared/workspace/WorkspaceLayout").then((module) => ({
+    default: module.WorkspaceLayout,
+  })),
+);
+const LandingPage = lazy(() =>
+  import("@/features/landing/LandingPage").then((module) => ({
+    default: module.LandingPage,
+  })),
+);
+const AudienceLandingPage = lazy(() =>
+  import("@/features/landing/AudienceLandingPage").then((module) => ({
+    default: module.AudienceLandingPage,
+  })),
+);
 
 const AccountPage = lazy(() =>
   import("@/features/account/AccountPage").then((module) => ({
@@ -183,7 +195,7 @@ const router = createBrowserRouter([
     element: <MarketingLayout />,
     errorElement: <RouteErrorPage />,
     children: [
-      { index: true, element: <LandingPage /> },
+      { index: true, element: lazyPage(<LandingPage />) },
       { path: "marketplace", element: lazyPage(<MarketplacePage />) },
       { path: "listings/:id", element: lazyPage(<ListingDetailsPage />) },
       {
@@ -197,11 +209,11 @@ const router = createBrowserRouter([
       { path: "unauthorized", element: <UnauthorizedPage /> },
       {
         path: "buyers",
-        element: <AudienceLandingPage audience="buyers" />,
+        element: lazyPage(<AudienceLandingPage audience="buyers" />),
       },
       {
         path: "sellers",
-        element: <AudienceLandingPage audience="sellers" />,
+        element: lazyPage(<AudienceLandingPage audience="sellers" />),
       },
       { path: "*", element: <NotFoundPage /> },
     ],

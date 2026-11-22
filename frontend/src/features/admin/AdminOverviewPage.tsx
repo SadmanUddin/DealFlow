@@ -114,7 +114,8 @@ export function AdminOverviewPage() {
   return (
     <>
       <WorkspacePageHeader
-        description="A current operational snapshot for account health, listing review and reported issues."
+        featured
+        description="Review accounts, listing decisions, and unresolved reports."
         eyebrow="Platform operations"
         title="Operations overview"
         action={
@@ -323,10 +324,8 @@ export function AdminOverviewPage() {
               )}
             </SectionCard>
           </div>
-          <p className="text-xs leading-5 text-ink-soft">
-            Deal and offer totals, registration trends, and historical activity
-            analytics are not exposed by the current admin API. No time-series
-            data is inferred from these totals.
+          <p className="text-sm text-ink-soft">
+            Registration trends are unavailable in this snapshot.
           </p>
         </div>
       ) : null}

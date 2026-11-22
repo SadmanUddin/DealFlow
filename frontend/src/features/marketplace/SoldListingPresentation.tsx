@@ -1,10 +1,4 @@
-import {
-  ArrowLeft,
-  ArrowUpRight,
-  BadgeCheck,
-  Building2,
-  MapPin,
-} from "lucide-react";
+import { ArrowLeft, ArrowUpRight, BadgeCheck, MapPin } from "lucide-react";
 import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
 import type { PublicListing } from "./marketplace-api";
@@ -13,7 +7,7 @@ import {
   formatSaleMoney,
   formatSoldDate,
 } from "./marketplace-format";
-import { listingImageSrc } from "./listing-image-url";
+import { ListingMedia } from "./ListingMedia";
 
 export function SoldBadge() {
   return (
@@ -27,7 +21,7 @@ export function PublicSalePrice({ listing }: { listing: PublicListing }) {
   return listing.publicSalePrice != null && listing.publicSaleCurrency ? (
     <>
       <p className="text-xs font-semibold text-emerald-900">Final sale price</p>
-      <p className="mt-1 break-words text-lg font-semibold tracking-tight text-navy-950 tabular-nums">
+      <p className="mt-1 break-words text-xl font-semibold tracking-tight text-navy-950 tabular-nums">
         {formatSaleMoney(listing.publicSalePrice, listing.publicSaleCurrency)}
       </p>
     </>
@@ -57,17 +51,14 @@ export function SoldListingDetail({
       </Link>
       <article className="mt-6 overflow-hidden rounded-2xl border border-line bg-white shadow-card">
         <div className="grid lg:grid-cols-[1.05fr_1fr]">
-          <div className="relative grid min-h-56 place-items-center bg-emerald-50 text-emerald-800 sm:min-h-80">
-            {imageUrl ? (
-              <img
-                className="absolute inset-0 size-full object-cover"
-                src={listingImageSrc(imageUrl)}
-                alt={`Seller-provided image for ${listing.title}`}
-                onError={onImageError}
-              />
-            ) : (
-              <Building2 size={44} strokeWidth={1.5} aria-hidden="true" />
-            )}
+          <div className="relative min-h-56 overflow-hidden bg-emerald-50 sm:min-h-80">
+            <ListingMedia
+              industry={listing.industry}
+              title={listing.title}
+              imageUrl={imageUrl}
+              onImageError={onImageError}
+              eager
+            />
             <div className="absolute left-5 top-5">
               <SoldBadge />
             </div>
@@ -76,7 +67,7 @@ export function SoldListingDetail({
             <p className="text-sm font-semibold text-emerald-900">
               This Business Has Been Sold
             </p>
-            <h1 className="mt-2 break-words text-3xl font-semibold tracking-tight text-navy-950 sm:text-5xl">
+            <h1 className="mt-3 break-words font-display text-4xl leading-[1.02] tracking-[-0.025em] text-navy-950 sm:text-6xl">
               {listing.title}
             </h1>
             <p className="mt-4 flex flex-wrap items-center gap-2 text-sm text-ink-soft">
@@ -87,7 +78,7 @@ export function SoldListingDetail({
                 </span>
               )}
             </p>
-            <div className="mt-6 rounded-xl border border-emerald-100 bg-emerald-50/70 p-4 sm:p-5">
+            <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 sm:p-5">
               <PublicSalePrice listing={listing} />
               {listing.soldAt && (
                 <p className="mt-2 text-sm text-emerald-950">
@@ -123,7 +114,7 @@ export function SoldListingDetail({
           className="border-t border-line p-6 sm:p-10"
           aria-labelledby="sold-about"
         >
-          <h2 id="sold-about" className="text-xl font-semibold text-navy-950">
+          <h2 id="sold-about" className="font-display text-3xl text-navy-950">
             About the business
           </h2>
           <p className="mt-3 max-w-3xl whitespace-pre-line break-words text-sm leading-7 text-ink-soft">

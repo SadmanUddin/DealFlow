@@ -140,10 +140,7 @@ function renderSellerListingLifecycle(path: string) {
       <AuthContext.Provider value={auth}>
         <MemoryRouter initialEntries={[path]}>
           <Routes>
-            <Route
-              path="/seller/listings"
-              element={<SellerListingsPage />}
-            />
+            <Route path="/seller/listings" element={<SellerListingsPage />} />
             <Route
               path="/seller/listings/:id/edit"
               element={<SellerListingFormPage />}
@@ -421,6 +418,9 @@ describe("seller workspace", () => {
       await screen.findByRole("heading", { name: "Seller overview" }),
     ).toBeInTheDocument();
     expect(await screen.findByText("Pending offers")).toBeInTheDocument();
-    expect(screen.getByText("Recent active deals")).toBeInTheDocument();
+    expect(screen.getByText("Active deals")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /pending offers/i }),
+    ).toHaveAttribute("href", "/seller/deals");
   });
 });

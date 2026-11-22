@@ -5,7 +5,10 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { formatListingMoney } from "@/features/marketplace/marketplace-format";
+import {
+  formatListingMoney,
+  formatSaleMoney,
+} from "@/features/marketplace/marketplace-format";
 import { toApiError } from "@/lib/api-error";
 
 const currencyCodes = new Set(
@@ -111,11 +114,11 @@ export function OfferComposer({
   return (
     <>
       <form className="space-y-4" noValidate onSubmit={submit}>
-        <div className="rounded-lg bg-[#F7F9F7] px-3.5 py-3">
-          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.1em] text-ink-faint">
+        <div className="rounded-2xl border border-line bg-paper px-4 py-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
             Current asking price
           </p>
-          <p className="mt-1 text-sm font-semibold text-navy-950">
+          <p className="mt-1 text-xl font-semibold tabular-nums tracking-tight text-navy-950">
             {formatListingMoney(askingPrice, listingCurrency)}
           </p>
         </div>
@@ -133,7 +136,7 @@ export function OfferComposer({
               }
               aria-invalid={Boolean(form.formState.errors.amount)}
               autoComplete="off"
-              className="h-11 w-full rounded-lg border border-line px-3 text-sm outline-none transition focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/10"
+              className="h-12 w-full rounded-xl border border-line bg-white px-3 text-base sm:text-sm outline-none transition focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/10"
               id="offer-amount"
               inputMode="decimal"
               onChange={(event) =>
@@ -164,7 +167,7 @@ export function OfferComposer({
                   : "offer-currency-help"
               }
               aria-invalid={Boolean(form.formState.errors.currency)}
-              className="h-11 w-full rounded-lg border border-line px-3 text-sm uppercase outline-none transition focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/10"
+              className="h-12 w-full rounded-xl border border-line bg-white px-3 text-base sm:text-sm uppercase outline-none transition focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/10"
               id="offer-currency"
               maxLength={3}
               onChange={(event) =>
@@ -263,11 +266,11 @@ export function OfferComposer({
           onConfirm={() => void submitValues(confirmation)}
           title={parentOfferId ? "Confirm counteroffer" : "Confirm offer"}
         >
-          <dl className="grid gap-3 rounded-lg bg-mist p-4 text-sm">
+          <dl className="grid gap-3 rounded-xl bg-paper p-4 text-sm">
             <div>
               <dt className="text-xs text-ink-soft">Amount</dt>
               <dd className="mt-1 font-semibold text-navy-950">
-                {formatListingMoney(confirmation.amount, confirmation.currency)}
+                {formatSaleMoney(confirmation.amount, confirmation.currency)}
               </dd>
             </div>
             {confirmation.message?.trim() ? (

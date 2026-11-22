@@ -24,7 +24,10 @@ import {
   WorkspaceSkeleton,
 } from "@/components/shared/workspace/WorkspaceUI";
 import { getPublishedListing } from "@/features/marketplace/marketplace-api";
-import { formatListingMoney } from "@/features/marketplace/marketplace-format";
+import {
+  formatListingMoney,
+  formatSaleMoney,
+} from "@/features/marketplace/marketplace-format";
 import { listMyListings } from "@/features/seller/api";
 import { useAuth } from "@/features/auth/useAuth";
 import { toApiError } from "@/lib/api-error";
@@ -250,7 +253,7 @@ export function DealDetailPage() {
   return (
     <>
       <WorkspacePageHeader
-        description="A participant-only workspace for acquisition terms, negotiation, milestones, and private deal files."
+        description="Review offers, share documents, and track the acquisition with the other participant."
         eyebrow={`${isBuyer ? "Buyer" : "Seller"} workspace`}
         title={listing?.title ?? "Business deal"}
         action={
@@ -298,7 +301,7 @@ export function DealDetailPage() {
             }
             detail={
               listing
-                ? `${listing.currency} · public or seller listing data`
+                ? `${listing.currency} · Listed asking price`
                 : "Listing is no longer available to this workspace"
             }
             icon={<Building2 size={17} />}
@@ -307,10 +310,7 @@ export function DealDetailPage() {
             label="Accepted offer"
             value={
               acceptedOffer
-                ? formatListingMoney(
-                    acceptedOffer.amount,
-                    acceptedOffer.currency,
-                  )
+                ? formatSaleMoney(acceptedOffer.amount, acceptedOffer.currency)
                 : "No accepted offer"
             }
             detail={
@@ -326,7 +326,7 @@ export function DealDetailPage() {
             detail={
               deal.accepted_at
                 ? `Accepted ${dateLabel(deal.accepted_at)}`
-                : "No expiration date is provided by the backend"
+                : "Date this deal room was created"
             }
             icon={<CalendarClock size={17} />}
           />
@@ -334,9 +334,19 @@ export function DealDetailPage() {
 
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] items-start gap-5 xl:grid-cols-[minmax(0,1fr)_19rem]">
           <div className="min-w-0 space-y-5">
+            {(deal.status === "accepted" || deal.status === "completed") &&
+            user &&
+            [deal.buyer_id, deal.seller_id].includes(user.id) ? (
+              <AcquisitionClosingPanel
+                deal={deal}
+                userId={user.id}
+                acceptedOffer={acceptedOffer}
+              />
+            ) : null}
+
             <SectionCard>
               <SectionHeading
-                description="The backend shares participant IDs but does not expose names or contact details in the deal response."
+                description="People with access to this deal room."
                 title="Deal participants"
               />
               <div className="grid gap-3 sm:grid-cols-2">
@@ -381,20 +391,19 @@ export function DealDetailPage() {
                 />
               ) : listingError ? (
                 <p className="mt-4 text-xs text-ink-soft">
-                  Business details could not be loaded; deal records remain
-                  available.
+                  Business details could not be loaded. You can still review the
+                  deal.
                 </p>
               ) : (
                 <p className="mt-4 text-xs text-ink-soft">
-                  The listing is not currently available in your public or
-                  seller listing results.
+                  The original listing is unavailable.
                 </p>
               )}
             </SectionCard>
 
             <SectionCard>
               <SectionHeading
-                description="Each amount keeps the currency stated in its offer. The timeline reflects immutable backend offer records."
+                description="Review each proposal in the currency it was originally made in."
                 title="Offer and counteroffer history"
               />
               {offersQuery.isPending ? (
@@ -565,19 +574,9 @@ export function DealDetailPage() {
               </SectionCard>
             ) : null}
 
-            {(deal.status === "accepted" || deal.status === "completed") &&
-            user &&
-            [deal.buyer_id, deal.seller_id].includes(user.id) ? (
-              <AcquisitionClosingPanel
-                deal={deal}
-                userId={user.id}
-                acceptedOffer={acceptedOffer}
-              />
-            ) : null}
-
             <SectionCard>
               <SectionHeading
-                description="Backend events only; actor IDs are shown without exposing account contact details."
+                description="See when offers, documents, and deal updates were recorded."
                 title="Deal activity"
               />
               {activityQuery.isPending ? (
@@ -604,7 +603,7 @@ export function DealDetailPage() {
                 ) : (
                   <WorkspaceEmpty
                     title="No activity recorded"
-                    description="Deal creation, offer, status, and document events appear here after the backend records them."
+                    description="Offers, status changes, and shared documents will appear here."
                   />
                 )
               ) : null}
@@ -630,7 +629,7 @@ export function DealDetailPage() {
           <aside className="min-w-0 space-y-5">
             <SectionCard>
               <SectionHeading
-                description="These transitions mirror the backend lifecycle. The server validates every request."
+                description="Follow the acquisition from the first proposal through completion."
                 title="Deal progression"
               />
               <ol className="space-y-2" aria-label="Deal lifecycle statuses">
@@ -640,9 +639,13 @@ export function DealDetailPage() {
                   "due_diligence",
                   "accepted",
                   "completed",
+                  ...(deal.status === "cancelled" || deal.status === "rejected"
+                    ? [deal.status]
+                    : []),
                 ].map((status) => (
                   <li
-                    className={`flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-xs ${status === deal.status ? "bg-emerald-50 font-semibold text-emerald-950" : "text-ink-soft"}`}
+                    aria-current={status === deal.status ? "step" : undefined}
+                    className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-sm ${status === deal.status ? "bg-emerald-50 font-semibold text-emerald-950" : "text-ink-soft"}`}
                     key={status}
                   >
                     <span className="capitalize">
@@ -656,10 +659,6 @@ export function DealDetailPage() {
                   </li>
                 ))}
               </ol>
-              <p className="mt-3 text-[0.68rem] leading-5 text-ink-faint">
-                Cancelled and rejected are terminal outcomes. Neither is omitted
-                from the status badge or history.
-              </p>
               {nextStatuses.length ? (
                 <div className="mt-4 border-t border-line pt-4">
                   <p className="text-xs font-semibold text-navy-950">
@@ -682,7 +681,8 @@ export function DealDetailPage() {
                 </div>
               ) : (
                 <p className="mt-4 rounded-lg bg-mist px-3 py-2 text-xs text-ink-soft">
-                  This deal is closed. No further state changes are available.
+                  This deal is closed. Its history and documents remain
+                  available here.
                 </p>
               )}
             </SectionCard>
@@ -738,7 +738,7 @@ export function DealDetailPage() {
           }
         >
           <p className="rounded-lg bg-mist px-3 py-2 text-sm font-semibold text-navy-950">
-            {formatListingMoney(
+            {formatSaleMoney(
               offerConfirmation.offer.amount,
               offerConfirmation.offer.currency,
             )}
@@ -775,15 +775,19 @@ function Summary({
   icon: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-line bg-white p-4">
+    <div className="min-w-0 rounded-2xl border border-line bg-white p-4 sm:p-5">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-ink-faint">
+        <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
           {label}
         </p>
-        <span className="text-emerald-800">{icon}</span>
+        <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-900">
+          {icon}
+        </span>
       </div>
-      <div className="mt-3 text-base font-semibold text-navy-950">{value}</div>
-      <p className="mt-1.5 text-[0.68rem] leading-5 text-ink-soft">{detail}</p>
+      <div className="mt-3 break-words text-base font-semibold tabular-nums text-navy-950 sm:text-lg">
+        {value}
+      </div>
+      <p className="mt-1.5 text-xs leading-5 text-ink-soft">{detail}</p>
     </div>
   );
 }
@@ -798,7 +802,7 @@ function Participant({
   isYou: boolean;
 }) {
   return (
-    <div className="rounded-lg border border-line px-4 py-3">
+    <div className="rounded-xl bg-paper px-4 py-3">
       <p className="text-xs font-semibold text-navy-950">
         {label}
         {isYou ? " · you" : ""}

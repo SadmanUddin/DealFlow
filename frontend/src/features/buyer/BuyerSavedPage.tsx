@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bookmark, Search, X } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/shared/ErrorState";
@@ -254,11 +254,6 @@ export function BuyerSavedPage() {
           )}
         </div>
       ) : null}
-      <p className="mt-5 flex items-start gap-2 text-xs leading-5 text-ink-faint">
-        <Bookmark aria-hidden="true" className="mt-0.5 shrink-0" size={14} />
-        The favorites endpoint returns published listings only. If a listing
-        becomes unavailable, the backend omits it from this list.
-      </p>
     </>
   );
 }

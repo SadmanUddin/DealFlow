@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ArrowUpRight, ChevronRight } from "lucide-react";
+import { ArrowUpRight, ChevronRight, Inbox } from "lucide-react";
 import { Link } from "react-router";
 import { Card } from "@/components/ui/card";
 
@@ -7,9 +7,10 @@ const statusStyles: Record<string, string> = {
   draft: "bg-slate-100 text-slate-700",
   pending: "bg-amber-50 text-amber-900 ring-1 ring-amber-700/10",
   in_review: "bg-amber-50 text-amber-900 ring-1 ring-amber-700/10",
-  proposed: "bg-sky-50 text-sky-900 ring-1 ring-sky-700/10",
-  negotiating: "bg-violet-50 text-violet-900 ring-1 ring-violet-700/10",
-  due_diligence: "bg-indigo-50 text-indigo-900 ring-1 ring-indigo-700/10",
+  proposed: "bg-slate-100 text-slate-700",
+  negotiating: "bg-blue-50 text-blue-950 ring-1 ring-blue-700/10",
+  due_diligence: "bg-blue-50 text-blue-950 ring-1 ring-blue-700/10",
+  active: "bg-emerald-50 text-emerald-900 ring-1 ring-emerald-700/10",
   accepted: "bg-emerald-50 text-emerald-900 ring-1 ring-emerald-700/10",
   published: "bg-emerald-50 text-emerald-900 ring-1 ring-emerald-700/10",
   sold: "bg-emerald-950 text-white",
@@ -27,7 +28,7 @@ const statusStyles: Record<string, string> = {
 export function StatusBadge({ status }: { status: string }) {
   return (
     <span
-      className={`inline-flex w-fit items-center rounded-full px-2.5 py-1 text-[0.68rem] font-semibold capitalize ${statusStyles[status] ?? "bg-slate-100 text-slate-700"}`}
+      className={`inline-flex w-fit items-center rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${statusStyles[status] ?? "bg-slate-100 text-slate-700"}`}
     >
       {status === "sold" ? "SOLD" : status.replaceAll("_", " ")}
     </span>
@@ -39,26 +40,36 @@ export function WorkspacePageHeader({
   title,
   description,
   action,
+  featured = false,
 }: {
   eyebrow: string;
   title: string;
   description?: string;
   action?: ReactNode;
+  featured?: boolean;
 }) {
   return (
-    <header className="mb-7 flex flex-col justify-between gap-4 border-b border-line pb-6 sm:flex-row sm:items-end">
+    <header
+      className={`mb-7 flex min-w-0 flex-wrap items-end justify-between gap-5 rounded-2xl border p-5 sm:p-8 ${featured ? "border-navy-950 bg-navy-950 text-white" : "border-line bg-white text-navy-950"}`}
+    >
       <div className="min-w-0">
-        <p className="eyebrow text-emerald-800">{eyebrow}</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-[-0.045em] text-navy-950 sm:text-[2.15rem]">
+        <p
+          className={`mb-2 text-xs font-semibold tracking-[0.12em] uppercase ${featured ? "text-emerald-200" : "text-emerald-900"}`}
+        >
+          {eyebrow}
+        </p>
+        <h1 className="break-words text-3xl leading-tight font-semibold tracking-tight sm:text-4xl">
           {title}
         </h1>
         {description ? (
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">
+          <p
+            className={`mt-2 max-w-2xl text-sm leading-6 sm:text-base ${featured ? "text-slate-200" : "text-ink-soft"}`}
+          >
             {description}
           </p>
         ) : null}
       </div>
-      {action ? <div className="shrink-0">{action}</div> : null}
+      {action ? <div className="max-w-full">{action}</div> : null}
     </header>
   );
 }
@@ -78,15 +89,19 @@ export function MetricCard({
 }) {
   const content = (
     <Card
-      className={`h-full p-5 shadow-none transition ${href ? "hover:border-emerald-800/25 hover:shadow-soft" : ""}`}
+      className={`h-full min-w-0 p-4 shadow-none transition sm:p-5 ${href ? "hover:border-emerald-800/25 hover:shadow-soft" : ""}`}
     >
       <div className="flex items-start justify-between gap-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.1em] text-ink-faint">
+        <p className="text-sm leading-snug font-semibold text-ink-soft">
           {label}
         </p>
-        {icon ? <span className="text-emerald-800">{icon}</span> : null}
+        {icon ? (
+          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-900">
+            {icon}
+          </span>
+        ) : null}
       </div>
-      <p className="mt-4 text-3xl font-semibold tracking-[-0.045em] text-navy-950">
+      <p className="mt-3 break-words text-3xl leading-none font-semibold tracking-tight text-navy-950 tabular-nums">
         {value}
       </p>
       {detail ? (
@@ -117,13 +132,13 @@ export function SectionHeading({
   action?: ReactNode;
 }) {
   return (
-    <div className="mb-4 flex items-end justify-between gap-4">
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
       <div>
         <h2 className="text-lg font-semibold tracking-tight text-navy-950">
           {title}
         </h2>
         {description ? (
-          <p className="mt-1 text-xs leading-5 text-ink-soft">{description}</p>
+          <p className="mt-1 text-sm leading-6 text-ink-soft">{description}</p>
         ) : null}
       </div>
       {action}
@@ -134,12 +149,16 @@ export function SectionHeading({
 export function SectionCard({
   children,
   className = "",
+  id,
 }: {
   children: ReactNode;
   className?: string;
+  id?: string;
 }) {
   return (
-    <Card className={`p-5 shadow-none sm:p-6 ${className}`}>{children}</Card>
+    <Card id={id} className={`p-5 shadow-none sm:p-6 ${className}`}>
+      {children}
+    </Card>
   );
 }
 
@@ -153,9 +172,12 @@ export function WorkspaceEmpty({
   action?: ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-dashed border-line bg-[#FBFCFB] px-5 py-10 text-center">
-      <h3 className="text-sm font-semibold text-navy-950">{title}</h3>
-      <p className="mx-auto mt-1.5 max-w-md text-xs leading-5 text-ink-soft">
+    <div className="rounded-xl border border-dashed border-line bg-paper px-4 py-9 text-center">
+      <span className="mx-auto mb-3 grid size-10 place-items-center rounded-lg bg-white text-emerald-900">
+        <Inbox size={20} aria-hidden="true" />
+      </span>
+      <h3 className="text-base font-semibold text-navy-950">{title}</h3>
+      <p className="mx-auto mt-1.5 max-w-md text-sm leading-6 text-ink-soft">
         {description}
       </p>
       {action ? <div className="mt-4">{action}</div> : null}

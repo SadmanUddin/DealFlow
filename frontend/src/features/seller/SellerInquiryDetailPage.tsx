@@ -161,7 +161,7 @@ export function SellerInquiryDetailPage() {
   if (!inquiry)
     return (
       <ErrorState
-        description="Only conversations returned for your seller account are available here."
+        description="This inquiry may be unavailable or belong to another seller."
         title="Inquiry not found"
       />
     );
@@ -198,7 +198,7 @@ export function SellerInquiryDetailPage() {
         <div className="space-y-5">
           <SectionCard>
             <SectionHeading
-              description="Messages are shown in chronological order. The API exposes participant IDs rather than buyer names."
+              description="Messages with the buyer about this listing."
               title="Conversation"
             />
             {messagesQuery.isPending ? (
@@ -286,7 +286,7 @@ export function SellerInquiryDetailPage() {
           </SectionCard>
           <SectionCard>
             <SectionHeading
-              description="Files remain private and are downloaded through authenticated DealFlow routes."
+              description="Only participants in this conversation can access these files."
               title="Shared documents"
             />
             {documentsQuery.isPending ? (
@@ -367,14 +367,13 @@ export function SellerInquiryDetailPage() {
               />
             </label>
             <p className="mt-2 text-xs text-ink-faint">
-              Accepted by the server: PDF, DOCX, XLSX, and CSV. Size is
-              validated by the backend.
+              Accepted file types include PDF, DOCX, XLSX, and CSV.
             </p>
           </SectionCard>
         </div>
         <SectionCard>
           <SectionHeading
-            description="Only status changes permitted by the conversation workflow are offered."
+            description="Update the status as you review and respond to the inquiry."
             title="Inquiry status"
           />
           <div className="mt-4 flex items-center gap-2">

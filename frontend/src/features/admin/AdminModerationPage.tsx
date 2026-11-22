@@ -134,7 +134,7 @@ export function AdminModerationPage() {
       />
       <SectionCard className="mb-5">
         <form
-          className="grid gap-3 sm:grid-cols-[minmax(14rem,1fr)_12rem_auto]"
+          className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_12rem_auto]"
           onSubmit={(event) => {
             event.preventDefault();
             updateFilters({ q: input.trim() });
@@ -232,7 +232,7 @@ export function AdminModerationPage() {
                       value={listing.location ?? "Not specified"}
                     />
                   </div>
-                  <p className="mt-4 whitespace-pre-line text-sm leading-6 text-ink-soft">
+                  <p className="mt-4 break-words whitespace-pre-line rounded-xl border border-line bg-paper p-4 text-sm leading-6 text-ink-soft">
                     {listing.description}
                   </p>
                   {listing.moderationReason ? (
@@ -339,7 +339,7 @@ export function AdminModerationPage() {
             </SectionCard>
           )}
           {query.data.pagination.totalPages > 1 ? (
-            <div className="flex justify-between">
+            <div className="flex flex-wrap justify-between gap-3">
               <Button
                 disabled={page <= 1 || query.isFetching}
                 onClick={() => updateFilters({ page: page - 1 })}

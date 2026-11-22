@@ -123,7 +123,7 @@ export function SellerAnalyticsPage() {
   return (
     <>
       <WorkspacePageHeader
-        description="A current snapshot of listing status, buyer inquiries and proposal progress. No view or impression analytics are tracked by the current backend."
+        description="Review the current status of your listings, inquiries, and offers."
         eyebrow="Seller workspace · Insights"
         title="Seller analytics"
       />
@@ -146,10 +146,8 @@ export function SellerAnalyticsPage() {
       {!pending && !failed ? (
         <div className="space-y-5">
           <p className="rounded-xl border border-line bg-white px-4 py-3 text-xs leading-5 text-ink-soft">
-            These charts are current distributions computed from up to 100
-            newest listings, 100 newest inquiries, and offers for the 20 newest
-            deals. They are not historical trends. Missing records are not
-            treated as zero outside these returned pages.
+            Charts cover your latest 100 listings, 100 inquiries, and offers
+            across the latest 20 deals.
           </p>
           <div className="grid gap-5 xl:grid-cols-2">
             <Distribution
@@ -222,17 +220,6 @@ export function SellerAnalyticsPage() {
               )}
             </SectionCard>
           </div>
-          <SectionCard>
-            <SectionHeading
-              description="The current backend does not record listing impressions, views, or favorites received."
-              title="Metrics not currently available"
-            />
-            <p className="mt-3 text-sm leading-6 text-ink-soft">
-              No view counts, traffic trends, favorites received, or time-based
-              performance are shown. The API exposes inquiries and offers, which
-              are reported separately above.
-            </p>
-          </SectionCard>
         </div>
       ) : null}
     </>
@@ -285,7 +272,7 @@ function Distribution({
         </div>
       ) : (
         <WorkspaceEmpty
-          description="There are no returned records for this distribution yet."
+          description="This chart will appear once there is activity to show."
           title="No data available"
         />
       )}

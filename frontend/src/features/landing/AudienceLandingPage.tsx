@@ -1,104 +1,145 @@
-import { ArrowRight, CheckCircle2, ShieldCheck } from 'lucide-react';
-import { Link } from 'react-router';
-import { Button } from '@/components/ui/button';
-
-type AudienceLandingPageProps = {
-  audience: 'buyers' | 'sellers';
-};
+import {
+  ChartNoAxesColumn,
+  CircleCheck,
+  Files,
+  MessagesSquare,
+  Search,
+  Store,
+} from "lucide-react";
+import { Link } from "react-router";
+import { Button } from "@/components/ui/button";
 
 const content = {
   buyers: {
-    eyebrow: 'For buyers',
-    title: 'Find the right business. Keep the process moving.',
+    label: "For buyers",
+    title: "Find the right business to own.",
     description:
-      'Explore reviewed opportunities, contact owners directly, and keep offers and deal documents together as a conversation develops.',
-    primary: { label: 'Browse businesses', to: '/marketplace' },
-    secondary: { label: 'Create a buyer account', to: '/register?role=buyer' },
+      "Compare opportunities, ask owners the questions that matter, and keep the details of each negotiation in one place.",
+    photo: "buyers",
+    alt: "Two people reviewing notes and laptops over coffee",
+    primary: { label: "Browse businesses", to: "/marketplace" },
+    secondary: { label: "Create a buyer account", to: "/register?role=buyer" },
     steps: [
-      ['Explore opportunities', 'Search published listings by business, industry, location, and financial range.'],
-      ['Start a conversation', 'Ask the seller questions from the listing and continue in your inbox.'],
-      ['Negotiate with context', 'Submit offers and follow deal activity, status, and participant-only documents.'],
+      {
+        icon: Search,
+        title: "Build a shortlist",
+        text: "Filter by industry, location, asking price, revenue, or EBITDA. Save listings to revisit them later.",
+      },
+      {
+        icon: MessagesSquare,
+        title: "Speak with the owner",
+        text: "Start a private conversation from the listing and keep each discussion with the business it concerns.",
+      },
+      {
+        icon: Files,
+        title: "Keep a record of the deal",
+        text: "Submit offers and follow deal activity, from the first proposal through documents and closing confirmations.",
+      },
     ],
+    note: "Listing information comes from sellers. Ask for supporting records as part of your own due diligence.",
   },
   sellers: {
-    eyebrow: 'For sellers',
-    title: 'Present your business clearly and manage buyer interest in one place.',
+    label: "For sellers",
+    title: "Present your business and manage buyer interest.",
     description:
-      'Prepare a listing for review, respond to buyer inquiries, and keep negotiations and deal documents connected as you move forward.',
-    primary: { label: 'Create a seller account', to: '/register?role=seller' },
-    secondary: { label: 'See current listings', to: '/marketplace' },
+      "Give prospective buyers a clear picture of the business you’ve built. Keep inquiries, offers, and deal documents organized as you move toward a sale.",
+    photo: "sellers",
+    alt: "A barista behind the counter of a warmly lit coffee shop",
+    primary: { label: "Create a seller account", to: "/register?role=seller" },
+    secondary: { label: "See current listings", to: "/marketplace" },
     steps: [
-      ['Prepare your listing', 'Add your business profile and financial details, then submit it for moderation.'],
-      ['Manage buyer conversations', 'Review inquiries, reply to buyers, and keep each discussion linked to its listing.'],
-      ['Review offers and progress', 'Respond to offers and share eligible documents within the private deal workflow.'],
+      {
+        icon: Store,
+        title: "Prepare your listing",
+        text: "Tell buyers what the business does, add relevant financial details and a photo, then submit it for moderation.",
+      },
+      {
+        icon: MessagesSquare,
+        title: "Manage inquiries",
+        text: "See who has reached out, respond privately, and keep each conversation linked to its listing.",
+      },
+      {
+        icon: ChartNoAxesColumn,
+        title: "Negotiate and close",
+        text: "Review offers and counteroffers. After the acquisition closes, agree on the final amount and confirm it with the buyer.",
+      },
     ],
+    note: "The listing shows as sold once both parties confirm completion. The final price is public only if both parties agree to share it.",
   },
 } as const;
 
-export function AudienceLandingPage({ audience }: AudienceLandingPageProps) {
+export function AudienceLandingPage({
+  audience,
+}: {
+  audience: keyof typeof content;
+}) {
   const page = content[audience];
-
   return (
-    <main>
-      <section className="bg-navy-950 py-16 text-white sm:py-24">
-        <div className="page-container grid gap-12 lg:grid-cols-[1fr_0.8fr] lg:items-end">
-          <div className="max-w-3xl">
-            <p className="eyebrow text-emerald-500">{page.eyebrow}</p>
-            <h1 className="mt-4 text-balance text-4xl font-semibold leading-tight tracking-[-0.045em] sm:text-5xl">
+    <>
+      <section className="bg-forest text-white">
+        <div className="page-container grid gap-8 py-12 lg:grid-cols-[1fr_1.05fr] lg:items-center lg:py-16">
+          <div>
+            <p className="eyebrow text-champagne">{page.label}</p>
+            <h1 className="editorial-title mt-5 max-w-[14ch] text-[clamp(3rem,6vw,6rem)]">
               {page.title}
             </h1>
-            <p className="mt-6 max-w-2xl text-base leading-7 text-white/70 sm:text-lg sm:leading-8">
+            <p className="mt-5 max-w-[38ch] text-base leading-7 text-white/85 sm:text-lg">
               {page.description}
             </p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <div className="mt-7 flex flex-wrap gap-3">
+              <Button asChild className="bg-white text-forest hover:bg-mist">
+                <Link to={page.primary.to}>{page.primary.label}</Link>
+              </Button>
               <Button
                 asChild
-                className="bg-emerald-500 text-navy-950 hover:bg-emerald-400"
-                size="lg"
+                variant="outline"
+                className="border-white/40 bg-transparent text-white hover:bg-white/10"
               >
-                <Link to={page.primary.to}>
-                  {page.primary.label}
-                  <ArrowRight aria-hidden="true" size={16} />
-                </Link>
-              </Button>
-              <Button asChild size="lg" variant="outline" className="border-white/20 bg-white/[0.04] text-white hover:bg-white/10">
                 <Link to={page.secondary.to}>{page.secondary.label}</Link>
               </Button>
             </div>
           </div>
-          <aside className="rounded-2xl border border-white/12 bg-white/[0.05] p-6 sm:p-7">
-            <ShieldCheck aria-hidden="true" className="text-emerald-500" size={24} />
-            <h2 className="mt-4 text-lg font-semibold">A clear, accountable process</h2>
-            <p className="mt-2 text-sm leading-6 text-white/65">
-              DealFlow reviews listings before publication and limits deal conversations and documents to their participants.
-            </p>
-          </aside>
+          <img
+            className="aspect-[4/3] w-full rounded-2xl object-cover"
+            src={`/images/editorial/${page.photo}.webp`}
+            alt={page.alt}
+            width="1000"
+            height="666"
+            fetchPriority="high"
+          />
         </div>
       </section>
-
-      <section aria-label={`${audience} workflow`} className="section-space">
+      <section className="section-space" aria-labelledby="audience-workflow">
         <div className="page-container">
-          <p className="eyebrow text-emerald-800">How DealFlow works</p>
-          <h2 className="mt-3 max-w-2xl text-balance text-3xl font-semibold tracking-[-0.04em] text-navy-950 sm:text-4xl">
-            Every next step stays connected.
+          <h2
+            className="editorial-title text-4xl sm:text-6xl"
+            id="audience-workflow"
+          >
+            {audience === "buyers"
+              ? "Your path to an acquisition"
+              : "From listing to sale"}
           </h2>
-          <ol className="mt-9 grid gap-4 md:grid-cols-3">
-            {page.steps.map(([title, description], index) => (
-              <li className="rounded-2xl border border-line bg-white p-6 shadow-soft" key={title}>
-                <span className="grid size-9 place-items-center rounded-full bg-emerald-50 text-sm font-semibold text-emerald-800">
-                  {index + 1}
+          <ol className="mt-8 grid gap-px overflow-hidden rounded-2xl border border-line bg-line md:grid-cols-3">
+            {page.steps.map(({ icon: Icon, title, text }) => (
+              <li className="bg-white p-5 sm:p-7" key={title}>
+                <span className="grid size-10 place-items-center rounded-lg bg-mist text-forest">
+                  <Icon size={20} aria-hidden="true" />
                 </span>
-                <h3 className="mt-5 font-semibold text-navy-950">{title}</h3>
-                <p className="mt-2 text-sm leading-6 text-ink-soft">{description}</p>
+                <h3 className="mt-4 text-lg font-semibold">{title}</h3>
+                <p className="mt-2 text-sm leading-6 text-ink-soft">{text}</p>
               </li>
             ))}
           </ol>
-          <p className="mt-7 flex items-center gap-2 text-sm text-ink-soft">
-            <CheckCircle2 aria-hidden="true" className="text-emerald-700" size={16} />
-            Account access is protected by email verification and role-based permissions.
+          <p className="mt-6 flex gap-3 rounded-xl border border-line bg-mist p-4 text-sm leading-6 text-ink-soft">
+            <CircleCheck
+              className="mt-0.5 shrink-0 text-forest"
+              size={19}
+              aria-hidden="true"
+            />
+            {page.note}
           </p>
         </div>
       </section>
-    </main>
+    </>
   );
 }

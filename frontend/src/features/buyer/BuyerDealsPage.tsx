@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { Building2, ChevronLeft, ChevronRight } from "lucide-react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/shared/ErrorState";
 import {
@@ -34,9 +34,14 @@ export function BuyerDealsPage({
   audience?: "buyer" | "seller";
 }) {
   const [page, setPage] = useState(1);
-  const [view, setView] = useState<DealView>(
-    audience === "seller" ? "completed" : "open",
-  );
+  const [params, setParams] = useSearchParams();
+  const requestedView = params.get("view");
+  const view: DealView =
+    audience === "seller" || requestedView === "completed"
+      ? "completed"
+      : requestedView === "ended"
+        ? "ended"
+        : "open";
   const dealsQuery = useQuery({
     queryKey: ["deals", "mine", page, 10, view],
     queryFn: () => listDeals(page, 10, view),
@@ -78,7 +83,7 @@ export function BuyerDealsPage({
       />
       {audience === "buyer" ? (
         <div
-          className="mb-4 flex flex-wrap gap-2"
+          className="mb-4 flex flex-wrap gap-2 rounded-xl border border-line bg-white p-2"
           role="group"
           aria-label="Deal views"
         >
@@ -95,7 +100,7 @@ export function BuyerDealsPage({
               variant={view === value ? "accent" : "outline"}
               aria-pressed={view === value}
               onClick={() => {
-                setView(value);
+                setParams(value === "open" ? {} : { view: value });
                 setPage(1);
               }}
             >

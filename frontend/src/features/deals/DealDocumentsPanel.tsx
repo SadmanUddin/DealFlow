@@ -104,7 +104,7 @@ export function DealDocumentsPanel({ dealId }: { dealId: number }) {
   return (
     <SectionCard>
       <SectionHeading
-        description="Deal documents remain private and are downloaded through an authenticated participant endpoint."
+        description="Documents shared here are available to both deal participants."
         title="Deal room documents"
       />
       {notice ? (
@@ -135,14 +135,14 @@ export function DealDocumentsPanel({ dealId }: { dealId: number }) {
       {documentsQuery.data && documentsQuery.data.documents.length === 0 ? (
         <WorkspaceEmpty
           title="No deal room documents"
-          description="Documents explicitly linked by a participant will appear here. No storage URL is exposed."
+          description="Share a file from the deal conversation to make it available here."
         />
       ) : null}
       {documentsQuery.data?.documents.length ? (
-        <ul className="divide-y divide-line">
+        <ul className="space-y-2">
           {documentsQuery.data.documents.map((document) => (
             <li
-              className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
+              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-paper p-3"
               key={document.id}
             >
               <div className="flex min-w-0 items-center gap-3">
@@ -182,108 +182,105 @@ export function DealDocumentsPanel({ dealId }: { dealId: number }) {
       ) : null}
 
       <div className="mt-5 border-t border-line pt-4">
-          <h3 className="text-sm font-semibold text-navy-950">
-            Add a private document
-          </h3>
-          <p className="mt-1 max-w-2xl text-xs leading-5 text-ink-soft">
-            Upload permitted files to the existing private listing conversation,
-            then link them to this deal room. Both deal participants can access
-            documents linked here.
+        <h3 className="text-sm font-semibold text-navy-950">
+          Add a private document
+        </h3>
+        <p className="mt-1 max-w-2xl text-xs leading-5 text-ink-soft">
+          Upload permitted files to the existing private listing conversation,
+          then link them to this deal room. Both deal participants can access
+          documents linked here.
+        </p>
+        {conversationsQuery.isPending ? (
+          <div
+            aria-label="Loading private conversation"
+            className="mt-3 h-12 animate-pulse rounded-lg bg-mist"
+            role="status"
+          />
+        ) : null}
+        {conversationsQuery.isError ? (
+          <ErrorState
+            error={conversationsQuery.error}
+            description="Your private listing conversation could not be loaded."
+            onRetry={() => void conversationsQuery.refetch()}
+            title="Conversation unavailable"
+          />
+        ) : null}
+        {conversation && sourceDocumentsQuery.isPending ? (
+          <div
+            aria-label="Loading conversation documents"
+            className="mt-3 h-12 animate-pulse rounded-lg bg-mist"
+            role="status"
+          />
+        ) : null}
+        {conversation && sourceDocumentsQuery.isError ? (
+          <ErrorState
+            error={sourceDocumentsQuery.error}
+            description="Private source documents could not be loaded."
+            onRetry={() => void sourceDocumentsQuery.refetch()}
+            title="Source documents unavailable"
+          />
+        ) : null}
+        {!conversationsQuery.isPending &&
+        !conversationsQuery.isError &&
+        !conversation ? (
+          <p className="mt-3 rounded-lg bg-mist px-3 py-2 text-xs text-ink-soft">
+            Open the listing conversation above before adding documents to this
+            deal.
           </p>
-          {conversationsQuery.isPending ? (
-            <div
-              aria-label="Loading private conversation"
-              className="mt-3 h-12 animate-pulse rounded-lg bg-mist"
-              role="status"
-            />
-          ) : null}
-          {conversationsQuery.isError ? (
-            <ErrorState
-              error={conversationsQuery.error}
-              description="Your private listing conversation could not be loaded."
-              onRetry={() => void conversationsQuery.refetch()}
-              title="Conversation unavailable"
-            />
-          ) : null}
-          {conversation && sourceDocumentsQuery.isPending ? (
-            <div
-              aria-label="Loading conversation documents"
-              className="mt-3 h-12 animate-pulse rounded-lg bg-mist"
-              role="status"
-            />
-          ) : null}
-          {conversation && sourceDocumentsQuery.isError ? (
-            <ErrorState
-              error={sourceDocumentsQuery.error}
-              description="Private source documents could not be loaded."
-              onRetry={() => void sourceDocumentsQuery.refetch()}
-              title="Source documents unavailable"
-            />
-          ) : null}
-          {!conversationsQuery.isPending &&
-          !conversationsQuery.isError &&
-          !conversation ? (
-            <p className="mt-3 rounded-lg bg-mist px-3 py-2 text-xs text-ink-soft">
-              Open the listing conversation above before adding documents to this
-              deal.
-            </p>
-          ) : null}
-          {conversation && sourceDocumentsQuery.data ? (
-            <div className="mt-3 space-y-2">
-              {sourceDocumentsQuery.data.documents
-                .filter(
-                  (item) =>
-                    !documentsQuery.data?.documents.some(
-                      (linked) => linked.id === item.id,
-                    ),
-                )
-                .map((document) => (
-                  <div
-                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line px-3 py-2"
-                    key={document.id}
-                  >
-                    <span className="min-w-0">
-                      <span className="block truncate text-xs font-semibold text-navy-950">
-                        {document.originalFilename}
-                      </span>
-                      <span className="text-[0.68rem] text-ink-soft">
-                        {document.mimeType} · {formatBytes(document.sizeBytes)}
-                      </span>
+        ) : null}
+        {conversation && sourceDocumentsQuery.data ? (
+          <div className="mt-3 space-y-2">
+            {sourceDocumentsQuery.data.documents
+              .filter(
+                (item) =>
+                  !documentsQuery.data?.documents.some(
+                    (linked) => linked.id === item.id,
+                  ),
+              )
+              .map((document) => (
+                <div
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line px-3 py-2"
+                  key={document.id}
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate text-xs font-semibold text-navy-950">
+                      {document.originalFilename}
                     </span>
-                    <Button
-                      disabled={linkMutation.isPending || uploading}
-                      onClick={() => linkMutation.mutate(document.id)}
-                      size="sm"
-                      variant="outline"
-                    >
-                      <Link2 aria-hidden="true" size={14} />
-                      {linkMutation.isPending ? "Linking…" : "Link to deal"}
-                    </Button>
-                  </div>
-                ))}
-              <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-line px-3 py-2 text-xs font-semibold text-navy-950 transition hover:bg-mist focus-within:ring-4 focus-within:ring-emerald-500/15">
-                <Upload aria-hidden="true" size={14} /> Upload a private
-                document
-                <input
-                  accept=".pdf,.docx,.xlsx,.csv"
-                  aria-label="Upload private deal document"
-                  className="sr-only"
-                  disabled={linkMutation.isPending}
-                  onChange={(event) => {
-                    const file = event.currentTarget.files?.[0];
-                    if (file) void uploadAndLink(file);
-                    event.currentTarget.value = "";
-                  }}
-                  type="file"
-                />
-              </label>
-              <p className="text-[0.68rem] text-ink-faint">
-                Accepted file types are validated by the existing
-                private-document API. File size and access rules are enforced by
-                the server.
-              </p>
-            </div>
-          ) : null}
+                    <span className="text-[0.68rem] text-ink-soft">
+                      {document.mimeType} · {formatBytes(document.sizeBytes)}
+                    </span>
+                  </span>
+                  <Button
+                    disabled={linkMutation.isPending || uploading}
+                    onClick={() => linkMutation.mutate(document.id)}
+                    size="sm"
+                    variant="outline"
+                  >
+                    <Link2 aria-hidden="true" size={14} />
+                    {linkMutation.isPending ? "Linking…" : "Link to deal"}
+                  </Button>
+                </div>
+              ))}
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-line px-3 py-2 text-xs font-semibold text-navy-950 transition hover:bg-mist focus-within:ring-4 focus-within:ring-emerald-500/15">
+              <Upload aria-hidden="true" size={14} /> Upload a private document
+              <input
+                accept=".pdf,.docx,.xlsx,.csv"
+                aria-label="Upload private deal document"
+                className="sr-only"
+                disabled={linkMutation.isPending}
+                onChange={(event) => {
+                  const file = event.currentTarget.files?.[0];
+                  if (file) void uploadAndLink(file);
+                  event.currentTarget.value = "";
+                }}
+                type="file"
+              />
+            </label>
+            <p className="text-[0.68rem] text-ink-faint">
+              Choose a PDF, Word document, Excel workbook, or CSV file.
+            </p>
+          </div>
+        ) : null}
       </div>
     </SectionCard>
   );

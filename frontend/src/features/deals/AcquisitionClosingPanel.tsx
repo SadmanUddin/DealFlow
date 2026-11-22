@@ -1,11 +1,14 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { BadgeCheck, CircleAlert, Clock3, Handshake } from "lucide-react";
-import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import {
-  SectionCard,
-  SectionHeading,
-} from "@/components/shared/workspace/WorkspaceUI";
+  BadgeCheck,
+  CircleAlert,
+  Clock3,
+  Handshake,
+  LockKeyhole,
+} from "lucide-react";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { SectionCard } from "@/components/shared/workspace/WorkspaceUI";
 import { Button } from "@/components/ui/button";
 import {
   formatSaleMoney,
@@ -104,36 +107,47 @@ export function AcquisitionClosingPanel({
 
   return (
     <SectionCard className="border-emerald-200">
-      <SectionHeading
-        title={completed ? "Acquisition Completed" : "Complete Acquisition"}
-        description={
-          completed
-            ? deal.completed_at
-              ? "Both parties have confirmed the transaction. This business is now marked as sold in the marketplace."
-              : "This deal was marked completed before closing confirmations were recorded."
-            : "After completing the transaction outside DealFlow, agree on the final amount and confirm completion separately."
-        }
-      />
+      <header className="mb-6 flex items-start gap-4">
+        <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-emerald-900 text-white">
+          {completed ? (
+            <BadgeCheck size={21} aria-hidden="true" />
+          ) : (
+            <Handshake size={21} aria-hidden="true" />
+          )}
+        </span>
+        <div className="min-w-0">
+          <h2 className="font-display text-3xl leading-tight tracking-[-0.035em] text-navy-950">
+            {completed ? "Acquisition Completed" : "Complete Acquisition"}
+          </h2>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-ink-soft">
+            {completed
+              ? deal.completed_at
+                ? "Both parties confirmed completion. DealFlow now shows this business as sold."
+                : "This deal was completed before DealFlow recorded separate confirmations."
+              : "Once the transaction is complete outside DealFlow, agree on the final amount and confirm separately."}
+          </p>
+        </div>
+      </header>
       <dl className="grid gap-3 sm:grid-cols-2">
-        <div className="rounded-xl border border-line p-4">
+        <div className="min-w-0 rounded-2xl border border-line bg-paper p-4 sm:p-5">
           <dt className="text-xs font-medium text-ink-soft">Accepted offer</dt>
-          <dd className="mt-1 text-lg font-semibold text-navy-950">
+          <dd className="mt-1 break-words text-xl font-semibold tabular-nums tracking-tight text-navy-950 sm:text-2xl">
             {offer
               ? formatSaleMoney(offer.amount, offer.currency)
               : "Unavailable"}
           </dd>
         </div>
-        <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
-          <dt className="text-xs font-medium text-emerald-950">
+        <div className="min-w-0 rounded-2xl bg-emerald-900 p-4 text-white sm:p-5">
+          <dt className="text-sm font-medium text-white/90">
             {agreed ? "Final closing amount" : "Proposed closing amount"}
           </dt>
-          <dd className="mt-1 text-lg font-semibold text-emerald-950">
+          <dd className="mt-1 break-words text-xl font-semibold tabular-nums tracking-tight text-white sm:text-2xl">
             {finalPrice ?? "Awaiting proposal"}
           </dd>
         </div>
       </dl>
-      <div className="mt-4 rounded-xl border border-line p-4">
-        <div className="flex items-center justify-between gap-2">
+      <div className="mt-5 rounded-2xl border border-line p-4 sm:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm font-semibold text-navy-950">
             Closing progress
           </p>
@@ -142,12 +156,12 @@ export function AcquisitionClosingPanel({
           </span>
         </div>
         <progress
-          className="mt-2 h-2 w-full accent-emerald-800"
+          className="mt-3 h-2 w-full appearance-none overflow-hidden rounded-full bg-mist [&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-emerald-800 [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-bar]:bg-mist [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-emerald-800"
           aria-label="Closing confirmations"
           value={confirmations}
           max={2}
         />
-        <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+        <ul className="mt-4 grid gap-2 sm:grid-cols-2">
           {(
             [
               ["Buyer", deal.buyer_confirmed_at],
@@ -156,7 +170,7 @@ export function AcquisitionClosingPanel({
           ).map(([role, confirmed]) => (
             <li
               key={role}
-              className="flex items-center gap-2 text-xs text-ink-soft"
+              className="flex min-w-0 items-start gap-2 rounded-xl bg-paper p-3 text-sm text-ink-soft"
             >
               {confirmed ? (
                 <BadgeCheck
@@ -167,16 +181,26 @@ export function AcquisitionClosingPanel({
               ) : (
                 <Clock3 size={16} aria-hidden="true" />
               )}
-              {role} ·{" "}
-              {confirmed
-                ? `Confirmed ${formatSoldDate(confirmed)}`
-                : "Awaiting confirmation"}
+              <span className="min-w-0">
+                <span className="block font-semibold text-navy-950">
+                  {role}
+                </span>
+                <span className="mt-0.5 block text-xs">
+                  {confirmed
+                    ? `Confirmed ${formatSoldDate(confirmed)}`
+                    : "Awaiting confirmation"}
+                </span>
+              </span>
             </li>
           ))}
         </ul>
       </div>
       {completed && deal.completed_at ? (
-        <p className="mt-4 text-sm font-medium text-emerald-950" role="status">
+        <p
+          className="mt-4 flex flex-wrap items-center gap-2 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-950"
+          role="status"
+        >
+          <BadgeCheck aria-hidden="true" size={17} />
           Completed {formatSoldDate(deal.completed_at)} ·{" "}
           {deal.buyer_price_consent && deal.seller_price_consent
             ? "Sale price publicly visible"
@@ -212,16 +236,16 @@ export function AcquisitionClosingPanel({
         <div className="mt-5 space-y-4">
           {!agreed && (
             <form
-              className="flex flex-wrap items-end gap-2"
+              className="flex flex-wrap items-end gap-3 rounded-2xl border border-line bg-paper p-4"
               onSubmit={(event) => {
                 event.preventDefault();
                 mutation.mutate({ action: "propose", amount, revision });
               }}
             >
-              <label className="flex flex-col gap-1 text-sm font-medium text-navy-950">
+              <label className="flex min-w-0 flex-1 flex-col gap-2 text-sm font-medium text-navy-950">
                 Propose closing amount {offer ? `(${offer.currency})` : ""}
                 <input
-                  className="h-10 max-w-full rounded-lg border border-line px-3 focus-visible:outline-2 focus-visible:outline-emerald-800"
+                  className="h-11 min-w-0 max-w-full rounded-lg border border-line bg-white px-3 tabular-nums focus-visible:outline-2 focus-visible:outline-emerald-800"
                   value={amount}
                   onChange={(event) => setAmount(event.target.value)}
                   inputMode="decimal"
@@ -328,8 +352,13 @@ export function AcquisitionClosingPanel({
                 checked={consent}
                 onChange={(event) => setConsent(event.target.checked)}
               />
-              I consent to DealFlow publishing the final sale price if the other
-              participant also consents.
+              <span>
+                <span className="mb-1 flex items-center gap-1.5 font-semibold">
+                  <LockKeyhole aria-hidden="true" size={14} /> Public sale price
+                </span>
+                I consent to DealFlow publishing the final sale price if the
+                other participant also consents.
+              </span>
             </label>
           )}
         </ConfirmDialog>

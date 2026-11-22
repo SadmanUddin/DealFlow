@@ -33,7 +33,7 @@ export function SellerDocumentsPage() {
   return (
     <>
       <WorkspacePageHeader
-        description="DealFlow keeps conversation documents in private storage and serves them only through authenticated participant routes."
+        description="Open a buyer conversation to review and manage its private documents."
         eyebrow="Seller workspace · Private files"
         title="Documents"
       />
@@ -106,8 +106,7 @@ export function SellerDocumentsPage() {
           )}
           {query.data.pagination.total > conversations.length ? (
             <p className="text-xs text-ink-faint">
-              Showing the latest 100 conversations. The API does not provide a
-              separate document index.
+              Showing your latest 100 conversations.
             </p>
           ) : null}
         </div>

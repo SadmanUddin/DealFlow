@@ -1,5 +1,5 @@
 import { ArrowDownLeft, ArrowUpRight, Check, Clock3 } from "lucide-react";
-import { formatListingMoney } from "@/features/marketplace/marketplace-format";
+import { formatSaleMoney } from "@/features/marketplace/marketplace-format";
 import { StatusBadge } from "@/components/shared/workspace/WorkspaceUI";
 import type { Offer } from "./api";
 
@@ -66,7 +66,7 @@ export function OfferTimeline({
                   <ArrowDownLeft aria-hidden="true" size={14} />
                 )}
               </span>
-              <div className="min-w-0 flex-1 rounded-xl border border-line bg-white p-4">
+              <div className="min-w-0 flex-1 rounded-2xl border border-line bg-paper p-4 sm:p-5">
                 <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -84,8 +84,8 @@ export function OfferTimeline({
                       Submitted {formatDate(offer.created_at)}
                     </p>
                   </div>
-                  <p className="shrink-0 text-lg font-semibold tracking-tight text-navy-950">
-                    {formatListingMoney(offer.amount, offer.currency)}
+                  <p className="break-words text-xl font-semibold tabular-nums tracking-tight text-navy-950">
+                    {formatSaleMoney(offer.amount, offer.currency)}
                   </p>
                 </div>
                 {offer.parent_offer_id ? (
@@ -94,7 +94,7 @@ export function OfferTimeline({
                   </p>
                 ) : null}
                 {offer.message ? (
-                  <p className="mt-3 whitespace-pre-wrap border-l-2 border-emerald-300 pl-3 text-sm leading-6 text-ink-soft">
+                  <p className="mt-3 whitespace-pre-wrap break-words border-l-2 border-emerald-300 pl-3 text-sm leading-6 text-ink-soft">
                     {offer.message}
                   </p>
                 ) : null}

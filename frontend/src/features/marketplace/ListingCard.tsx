@@ -1,11 +1,11 @@
-import { ArrowUpRight, Building2, MapPin } from "lucide-react";
+import { MapPin } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
 import { Card } from "@/components/ui/card";
 import type { PublicListing } from "./marketplace-api";
 import { PublicSalePrice, SoldBadge } from "./SoldListingPresentation";
 import { formatListingMoney, formatSoldDate } from "./marketplace-format";
-import { listingImageSrc } from "./listing-image-url";
+import { ListingMedia } from "./ListingMedia";
 
 export function ListingCard({ listing }: { listing: PublicListing }) {
   const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
@@ -14,103 +14,69 @@ export function ListingCard({ listing }: { listing: PublicListing }) {
       ? listing.imageUrl
       : null;
   const sold = listing.status === "sold";
+  const financials = [
+    ["Asking price", listing.askingPrice],
+    ["Annual revenue", listing.annualRevenue],
+    ...(listing.ebitda != null ? [["EBITDA", listing.ebitda] as const] : []),
+  ] as const;
+
   return (
-    <Card className="group h-full overflow-hidden border-line/90 shadow-none transition duration-200 hover:-translate-y-0.5 hover:border-emerald-800/25 hover:shadow-card">
+    <Card className="group h-full overflow-hidden rounded-2xl border-line bg-white shadow-none transition-[border-color,box-shadow] duration-200 hover:border-emerald-800/50 hover:shadow-card">
       <Link
         aria-label={`View ${listing.title}`}
-        className="flex h-full flex-col rounded-[inherit] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-emerald-700/35"
+        className="flex h-full flex-col rounded-[inherit] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-emerald-700/40"
         to={`/listings/${listing.id}`}
       >
-        <div className="relative flex aspect-[1.9/1] items-end overflow-hidden border-b border-line bg-[linear-gradient(125deg,#eff5f1_0%,#e5efe8_58%,#d6e6db_100%)] p-5 sm:p-6">
-          {imageUrl ? (
-            <img
-              alt={`Seller-provided image for ${listing.title}`}
-              className="absolute inset-0 size-full object-cover"
-              loading="lazy"
-              src={listingImageSrc(imageUrl)}
-              onError={() => setFailedImageUrl(listing.imageUrl ?? null)}
-            />
-          ) : null}
-          {!imageUrl ? (
-            <div
-              aria-hidden="true"
-              className="absolute inset-0 bg-[radial-gradient(ellipse_at_80%_8%,rgba(255,255,255,0.9),transparent_34%),linear-gradient(35deg,transparent_45%,rgba(255,255,255,0.36)_45%,rgba(255,255,255,0.36)_46%,transparent_46%)]"
-            />
-          ) : null}
-          {!imageUrl ? (
-            <div
-              aria-hidden="true"
-              className="absolute -right-8 -top-24 size-64 rounded-full border border-emerald-950/[0.08] sm:size-72"
-            />
-          ) : null}
-          {!imageUrl ? (
-            <div
-              aria-hidden="true"
-              className="absolute -right-1 -top-16 size-48 rounded-full border border-emerald-950/[0.08]"
-            />
-          ) : null}
-          {!imageUrl ? (
-            <span className="relative grid size-12 place-items-center rounded-full border border-white/90 bg-white/80 text-emerald-900 shadow-sm backdrop-blur">
-              <Building2 aria-hidden="true" size={21} strokeWidth={1.7} />
-            </span>
-          ) : null}
-          {sold ? (
-            <div className="absolute left-4 top-4">
+        <div className="relative aspect-[16/10] overflow-hidden border-b border-line bg-mist">
+          <ListingMedia
+            industry={listing.industry}
+            title={listing.title}
+            imageUrl={imageUrl}
+            onImageError={() => setFailedImageUrl(listing.imageUrl ?? null)}
+          />
+          <div className="absolute top-3 left-3 sm:top-4 sm:left-4">
+            {sold ? (
               <SoldBadge />
-            </div>
-          ) : (
-            <span className="absolute bottom-5 right-5 text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-navy-950/45 sm:bottom-6 sm:right-6">
-              Business opportunity
-            </span>
-          )}
+            ) : (
+              <span className="inline-flex min-h-7 items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-emerald-900 shadow-sm">
+                <span
+                  aria-hidden="true"
+                  className="size-1.5 rounded-full bg-emerald-700"
+                />{" "}
+                Available
+              </span>
+            )}
+          </div>
         </div>
-
-        <div className="flex flex-1 flex-col p-5 sm:p-6">
-          {listing.industry ? (
-            <p className="w-fit max-w-full truncate rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-900">
+        <div className="flex flex-1 flex-col p-5">
+          {listing.industry && (
+            <p className="mb-2 break-words text-xs font-semibold tracking-wide text-emerald-900">
               {listing.industry}
             </p>
-          ) : null}
-          <div className="mt-3 flex items-start justify-between gap-3">
-            <h3 className="line-clamp-2 text-xl font-semibold leading-snug tracking-[-0.035em] text-navy-950 transition group-hover:text-emerald-900">
-              {listing.title}
-            </h3>
-            <ArrowUpRight
-              aria-hidden="true"
-              className="mt-1 shrink-0 text-ink-faint transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-emerald-800"
-              size={18}
-            />
-          </div>
-          <p className="mt-2 flex items-center gap-1.5 text-sm text-ink-soft">
+          )}
+          <h3 className="break-words font-display text-[1.65rem] leading-[1.05] text-navy-950 group-hover:text-emerald-900">
+            {listing.title}
+          </h3>
+          <p className="mt-2 flex items-center gap-1.5 break-words text-sm text-ink-soft">
             <MapPin
               aria-hidden="true"
               className="shrink-0 text-emerald-800"
               size={15}
             />
-            <span className="truncate">
-              {listing.location || "Location not disclosed"}
-            </span>
+            <span>{listing.location || "Location undisclosed"}</span>
           </p>
-          {!sold && listing.sellerName ? (
-            <p className="mt-2 text-xs text-ink-faint">
-              Published by{" "}
-              <span className="font-semibold text-ink-soft">
-                {listing.sellerName}
-              </span>
-            </p>
-          ) : null}
           {!sold && (
-            <p className="mt-4 line-clamp-3 min-h-[4.5rem] text-sm leading-6 text-ink-soft">
+            <p className="mt-3 line-clamp-2 text-sm leading-6 text-ink-soft">
               {listing.description}
             </p>
           )}
 
           {sold ? (
             <div className="mt-auto pt-5">
-              <div className="rounded-xl border border-emerald-100 bg-emerald-50/70 p-4">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
                 <PublicSalePrice listing={listing} />
                 {listing.soldAt && (
-                  <p className="mt-2 text-xs text-ink-soft">
+                  <p className="mt-1 text-xs text-ink-soft">
                     Completed{" "}
                     <time dateTime={listing.soldAt}>
                       {formatSoldDate(listing.soldAt)}
@@ -120,37 +86,22 @@ export function ListingCard({ listing }: { listing: PublicListing }) {
               </div>
             </div>
           ) : (
-            <div className="mt-auto grid grid-cols-2 gap-4 border-t border-line pt-5">
-              <div className="min-w-0">
-                <p className="text-[0.65rem] font-semibold uppercase tracking-[0.11em] text-ink-faint">
-                  Asking price
-                </p>
-                <p className="mt-1.5 truncate text-lg font-semibold tracking-tight text-navy-950">
-                  {formatListingMoney(listing.askingPrice, listing.currency)}
-                </p>
-              </div>
-              {listing.annualRevenue !== null ? (
-                <div className="min-w-0 border-l border-line pl-4">
-                  <p className="text-[0.65rem] font-semibold uppercase tracking-[0.11em] text-ink-faint">
-                    Annual revenue
-                  </p>
-                  <p className="mt-1.5 truncate text-base font-semibold tracking-tight text-navy-950">
-                    {formatListingMoney(
-                      listing.annualRevenue,
-                      listing.currency,
-                    )}
-                  </p>
-                </div>
-              ) : (
-                <div className="min-w-0 border-l border-line pl-4">
-                  <p className="text-[0.65rem] font-semibold uppercase tracking-[0.11em] text-ink-faint">
-                    Annual revenue
-                  </p>
-                  <p className="mt-1.5 text-sm font-medium text-ink-faint">
-                    Not disclosed
-                  </p>
-                </div>
-              )}
+            <div className="mt-auto pt-5">
+              <dl className="grid grid-cols-2 overflow-hidden rounded-xl border border-line bg-paper">
+                {financials.map(([label, amount]) => (
+                  <div
+                    key={label}
+                    className={`min-w-0 px-3 py-2.5 ${label === "Asking price" ? "col-span-2 border-b border-line bg-emerald-50/70" : financials.length === 2 ? "col-span-2" : "even:border-r even:border-line"}`}
+                  >
+                    <dt className="text-xs leading-4 text-ink-soft">{label}</dt>
+                    <dd
+                      className={`mt-1 break-words font-semibold leading-5 text-navy-950 tabular-nums ${label === "Asking price" ? "text-base" : "text-sm"}`}
+                    >
+                      {formatListingMoney(amount, listing.currency)}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
             </div>
           )}
         </div>

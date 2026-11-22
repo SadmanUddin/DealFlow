@@ -215,7 +215,8 @@ export function BuyerOffersPage() {
                     <StatusBadge status={deal.status} />
                   </span>
                   <span className="mt-1.5 block text-[0.68rem] text-ink-soft">
-                    {deal.buyer_name ?? "Buyer"} · {deal.seller_name ?? "Seller"}
+                    {deal.buyer_name ?? "Buyer"} ·{" "}
+                    {deal.seller_name ?? "Seller"}
                   </span>
                 </button>
               ))}
@@ -234,7 +235,9 @@ export function BuyerOffersPage() {
                 <SectionHeading
                   description={`Created ${new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(selectedDeal.created_at))}`}
                   title={
-                    listingQuery.data?.title ?? selectedDeal.listing_title ?? "Business listing"
+                    listingQuery.data?.title ??
+                    selectedDeal.listing_title ??
+                    "Business listing"
                   }
                 />
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -381,7 +384,7 @@ export function BuyerOffersPage() {
                     Negotiation is closed
                   </p>
                   <p className="mt-1 text-xs leading-5 text-ink-soft">
-                    The backend does not accept offers while this deal is{" "}
+                    New offers are unavailable while this deal is{" "}
                     {selectedDeal.status.replaceAll("_", " ")}.
                   </p>
                 </SectionCard>

@@ -1,14 +1,5 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { ErrorState } from "@/components/shared/ErrorState";
 import {
   SectionCard,
@@ -75,6 +66,39 @@ function priceBandRows(values: number[], currency: string) {
   return result.map(({ label, count }) => ({ label, count }));
 }
 
+function DistributionBars({
+  rows,
+  label,
+}: {
+  rows: CountRow[];
+  label: string;
+}) {
+  const largest = Math.max(1, ...rows.map((row) => row.count));
+  return (
+    <ul aria-label={label} className="space-y-3">
+      {rows.map((row) => (
+        <li key={row.label}>
+          <div className="mb-1.5 flex justify-between gap-2 text-sm">
+            <span className="min-w-0 break-words text-ink-soft">
+              {row.label}
+            </span>
+            <strong className="tabular-nums text-ink">{row.count}</strong>
+          </div>
+          <div
+            className="h-2 overflow-hidden rounded-full bg-mist"
+            aria-hidden="true"
+          >
+            <div
+              className="h-full rounded-full bg-forest"
+              style={{ width: `${(row.count / largest) * 100}%` }}
+            />
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function DistributionChart({
   title,
   description,
@@ -88,47 +112,7 @@ function DistributionChart({
     <SectionCard>
       <SectionHeading description={description} title={title} />
       {rows.length ? (
-        <div aria-label={title} className="h-64 w-full" role="img">
-          <ResponsiveContainer height="100%" width="100%">
-            <BarChart
-              data={rows}
-              margin={{ top: 8, right: 8, bottom: 8, left: -18 }}
-            >
-              <CartesianGrid
-                stroke="#e7ece8"
-                strokeDasharray="3 4"
-                vertical={false}
-              />
-              <XAxis
-                axisLine={false}
-                dataKey="label"
-                tick={{ fill: "#607069", fontSize: 10 }}
-                tickLine={false}
-                tickMargin={10}
-              />
-              <YAxis
-                allowDecimals={false}
-                axisLine={false}
-                tick={{ fill: "#87948d", fontSize: 10 }}
-                tickLine={false}
-              />
-              <Tooltip
-                cursor={{ fill: "#f3f7f5" }}
-                contentStyle={{
-                  border: "1px solid #e3e9e4",
-                  borderRadius: 10,
-                  fontSize: 12,
-                }}
-              />
-              <Bar
-                dataKey="count"
-                fill="#0B1F36"
-                maxBarSize={44}
-                radius={[5, 5, 0, 0]}
-              />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        <DistributionBars label={title} rows={rows} />
       ) : (
         <WorkspaceEmpty
           description="Save published opportunities to see their distribution here."
@@ -208,7 +192,7 @@ export function BuyerAnalyticsPage() {
   return (
     <>
       <WorkspacePageHeader
-        description="A current snapshot of your saved opportunity mix and acquisition pipeline. These are portfolio distributions, not historical trends."
+        description="See how your saved businesses and current deals are distributed."
         eyebrow="Buyer workspace · Insights"
         title="Buyer analytics"
       />
@@ -230,9 +214,8 @@ export function BuyerAnalyticsPage() {
             Snapshot based on up to {favoriteRows.length} most recently saved
             published businesses and {dealRows.length} most recently updated
             deals. {favoritesQuery.data?.pagination.total ?? 0} saved listings
-            and {dealsQuery.data?.pagination.total ?? 0} deals exist across the
-            full paginated records. No daily/monthly history or currency
-            conversion is available.
+            and {dealsQuery.data?.pagination.total ?? 0} deals in total. Prices
+            are grouped by their original currency.
           </p>
           <div className="grid gap-5 xl:grid-cols-2">
             <DistributionChart
@@ -276,51 +259,10 @@ export function BuyerAnalyticsPage() {
                         </span>
                       </p>
                     </div>
-                    <div
-                      aria-label={`${group.currency} asking-price bands`}
-                      className="h-56"
-                      role="img"
-                    >
-                      <ResponsiveContainer height="100%" width="100%">
-                        <BarChart
-                          data={group.rows}
-                          margin={{ top: 8, right: 4, bottom: 8, left: -18 }}
-                        >
-                          <CartesianGrid
-                            stroke="#e7ece8"
-                            strokeDasharray="3 4"
-                            vertical={false}
-                          />
-                          <XAxis
-                            axisLine={false}
-                            dataKey="label"
-                            interval={0}
-                            tick={{ fill: "#607069", fontSize: 9 }}
-                            tickLine={false}
-                            tickMargin={8}
-                          />
-                          <YAxis
-                            allowDecimals={false}
-                            axisLine={false}
-                            tick={{ fill: "#87948d", fontSize: 10 }}
-                            tickLine={false}
-                          />
-                          <Tooltip
-                            contentStyle={{
-                              border: "1px solid #e3e9e4",
-                              borderRadius: 10,
-                              fontSize: 12,
-                            }}
-                          />
-                          <Bar
-                            dataKey="count"
-                            fill="#10B981"
-                            maxBarSize={44}
-                            radius={[5, 5, 0, 0]}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
+                    <DistributionBars
+                      label={`${group.currency} asking-price bands`}
+                      rows={group.rows}
+                    />
                   </div>
                 ))}
               </div>
@@ -332,7 +274,7 @@ export function BuyerAnalyticsPage() {
             )}
           </SectionCard>
           <DistributionChart
-            description="Current deal status counts from the most recently updated participant deals. This is a current snapshot, not monthly deal flow."
+            description="Status counts for your most recently updated deals."
             rows={dealStatuses}
             title="Deal pipeline by status"
           />

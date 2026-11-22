@@ -216,19 +216,20 @@ describe("deal workflow", () => {
     ).toBeInTheDocument();
     expect(mocks.createOffer).not.toHaveBeenCalled();
 
-    await user.type(screen.getByLabelText("Offer amount"), "420000");
+    await user.type(screen.getByLabelText("Offer amount"), "420000.25");
     await user.type(
       screen.getByLabelText(/Terms or note/),
       "Subject to due diligence",
     );
     await user.click(screen.getByRole("button", { name: "Submit offer" }));
     const dialog = await screen.findByRole("alertdialog");
+    expect(within(dialog).getByText(/420,000\.25/)).toBeVisible();
     await user.click(
       within(dialog).getByRole("button", { name: "Submit offer" }),
     );
     await waitFor(() =>
       expect(mocks.createOffer).toHaveBeenCalledWith(40, {
-        amount: "420000",
+        amount: "420000.25",
         currency: "EUR",
         message: "Subject to due diligence",
       }),

@@ -125,7 +125,7 @@ export function DealConversationPanel({
   return (
     <SectionCard>
       <SectionHeading
-        description="Messages are visible only to the buyer and seller in this private listing conversation."
+        description="Use this private thread to discuss the deal with the other participant."
         title="Buyer conversation"
       />
       {notice ? (
@@ -156,7 +156,7 @@ export function DealConversationPanel({
       {conversationsQuery.data === null ? (
         <WorkspaceEmpty
           title="No conversation is linked to this deal yet"
-          description="A buyer can open the private conversation for this listing. Messages and source documents stay within that participant-authorized thread."
+          description="The buyer can start a conversation to discuss the deal and share documents."
           action={
             canStartConversation ? (
               <Button
@@ -176,7 +176,7 @@ export function DealConversationPanel({
       ) : null}
       {conversation ? (
         <div className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-mist/70 px-3 py-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-paper px-4 py-3">
             <div>
               <p className="text-xs font-semibold text-navy-950">
                 Conversation with{" "}
@@ -237,7 +237,7 @@ export function DealConversationPanel({
                     const timestamp = formatMessageDate(message.createdAt);
                     return (
                       <li
-                        className={`rounded-xl border px-4 py-3 ${message.senderId === currentUserId ? "ml-3 border-emerald-200 bg-emerald-50/70 sm:ml-10" : "mr-3 border-line bg-white sm:mr-10"}`}
+                        className={`rounded-xl border px-4 py-3 ${message.senderId === currentUserId ? "ml-3 rounded-br-sm border-emerald-200 bg-emerald-50 sm:ml-10" : "mr-3 rounded-bl-sm border-line bg-paper sm:mr-10"}`}
                         key={message.id}
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -310,7 +310,7 @@ export function DealConversationPanel({
                     {form.formState.errors.content.message}
                   </p>
                 ) : null}
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   <p className="text-[0.65rem] text-ink-faint">
                     {messageContent.length}/10,000
                   </p>

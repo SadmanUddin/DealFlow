@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, EyeOff, LoaderCircle } from "lucide-react";
-import { useForm } from "react-hook-form";
+import { ChevronDown, Eye, EyeOff, LoaderCircle } from "lucide-react";
+import { useForm, useWatch } from "react-hook-form";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import { Button } from "@/components/ui/button";
 import { toApiError } from "@/lib/api-error";
@@ -54,7 +54,7 @@ function TextField({
         {label}
       </label>
       <input
-        className="h-11 w-full rounded-xl border border-line bg-white px-3.5 text-sm text-navy-950 outline-none transition placeholder:text-ink-faint focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/10 aria-[invalid=true]:border-red-500"
+        className="h-12 w-full rounded-xl border border-line bg-white px-3.5 text-base sm:text-sm text-navy-950 outline-none transition placeholder:text-ink-faint focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/10 aria-[invalid=true]:border-red-500"
         id={id}
         aria-invalid={Boolean(error)}
         aria-describedby={error ? `${id}-error` : undefined}
@@ -86,7 +86,7 @@ function PasswordField({
       </label>
       <div className="relative">
         <input
-          className="h-11 w-full rounded-xl border border-line bg-white px-3.5 pr-11 text-sm text-navy-950 outline-none transition placeholder:text-ink-faint focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/10 aria-[invalid=true]:border-red-500"
+          className="h-12 w-full rounded-xl border border-line bg-white px-3.5 pr-11 text-base sm:text-sm text-navy-950 outline-none transition placeholder:text-ink-faint focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/10 aria-[invalid=true]:border-red-500"
           id={id}
           type={visible ? "text" : "password"}
           aria-invalid={Boolean(error)}
@@ -199,11 +199,11 @@ export function LoginPage() {
   return (
     <AuthLayout>
       <p className="eyebrow text-emerald-800">Welcome back</p>
-      <h1 className="mt-2 text-2xl font-semibold tracking-tight text-navy-950">
+      <h1 className="mt-2 font-display text-[clamp(2.5rem,6vw,3.65rem)] leading-[1.02] tracking-[-0.04em] text-navy-950">
         Sign in to DealFlow
       </h1>
-      <p className="mt-2 text-sm leading-6 text-ink-soft">
-        Continue your business transition with confidence.
+      <p className="mt-4 text-base leading-7 text-ink-soft">
+        Access your DealFlow account with your email and password.
       </p>
       <form className="mt-7 space-y-5" noValidate onSubmit={submit}>
         <TextField
@@ -253,6 +253,7 @@ export function RegisterPage() {
   const [searchParams] = useSearchParams();
   const [formError, setFormError] = useState("");
   const {
+    control,
     register,
     handleSubmit,
     formState: { errors },
@@ -262,6 +263,8 @@ export function RegisterPage() {
       role: searchParams.get("role") === "seller" ? "seller" : "buyer",
     },
   });
+
+  const role = useWatch({ control, name: "role" });
 
   const submit = handleSubmit(async (values) => {
     setFormError("");
@@ -282,13 +285,13 @@ export function RegisterPage() {
   });
 
   return (
-    <AuthLayout>
+    <AuthLayout variant={role === "seller" ? "seller" : "buyer"}>
       <p className="eyebrow text-emerald-800">Get started</p>
-      <h1 className="mt-2 text-2xl font-semibold tracking-tight text-navy-950">
+      <h1 className="mt-2 font-display text-[clamp(2.5rem,6vw,3.65rem)] leading-[1.02] tracking-[-0.04em] text-navy-950">
         Create your account
       </h1>
-      <p className="mt-2 text-sm leading-6 text-ink-soft">
-        Join as a buyer or seller and take the next step.
+      <p className="mt-4 text-base leading-7 text-ink-soft">
+        Choose the workspace that fits what you want to do.
       </p>
       <form className="mt-7 space-y-4" noValidate onSubmit={submit}>
         <TextField
@@ -313,14 +316,23 @@ export function RegisterPage() {
           >
             I’m joining as a
           </label>
-          <select
-            className="h-11 w-full rounded-xl border border-line bg-white px-3.5 text-sm text-navy-950 outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/10"
-            id="role"
-            {...register("role")}
-          >
-            <option value="buyer">Buyer</option>
-            <option value="seller">Seller</option>
-          </select>
+          <div className="relative">
+            <select
+              className="h-12 w-full appearance-none rounded-xl border border-line bg-white px-3.5 pr-10 text-base text-navy-950 outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/10 sm:text-sm"
+              id="role"
+              aria-invalid={Boolean(errors.role)}
+              aria-describedby={errors.role ? "role-error" : undefined}
+              {...register("role")}
+            >
+              <option value="buyer">Buyer</option>
+              <option value="seller">Seller</option>
+            </select>
+            <ChevronDown
+              aria-hidden="true"
+              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink-soft"
+              size={16}
+            />
+          </div>
           <FieldError id="role-error">{errors.role?.message}</FieldError>
         </div>
         <PasswordField
@@ -381,13 +393,13 @@ export function ForgotPasswordPage() {
   });
 
   return (
-    <AuthLayout>
+    <AuthLayout variant="recovery">
       <p className="eyebrow text-emerald-800">Account recovery</p>
-      <h1 className="mt-2 text-2xl font-semibold tracking-tight text-navy-950">
+      <h1 className="mt-2 font-display text-[clamp(2.5rem,6vw,3.65rem)] leading-[1.02] tracking-[-0.04em] text-navy-950">
         Forgot your password?
       </h1>
-      <p className="mt-2 text-sm leading-6 text-ink-soft">
-        Enter the email address associated with your account.
+      <p className="mt-4 text-base leading-7 text-ink-soft">
+        Enter the email address you use for DealFlow.
       </p>
       <form className="mt-7 space-y-5" noValidate onSubmit={submit}>
         <TextField
@@ -441,9 +453,9 @@ export function ResetPasswordPage() {
   });
 
   return (
-    <AuthLayout>
+    <AuthLayout variant="recovery">
       <p className="eyebrow text-emerald-800">Secure your account</p>
-      <h1 className="mt-2 text-2xl font-semibold tracking-tight text-navy-950">
+      <h1 className="mt-2 font-display text-[clamp(2.5rem,6vw,3.65rem)] leading-[1.02] tracking-[-0.04em] text-navy-950">
         Set a new password
       </h1>
       {success ? (
@@ -523,9 +535,9 @@ export function VerifyEmailPage() {
   });
 
   return (
-    <AuthLayout>
+    <AuthLayout variant="verification">
       <p className="eyebrow text-emerald-800">Email verification</p>
-      <h1 className="mt-2 text-2xl font-semibold tracking-tight text-navy-950">
+      <h1 className="mt-2 font-display text-[clamp(2.5rem,6vw,3.65rem)] leading-[1.02] tracking-[-0.04em] text-navy-950">
         Verify your email
       </h1>
       {success ? (
@@ -543,9 +555,9 @@ export function VerifyEmailPage() {
         </div>
       ) : (
         <>
-          <p className="mt-2 text-sm leading-6 text-ink-soft">
-            Confirm your email address to complete registration and unlock your
-            DealFlow account. We sent a verification link to:
+          <p className="mt-4 text-base leading-7 text-ink-soft">
+            Follow the link in your email or paste your verification token
+            below.
           </p>
           {email && (
             <p className="mt-2 break-all text-sm font-semibold text-navy-950">

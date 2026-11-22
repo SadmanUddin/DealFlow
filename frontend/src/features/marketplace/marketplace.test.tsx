@@ -187,6 +187,33 @@ describe("public marketplace", () => {
     expect(screen.getByText("1 business")).toBeInTheDocument();
   });
 
+  it("toggles a browse industry in the URL without removing keyboard focus", async () => {
+    const user = userEvent.setup();
+    renderMarketplace();
+    const chip = screen.getByRole("button", { name: "Food" });
+    await user.click(chip);
+    expect(chip).toHaveAttribute("aria-pressed", "true");
+    expect(chip).toHaveFocus();
+    await waitFor(() => {
+      expect(apiMocks.getPublicListings).toHaveBeenLastCalledWith(
+        expect.objectContaining({ industry: "Food", page: 1 }),
+      );
+    });
+    await user.click(chip);
+    expect(chip).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByTestId("location-search")).toBeEmptyDOMElement();
+  });
+
+  it("shows an illustrated placeholder explicitly labelled when a seller photo is missing", async () => {
+    apiMocks.getPublicListings.mockResolvedValue(
+      listingPage([{ ...listing, imageUrl: null }]),
+    );
+    renderMarketplace();
+    const card = await screen.findByRole("link", { name: /view independent/i });
+    expect(within(card).getByText("No photo provided")).toBeVisible();
+    expect(within(card).queryByRole("img")).not.toBeInTheDocument();
+  });
+
   it("reads supported query parameters and submits search into the URL", async () => {
     const user = userEvent.setup();
     renderMarketplace(
@@ -258,6 +285,9 @@ describe("public marketplace", () => {
     await screen.findByRole("link", {
       name: /view independent neighborhood bakery/i,
     });
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Financial filters" }));
     expect(screen.getByLabelText(/minimum asking price/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/maximum asking price/i)).toBeInTheDocument();
     expect(
@@ -276,6 +306,7 @@ describe("public marketplace", () => {
     await screen.findByRole("link", {
       name: /view independent neighborhood bakery/i,
     });
+    await user.click(screen.getByRole("button", { name: "Financial filters" }));
     await user.type(screen.getByLabelText(/minimum asking price/i), "100000");
     await user.type(screen.getByLabelText(/maximum asking price/i), "900000");
     await user.click(screen.getByRole("button", { name: "Search" }));
