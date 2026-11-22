@@ -15,7 +15,7 @@ export const sanitizeFilename = value => {
       .replace(/\\/g, '/')
       .split('/')
       .pop() ?? '';
-  const safe = Array.from(base.normalize('NFKC'), character => {
+  const safe = Array.from(base.toWellFormed().normalize('NFKC'), character => {
     const code = character.codePointAt(0);
     return code < 32 || code === 127 || '"<>:|?*'.includes(character)
       ? '_'
@@ -24,5 +24,7 @@ export const sanitizeFilename = value => {
     .join('')
     .trim()
     .replace(/\.{2,}/g, '.');
-  return (safe || 'document').slice(0, 255);
+  return Array.from(safe || 'document')
+    .slice(0, 255)
+    .join('');
 };

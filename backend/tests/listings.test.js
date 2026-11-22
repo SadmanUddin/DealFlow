@@ -184,18 +184,19 @@ describe('public listing visibility', () => {
     const publicResponse = await request(app).get(`/api/listings/${listingId}`);
     expect(publicResponse.body.listing.isFavorite).toBeUndefined();
     expect(publicResponse.headers['cache-control']).toBe('public, no-cache');
+    expect(publicResponse.headers.vary).toContain('Cookie');
 
-    await signed(request(app).post(`/api/favorites/${listingId}`), buyer).send({});
+    await signed(request(app).post(`/api/favorites/${listingId}`), buyer).send(
+      {}
+    );
     const savedResponse = await request(app)
       .get(`/api/listings/${listingId}`)
       .set('Cookie', buyer.cookie);
     expect(savedResponse.body.listing.isFavorite).toBe(true);
     expect(savedResponse.headers['cache-control']).toBe('private, no-store');
+    expect(savedResponse.headers.vary).toContain('Cookie');
 
-    await signed(
-      request(app).delete(`/api/favorites/${listingId}`),
-      buyer
-    );
+    await signed(request(app).delete(`/api/favorites/${listingId}`), buyer);
     const unsavedResponse = await request(app)
       .get(`/api/listings/${listingId}`)
       .set('Cookie', buyer.cookie);

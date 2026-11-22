@@ -16,6 +16,9 @@ import { signAccessToken } from '#utils/jwt.js';
 import { getEnvironment } from '#config/env.js';
 
 const BCRYPT_ROUNDS = 12;
+// A dummy hash with the same cost keeps missing-user sign-in on the bcrypt path.
+const DUMMY_PASSWORD_HASH =
+  '$2b$12$OhI7UCpFcTkQKnUikQJEYeczhMKK1jl2o4o2Kel1yNR0yB25T2tgS';
 const ACCESS_TOKEN_MS = 15 * 60 * 1000;
 const EMAIL_TOKEN_MS = 24 * 60 * 60 * 1000;
 const RESET_TOKEN_MS = 60 * 60 * 1000;
@@ -55,7 +58,7 @@ export const registerUser = async ({ name, email, password, role }) => {
       });
     return user;
   } catch (error) {
-    if (error?.code === '23505') {
+    if ((error?.cause?.code ?? error?.code) === '23505') {
       return null;
     }
     throw error;
@@ -134,7 +137,11 @@ export const authenticateUser = async ({ email, password }) => {
     .where(eq(users.email, email))
     .limit(1);
 
-  if (!user || !(await comparePassword(password, user.passwordHash))) {
+  const passwordMatches = await comparePassword(
+    password,
+    user?.passwordHash ?? DUMMY_PASSWORD_HASH
+  );
+  if (!user || !passwordMatches) {
     throw new AppError(
       401,
       'INVALID_CREDENTIALS',

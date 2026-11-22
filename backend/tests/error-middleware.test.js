@@ -1,14 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('#config/logger.js', () => ({ default: { error: vi.fn() } }));
+vi.mock('#config/logger.js', () => ({
+  default: { error: vi.fn(), warn: vi.fn() },
+}));
 
+const { default: logger } = await import('#config/logger.js');
 const { errorMiddleware } = await import('#middleware/error.middleware.js');
 
 describe('error middleware', () => {
-  it('delegates stream failures after headers are sent to Express', () => {
+  it('closes interrupted streams without forwarding the raw exception', () => {
     const error = new Error('document stream failed');
     const next = vi.fn();
-    const res = { headersSent: true };
+    const res = { headersSent: true, destroy: vi.fn() };
 
     errorMiddleware(
       error,
@@ -17,7 +20,8 @@ describe('error middleware', () => {
       next
     );
 
-    expect(next).toHaveBeenCalledWith(error);
+    expect(next).not.toHaveBeenCalled();
+    expect(res.destroy).toHaveBeenCalledWith();
     expect(res).not.toHaveProperty('status');
   });
 
@@ -36,7 +40,9 @@ describe('error middleware', () => {
     };
 
     errorMiddleware(
-      new Error('private database detail'),
+      new Error('private database detail', {
+        cause: { code: 'XX000', detail: 'sensitive parameter' },
+      }),
       { method: 'GET', path: '/api/test' },
       res,
       next
@@ -50,5 +56,12 @@ describe('error middleware', () => {
       },
     });
     expect(JSON.stringify(res.body)).not.toContain('private database detail');
+    expect(logger.error).toHaveBeenLastCalledWith('Unhandled API error', {
+      requestId: undefined,
+      code: 'INTERNAL_SERVER_ERROR',
+      status: 500,
+      sqlState: 'XX000',
+      method: 'GET',
+    });
   });
 });

@@ -62,8 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const user = await restoreSession();
         queryClient.setQueryData(authQueryKeys.session, user);
-        if (!user)
-          queryClient.removeQueries({ queryKey: authQueryKeys.profile });
+        if (!user) await clearPrivateQueryCache(queryClient);
       } catch {
         // Keep the current state and let the user retry when the API is reachable.
       }

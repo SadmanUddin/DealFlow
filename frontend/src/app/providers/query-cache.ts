@@ -5,6 +5,8 @@ const publicQueryPrefixes = new Set(["public", "marketplace"]);
 function isPrivateQuery(query: Query) {
   const prefix = query.queryKey[0];
   const isSessionQuery = prefix === "auth" && query.queryKey[1] === "session";
+  // Listing details can include the current buyer's saved state.
+  if (prefix === "marketplace" && query.queryKey[1] === "listing") return true;
   return (
     !isSessionQuery &&
     (typeof prefix !== "string" || !publicQueryPrefixes.has(prefix))

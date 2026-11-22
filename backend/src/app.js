@@ -60,14 +60,7 @@ app.use(
   })
 );
 app.use(express.json({ limit: '32kb' }));
-app.use(express.urlencoded({ extended: true }));
-app.use(
-  morgan('combined', {
-    stream: {
-      write: message => logger.info(message.trim()),
-    },
-  })
-);
+app.use(express.urlencoded({ extended: true, limit: '32kb' }));
 app.use(cookieParser());
 app.use((req, res, next) => {
   const candidate = req.get('x-request-id');
@@ -81,6 +74,17 @@ app.use((req, res, next) => {
   res.set('X-Request-Id', req.requestId);
   next();
 });
+app.use(
+  morgan((tokens, req, res) => {
+    logger.info('HTTP request completed', {
+      requestId: req.requestId,
+      method: req.method,
+      status: Number(tokens.status(req, res)) || undefined,
+      durationMs: Number(tokens['response-time'](req, res)) || undefined,
+    });
+    return undefined;
+  })
+);
 app.use(optionalAuthentication);
 app.use(privateCacheMiddleware);
 

@@ -6,8 +6,12 @@ export const notFoundMiddleware = (req, res, next) => {
   next(new AppError(404, 'NOT_FOUND', 'The requested endpoint was not found'));
 };
 
-export const errorMiddleware = (error, req, res, next) => {
-  if (res.headersSent) return next(error);
+export const errorMiddleware = (error, req, res, _next) => {
+  if (res.headersSent) {
+    logger.warn('Response stream interrupted', { requestId: req.requestId });
+    res.destroy();
+    return;
+  }
 
   let status = 500;
   let code = 'INTERNAL_SERVER_ERROR';
@@ -18,7 +22,8 @@ export const errorMiddleware = (error, req, res, next) => {
     status = error.status;
     code = error.code;
     message = error.message;
-    details = error.details;
+    details = status < 500 ? error.details : undefined;
+    if (status >= 500) message = 'The request could not be completed';
   } else if (error instanceof ZodError) {
     status = 400;
     code = 'VALIDATION_ERROR';
@@ -45,18 +50,14 @@ export const errorMiddleware = (error, req, res, next) => {
     const databaseError = error?.cause?.cause ?? error?.cause ?? error;
     logger.error('Unhandled API error', {
       requestId: req.requestId,
-      error: error?.message,
-      database: {
-        code: databaseError?.code,
-        severity: databaseError?.severity,
-        constraint: databaseError?.constraint,
-        routine: databaseError?.routine,
-        detail: databaseError?.detail,
-        message: databaseError?.message,
-      },
-      stack: error?.stack,
+      code,
+      status,
+      sqlState:
+        typeof databaseError?.code === 'string' &&
+        /^[0-9A-Z]{5}$/.test(databaseError.code)
+          ? databaseError.code
+          : undefined,
       method: req.method,
-      path: req.path,
     });
   }
 

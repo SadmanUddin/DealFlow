@@ -6,6 +6,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import { getEnvironment } from '#config/env.js';
+import logger from '#config/logger.js';
 import { AppError } from '#utils/app-error.js';
 
 let adapter;
@@ -59,18 +60,9 @@ const getAdapter = () => {
           leavePartsOnError: false,
         }).done();
       } catch (error) {
-        console.error('R2 upload diagnostic:', {
-          name: error.name,
-
-          code: error.Code ?? error.code,
-
-          message: error.message,
-
-          statusCode: error.$metadata?.httpStatusCode,
-
-          requestId: error.$metadata?.requestId,
+        logger.warn('Document storage upload failed', {
+          status: error?.$metadata?.httpStatusCode,
         });
-
         throw storageError();
       }
     },

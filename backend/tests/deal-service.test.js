@@ -280,6 +280,30 @@ describe('Phase 8 deal service writes', () => {
     expect(executed.at(-1).query).toContain('WHERE id = ? AND status = ?');
   });
 
+  it('retains closing privacy in admin status-change responses', async () => {
+    const deal = {
+      id: 31,
+      listing_id: 8,
+      buyer_id: 4,
+      seller_id: 7,
+      status: 'accepted',
+      closing_amount: '90000.00',
+      buyer_confirmed_at: new Date(),
+      buyer_price_consent: true,
+    };
+    rowsByTable.deals = [deal];
+    const updated = { ...deal, status: 'cancelled' };
+    db.executeResults.push([updated], [updated]);
+    const adminResponse = await updateDealStatus(31, 99, 'admin', 'cancelled');
+    expect(adminResponse).toMatchObject({ id: 31, status: 'cancelled' });
+    expect(adminResponse).not.toHaveProperty('closing_amount');
+    expect(adminResponse).not.toHaveProperty('buyer_confirmed_at');
+    expect(adminResponse).not.toHaveProperty('buyer_price_consent');
+    expect(await updateDealStatus(31, 4, 'buyer', 'cancelled')).toMatchObject({
+      closing_amount: '90000.00',
+    });
+  });
+
   it('creates counteroffers as new rows and atomically supersedes the pending offer', async () => {
     rowsByTable.deals = [
       {
@@ -359,7 +383,9 @@ describe('Phase 8 deal service writes', () => {
     await withdrawOffer(31, 52, 7);
     expect(executed.at(-1).query).toContain('status = \'pending\'');
     expect(executed.at(-1).query).toContain('created_by = ?');
-    expect(executed.at(-1).query.match(/'dealId', \?::integer/g)).toHaveLength(2);
+    expect(executed.at(-1).query.match(/'dealId', \?::integer/g)).toHaveLength(
+      2
+    );
   });
 
   it('does not report acceptance when the locked deal transition fails', async () => {

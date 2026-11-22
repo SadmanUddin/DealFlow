@@ -1,7 +1,7 @@
-import { Component } from 'react';
-import type { ReactNode } from 'react';
-import { AlertTriangle, RotateCcw } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Component } from "react";
+import type { ReactNode } from "react";
+import { AlertTriangle, RotateCcw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 type ErrorBoundaryProps = { children: ReactNode };
 type ErrorBoundaryState = { hasError: boolean };
@@ -14,10 +14,6 @@ export class ErrorBoundary extends Component<
 
   static getDerivedStateFromError(): ErrorBoundaryState {
     return { hasError: true };
-  }
-
-  componentDidCatch(error: Error) {
-    console.error('Frontend render error', error);
   }
 
   render() {

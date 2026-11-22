@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { PGlite } from '@electric-sql/pglite';
 import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
 import { drizzle } from 'drizzle-orm/pglite';
+import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 let engine;
@@ -11,6 +12,16 @@ vi.mock('#config/database.js', () => ({
     return database;
   },
 }));
+
+vi.mock('#config/arcjet.js', () => {
+  const protector = {
+    withRule: () => protector,
+    protect: async () => ({ conclusion: 'ALLOW', isDenied: () => false }),
+  };
+  return { default: protector };
+});
+const { default: app } = await import('../src/app.js');
+const { createSession } = await import('#services/auth.service.js');
 
 const {
   createDeal,
@@ -46,11 +57,11 @@ beforeAll(async () => {
     await engine.exec(readFileSync(new URL(tag + '.sql', root), 'utf8'));
   }
   await engine.exec(`
-    INSERT INTO users (id, name, email, password, role) VALUES
-      (1, 'Buyer', 'buyer@example.test', 'fixture', 'buyer'),
-      (2, 'Seller', 'seller@example.test', 'fixture', 'seller'),
-      (3, 'Other Buyer', 'other@example.test', 'fixture', 'buyer'),
-      (4, 'New Buyer', 'new@example.test', 'fixture', 'buyer');
+    INSERT INTO users (id, name, email, password, role, email_verified) VALUES
+      (1, 'Buyer', 'buyer@example.test', 'fixture', 'buyer', true),
+      (2, 'Seller', 'seller@example.test', 'fixture', 'seller', true),
+      (3, 'Other Buyer', 'other@example.test', 'fixture', 'buyer', true),
+      (4, 'New Buyer', 'new@example.test', 'fixture', 'buyer', true);
   `);
 }, 30000);
 
@@ -320,4 +331,58 @@ describe('acquisition closing on the migrated PostgreSQL schema', () => {
     expect(allPage.pagination.total).toBe(2);
     expect(allPage.listings).toHaveLength(1);
   }, 15000);
+});
+
+it('enforces session, CSRF, participant and admin boundaries through the API', async () => {
+  const listingId = await listing();
+  const dealId = await accepted(listingId);
+  const { conversation } = await startConversation(buyer, listingId);
+  const owner = await createSession({ id: buyer });
+  const outsider = await createSession({ id: otherBuyer });
+  const ownerCookie = `token=${owner.accessToken}`;
+  const outsiderCookie = `token=${outsider.accessToken}`;
+  const dealUrl = `/api/deals/${dealId}`;
+  const proposal = { action: 'propose', revision: 0, amount: '115000' };
+  expect((await request(app).get(dealUrl)).status).toBe(401);
+  expect(
+    (
+      await request(app)
+        .post(`${dealUrl}/closing`)
+        .set('Cookie', ownerCookie)
+        .send(proposal)
+    ).status
+  ).toBe(403);
+  expect(
+    (
+      await request(app)
+        .post(`${dealUrl}/closing`)
+        .set('Cookie', outsiderCookie)
+        .set('X-CSRF-Token', outsider.csrfToken)
+        .send(proposal)
+    ).status
+  ).toBe(404);
+  for (const url of [
+    dealUrl,
+    `${dealUrl}/offers`,
+    `${dealUrl}/documents/1/download`,
+    `/api/conversations/${conversation.id}/messages`,
+  ]) {
+    expect(
+      (await request(app).get(url).set('Cookie', outsiderCookie)).status
+    ).toBe(404);
+  }
+  expect(
+    (await request(app).get('/api/admin/users').set('Cookie', outsiderCookie))
+      .status
+  ).toBe(403);
+  const result = await request(app)
+    .post(`${dealUrl}/closing`)
+    .set('Cookie', ownerCookie)
+    .set('X-CSRF-Token', owner.csrfToken)
+    .send(proposal);
+  expect(result.status).toBe(200);
+  expect(result.body.deal).toMatchObject({
+    status: 'accepted',
+    closing_amount: '115000.00',
+  });
 });

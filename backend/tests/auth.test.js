@@ -502,11 +502,15 @@ describe('password recovery', () => {
       token: known.body.resetToken,
       password: 'New-strong-password-81',
     });
+    vi.stubEnv('CORS_ORIGINS', 'https://dealflow.example.test');
+    vi.stubEnv('FRONTEND_URL', 'https://dealflow.example.test');
+    vi.stubEnv('DATABASE_URL', 'postgresql://test:test@127.0.0.1:1/test');
     process.env.NODE_ENV = 'production';
     const productionResponse = await request(app)
       .post('/api/auth/forgot-password')
       .send({ email: 'buyer@example.test' });
     process.env.NODE_ENV = 'test';
+    vi.unstubAllEnvs();
     const oldPassword = await request(app)
       .post('/api/auth/sign-in')
       .send({ email: 'buyer@example.test', password: validPassword });
@@ -530,6 +534,7 @@ describe('password recovery', () => {
     expect(resetEmailEvent?.payload.encryptedToken).not.toBe(
       known.body.resetToken
     );
+    expect(productionResponse.status).toBe(200);
     expect(productionResponse.body).not.toHaveProperty('resetToken');
     expect(reset.status).toBe(200);
     expect(oldPassword.status).toBe(401);
@@ -595,4 +600,54 @@ describe('password recovery', () => {
       )
     ).toBe(true);
   });
+});
+
+describe('authentication privacy', () => {
+  it('runs bcrypt for missing login accounts', async () => {
+    const { default: bcrypt } = await import('bcrypt');
+    const compare = vi.spyOn(bcrypt, 'compare');
+    try {
+      const response = await request(app)
+        .post('/api/auth/sign-in')
+        .send({ email: 'missing@example.test', password: validPassword });
+      expect(response.status).toBe(401);
+      expect(response.body.error.code).toBe('INVALID_CREDENTIALS');
+      expect(compare).toHaveBeenCalledOnce();
+      expect(bcrypt.getRounds(compare.mock.calls[0][1])).toBe(12);
+    } finally {
+      compare.mockRestore();
+    }
+  });
+});
+
+it('keeps recoverable registration behavior for wrapped uniqueness errors', async () => {
+  mockDatabase.databaseState.failNext = new Error('Database operation failed', {
+    cause: { code: '23505' },
+  });
+  mockDatabase.databaseState.failOn = { table: 'users', operation: 'insert' };
+  const response = await request(app).post('/api/auth/sign-up').send({
+    name: 'Fixture Buyer',
+    email: 'duplicate@example.test',
+    password: validPassword,
+  });
+  expect(response.status).toBe(202);
+  expect(mockDatabase.databaseState.outbox_events).toHaveLength(0);
+});
+
+it('reports HTTP status without including request data in access logs', async () => {
+  const { default: logger } = await import('#config/logger.js');
+  const marker = 'fixture-request-marker';
+  await request(app)
+    .get('/health')
+    .query({ label: marker })
+    .set('Referer', 'https://example.test/' + marker);
+  expect(logger.info).toHaveBeenLastCalledWith(
+    'HTTP request completed',
+    expect.objectContaining({
+      method: 'GET',
+      status: 200,
+      requestId: expect.any(String),
+    })
+  );
+  expect(JSON.stringify(logger.info.mock.lastCall)).not.toContain(marker);
 });

@@ -5,10 +5,8 @@ import { AppError } from '#utils/app-error.js';
 export const executeDatabaseBatch = async operations => {
   try {
     return await db.batch(operations);
-  } catch (error) {
+  } catch {
     logger.error('Database batch operation failed', {
-      error: error?.message,
-      stack: error?.stack,
       operationCount: operations.length,
     });
     throw new AppError(

@@ -33,9 +33,7 @@ export const uploadListingImageController = async (req, res) => {
 };
 
 export const removeListingImageController = async (req, res) => {
-  res
-    .status(200)
-    .json(await removeListingImage(listingId(req), req.user.id));
+  res.status(200).json(await removeListingImage(listingId(req), req.user.id));
 };
 
 export const getListingImageController = async (req, res) => {
@@ -73,6 +71,7 @@ export const getPublicListings = async (req, res) => {
 };
 
 export const getPublishedListing = async (req, res) => {
+  res.vary('Cookie');
   if (req.user) res.set('Cache-Control', 'private, no-store');
   res.status(200).json({
     listing: await getPublishedListingService(

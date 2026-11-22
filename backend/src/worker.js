@@ -18,8 +18,8 @@ while (!stopping) {
       await new Promise(resolve =>
         setTimeout(resolve, environment.OUTBOX_POLL_INTERVAL_MS)
       );
-  } catch (error) {
-    logger.error('Outbox worker batch failed', { error: error.message });
+  } catch {
+    logger.error('Outbox worker batch failed');
     if (!stopping)
       await new Promise(resolve =>
         setTimeout(resolve, environment.OUTBOX_POLL_INTERVAL_MS)

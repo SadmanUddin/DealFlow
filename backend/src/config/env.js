@@ -63,7 +63,17 @@ const environmentSchema = z
           }),
         'CORS_ORIGINS must be a comma-separated list of origins'
       ),
-    FRONTEND_URL: z.url().optional(),
+    FRONTEND_URL: z
+      .url()
+      .refine(value => {
+        const url = new URL(value);
+        return (
+          ['http:', 'https:'].includes(url.protocol) &&
+          !url.username &&
+          !url.password
+        );
+      }, 'FRONTEND_URL must use HTTP(S) without credentials')
+      .optional(),
     DOCUMENT_STORAGE_DRIVER: z.enum(['r2', 'mock']).default('mock'),
     R2_ACCOUNT_ID: z.string().optional(),
     R2_ACCESS_KEY_ID: z.string().optional(),
@@ -89,6 +99,23 @@ const environmentSchema = z
     OUTBOX_BATCH_SIZE: z.coerce.number().int().min(1).max(100).default(20),
   })
   .superRefine((environment, context) => {
+    if (environment.NODE_ENV === 'production') {
+      for (const [key, urls] of [
+        ['CORS_ORIGINS', environment.CORS_ORIGINS.split(',')],
+        [
+          'FRONTEND_URL',
+          environment.FRONTEND_URL ? [environment.FRONTEND_URL] : [],
+        ],
+      ]) {
+        if (urls.some(url => !url.trim().startsWith('https://'))) {
+          context.addIssue({
+            code: 'custom',
+            path: [key],
+            message: `${key} must use HTTPS in production`,
+          });
+        }
+      }
+    }
     if (environment.DOCUMENT_STORAGE_DRIVER === 'r2') {
       for (const key of [
         'R2_ACCOUNT_ID',

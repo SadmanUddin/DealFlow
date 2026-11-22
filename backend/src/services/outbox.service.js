@@ -294,9 +294,9 @@ export const finishOutboxEvent = async event => {
 
 export const failOutboxEvent = async (event, error) => {
   const dead = error.permanent || event.attempts >= maxAttempts;
-  const safeError = (error.message || 'Event processing failed')
-    .replace(/(?:Bearer\s+)[^\s]+/gi, '[redacted]')
-    .slice(0, 500);
+  const safeError = error.permanent
+    ? 'Permanent delivery failure'
+    : 'Retryable processing failure';
   const delayMs = Math.min(
     3600000,
     5000 * 2 ** Math.max(0, event.attempts - 1)
@@ -371,11 +371,10 @@ export const processClaimedEvent = async event => {
     () => abortController.abort()
   );
   const heartbeat = setInterval(() => {
-    lease.assertLease().catch(error =>
+    lease.assertLease().catch(() =>
       logger.warn('Outbox lease refresh failed; event processing stopped', {
         eventId: event.id,
         eventType: event.type,
-        error: error.message,
       })
     );
   }, 20000);

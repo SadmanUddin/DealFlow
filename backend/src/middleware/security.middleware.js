@@ -68,6 +68,9 @@ const emailKey = req => {
   return accountFingerprint(`email:${email.trim().toLowerCase()}`);
 };
 
+// Express route matching ignores case and a trailing slash by default.
+const policyPath = path => path.toLowerCase().replace(/\/+$/, '') || '/';
+
 const isPublicListingRead = req =>
   ['GET', 'HEAD'].includes(req.method) &&
   (req.path === '/api/listings' ||
@@ -90,9 +93,10 @@ const isListingWrite = req =>
 
 const isDealNegotiationWrite = req =>
   (req.method === 'POST' && req.path === '/api/deals') ||
-  (req.method === 'PATCH' && /^\/api\/deals\/[1-9]\d*\/status$/.test(req.path)) ||
+  (req.method === 'PATCH' &&
+    /^\/api\/deals\/[1-9]\d*\/status$/.test(req.path)) ||
   (req.method === 'POST' &&
-    /^\/api\/deals\/[1-9]\d*\/offers(?:\/[1-9]\d*\/(?:respond|withdraw))?$/.test(
+    /^\/api\/deals\/[1-9]\d*\/(?:closing|offers(?:\/[1-9]\d*\/(?:respond|withdraw))?)$/.test(
       req.path
     ));
 
@@ -113,7 +117,13 @@ const isAuthEmailOperation = req =>
  * counters. Authenticated requests use both account and shared-IP safeguards;
  * the IP ceiling is deliberately higher to accommodate NAT and shared networks.
  */
-export function getRateLimitPolicy(req) {
+export function getRateLimitPolicy(request) {
+  const req = {
+    method: request.method,
+    path: policyPath(request.path),
+    body: request.body,
+    user: request.user,
+  };
   if (req.method === 'OPTIONS') return { name: 'cors-preflight', limits: [] };
 
   if (req.method === 'POST' && req.path === '/api/auth/sign-in') {
@@ -294,7 +304,8 @@ const retrySeconds = reason => {
 const ruleNames = policy => policy.limits.map(limit => limit.name);
 
 const securityMiddleware = async (req, res, next) => {
-  if (req.path !== '/api' && !req.path.startsWith('/api/')) return next();
+  const path = policyPath(req.path);
+  if (path !== '/api' && !path.startsWith('/api/')) return next();
 
   const policy = getRateLimitPolicy(req);
   if (policy.limits.length === 0) return next();
@@ -339,7 +350,6 @@ const securityMiddleware = async (req, res, next) => {
       logger.warn('Arcjet rejected an API request', {
         requestId: req.requestId,
         method: req.method,
-        endpoint: req.path,
         policy: policy.name,
         appliedPolicies: ruleNames(policy),
         reason: decision.reason.type,
@@ -363,7 +373,6 @@ const securityMiddleware = async (req, res, next) => {
       logger.warn('Arcjet decision returned an error; request allowed', {
         requestId: req.requestId,
         method: req.method,
-        endpoint: req.path,
         policy: policy.name,
         decisionId: decision.id,
         environment: environment.NODE_ENV,
@@ -377,7 +386,6 @@ const securityMiddleware = async (req, res, next) => {
     logger.error('Arcjet protection threw unexpectedly; request allowed', {
       requestId: req.requestId,
       method: req.method,
-      endpoint: req.path,
       policy: policy.name,
       environment: environment.NODE_ENV,
       authenticated: Boolean(req.user),

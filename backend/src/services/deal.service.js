@@ -163,8 +163,7 @@ export const listDeals = async (userId, { page: pageNo, limit, view }) => {
   return { deals: rows, pagination: page(pageNo, limit, total) };
 };
 
-export const getDeal = async (dealId, userId, isAdmin = false) => {
-  const deal = await participantDeal(dealId, userId, isAdmin);
+const dealVisibleTo = (deal, userId) => {
   const visibleDeal = { ...deal };
   if (![deal.buyer_id, deal.seller_id].includes(userId)) {
     for (const field of Object.keys(visibleDeal)) {
@@ -177,6 +176,12 @@ export const getDeal = async (dealId, userId, isAdmin = false) => {
       }
     }
   }
+  return visibleDeal;
+};
+
+export const getDeal = async (dealId, userId, isAdmin = false) => {
+  const deal = await participantDeal(dealId, userId, isAdmin);
+  const visibleDeal = dealVisibleTo(deal, userId);
   const participants = await db
     .select({
       id: users.id,
@@ -247,7 +252,7 @@ export const updateDealStatus = async (dealId, userId, role, status) => {
       'DEAL_STATUS_CHANGED',
       'Deal status changed; reload and try again'
     );
-  return rows[0];
+  return dealVisibleTo(rows[0], userId);
 };
 
 const closingErrors = {
@@ -256,7 +261,8 @@ const closingErrors = {
   disputed: 'Resolve the dispute before continuing with closing.',
   dispute_owner: 'Only the participant who raised the dispute can clear it.',
   agreement_required: 'Both parties must agree on the proposed closing amount.',
-  already_agreed: 'The final amount has been agreed. Report a dispute to pause closing and review the terms.',
+  already_agreed:
+    'The final amount has been agreed. Report a dispute to pause closing and review the terms.',
   invalid_amount:
     'Enter a positive closing amount with up to two decimal places.',
 };

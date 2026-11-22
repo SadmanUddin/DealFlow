@@ -408,13 +408,13 @@ describe('Arcjet request middleware', () => {
       'Arcjet rejected an API request',
       expect.objectContaining({
         requestId: req.requestId,
-        endpoint: '/api/listings',
         policy: 'public-listings-guest-read',
         reason: 'RATE_LIMIT',
         authenticated: false,
       })
     );
     expect(JSON.stringify(arcjetMocks.warn.mock.calls)).not.toContain('198.51');
+    expect(arcjetMocks.warn.mock.calls[0][1]).not.toHaveProperty('endpoint');
   });
 
   it('logs a denied write policy without logging body content', async () => {
@@ -474,4 +474,27 @@ describe('Arcjet request middleware', () => {
       'provider offline'
     );
   });
+});
+
+it('applies the same protection to Express-equivalent route spellings', async () => {
+  const signIn = { method: 'POST', body: { email: 'buyer@example.test' } };
+  expect(
+    getRateLimitPolicy(createRequest({ ...signIn, path: '/API/AUTH/SIGN-IN/' }))
+  ).toEqual(
+    getRateLimitPolicy(createRequest({ ...signIn, path: '/api/auth/sign-in' }))
+  );
+  const { next } = await runMiddleware({
+    ...signIn,
+    path: '/API/AUTH/SIGN-IN/',
+  });
+  expect(next).toHaveBeenCalledOnce();
+  expect(
+    getRateLimitPolicy(
+      createRequest({
+        path: '/api/deals/4/closing',
+        method: 'POST',
+        role: 'buyer',
+      })
+    ).name
+  ).toBe('deal-negotiation-write');
 });
