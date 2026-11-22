@@ -130,8 +130,8 @@ export function AccountPage() {
         {!profile.emailVerified && (
           <div className="mt-5 flex flex-col justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center">
             <p className="text-sm text-amber-950">
-              Email verification is pending. Verification email delivery is not
-              currently available.
+              Verify your email to finish setting up your account. Use the
+              link in your verification email or request a new one.
             </p>
             <a
               className="shrink-0 text-sm font-semibold text-emerald-900 underline"
@@ -297,12 +297,28 @@ export function AccountPage() {
                       type="checkbox"
                       checked={preferencesQuery.data[key]}
                       disabled={preferencesMutation.isPending}
-                      onChange={(event) =>
+                      onChange={(event) => {
+                        const current = preferencesQuery.data;
+                        if (!current) return;
                         preferencesMutation.mutate({
-                          ...preferencesQuery.data!,
-                          [key]: event.target.checked,
-                        })
-                      }
+                          listingStatus:
+                            key === "listingStatus"
+                              ? event.target.checked
+                              : current.listingStatus,
+                          listingPrice:
+                            key === "listingPrice"
+                              ? event.target.checked
+                              : current.listingPrice,
+                          listingDetails:
+                            key === "listingDetails"
+                              ? event.target.checked
+                              : current.listingDetails,
+                          dealUpdates:
+                            key === "dealUpdates"
+                              ? event.target.checked
+                              : current.dealUpdates,
+                        });
+                      }}
                     />
                     {label}
                   </label>

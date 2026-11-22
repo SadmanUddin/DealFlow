@@ -521,6 +521,15 @@ describe('password recovery', () => {
     expect(known.status).toBe(200);
     expect(unknown.status).toBe(200);
     expect(known.body.message).toBe(unknown.body.message);
+    const resetEmailEvent = mockDatabase.databaseState.outbox_events.find(
+      event => event.type === 'auth.password_reset'
+    );
+    expect(resetEmailEvent?.payload).toMatchObject({
+      email: 'buyer@example.test',
+    });
+    expect(resetEmailEvent?.payload.encryptedToken).not.toBe(
+      known.body.resetToken
+    );
     expect(productionResponse.body).not.toHaveProperty('resetToken');
     expect(reset.status).toBe(200);
     expect(oldPassword.status).toBe(401);

@@ -202,14 +202,17 @@ export const processOutboxEvent = async (
   event,
   { assertLease = async () => {} } = {}
 ) => {
-  if (event.type === 'auth.email_verification') {
+  if (
+    event.type === 'auth.email_verification' ||
+    event.type === 'auth.password_reset'
+  ) {
     const payload = event.payload;
     if (
       !payload ||
       typeof payload.email !== 'string' ||
       typeof payload.encryptedToken !== 'string'
     ) {
-      const error = new Error('Invalid verification email event payload');
+      const error = new Error('Invalid authentication email event payload');
       error.permanent = true;
       throw error;
     }
@@ -218,14 +221,24 @@ export const processOutboxEvent = async (
     const frontendUrl =
       getEnvironment().FRONTEND_URL ||
       getEnvironment().CORS_ORIGINS.split(',')[0].trim();
-    const link = new URL('/verify-email', frontendUrl);
+    const isVerification = event.type === 'auth.email_verification';
+    const link = new URL(
+      isVerification ? '/verify-email' : '/reset-password',
+      frontendUrl
+    );
     link.searchParams.set('token', token);
     link.searchParams.set('email', payload.email);
     await sendEmail({
       to: payload.email,
-      subject: 'Verify your DealFlow email',
-      text: `Verify your email address to complete your DealFlow registration: ${link}\n\nYou can also enter this verification token on DealFlow: ${token}\n\nThis link expires in 24 hours.`,
-      html: `<p>Verify your email address to complete your DealFlow registration.</p><p><a href="${link}">Verify email</a></p><p>If the link does not work, enter this token on DealFlow:</p><p><code>${token}</code></p><p>This link expires in 24 hours.</p>`,
+      subject: isVerification
+        ? 'Verify your DealFlow email'
+        : 'Reset your DealFlow password',
+      text: isVerification
+        ? `Verify your email address to complete your DealFlow registration: ${link}\n\nYou can also enter this verification token on DealFlow: ${token}\n\nThis link expires in 24 hours.`
+        : `Reset your DealFlow password using this link: ${link}\n\nThis link expires in 1 hour. If you did not request a password reset, you can ignore this email.`,
+      html: isVerification
+        ? `<p>Verify your email address to complete your DealFlow registration.</p><p><a href="${link}">Verify email</a></p><p>If the link does not work, enter this verification token on DealFlow:</p><p><code>${token}</code></p><p>This link expires in 24 hours.</p>`
+        : `<p>A password reset was requested for your DealFlow account.</p><p><a href="${link}">Reset password</a></p><p>This link expires in 1 hour. If you did not request a password reset, you can ignore this email.</p>`,
       idempotencyKey: `${event.eventKey}:email`,
       signal: event.signal,
     });

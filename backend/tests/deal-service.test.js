@@ -208,6 +208,10 @@ describe('Phase 8 deal service writes', () => {
     );
     expect(executed[0].query).toContain('UNION ALL');
     expect(executed[0].query).toContain('AS recipients(user_id)');
+    expect(executed[0].query).toMatch(
+      /CAST\([\s\S]*?AS integer\s*\)\s+AS user_id/
+    );
+    expect(executed[0].query.match(/'dealId', \?::integer/g)).toHaveLength(2);
     expect(executed[0].query).toContain('recipients.user_id <> ?');
     const counteredCte = executed[0].query.split('), countered AS (')[1];
     expect(counteredCte).toContain('RETURNING parent.id');
@@ -216,6 +220,9 @@ describe('Phase 8 deal service writes', () => {
     expect(executed[0].query).toContain('RETURNING current_deal.id');
     expect(executed[0].query).toContain('RETURNING inserted_offer.*');
     expect(executed[0].query).toContain('RETURNING inserted_activity.id');
+    expect(executed[0].query).toContain(
+      'INSERT INTO notifications AS inserted_notification'
+    );
     expect(executed[0].query).toContain('RETURNING inserted_notification.id');
     expect(executed[0].query).toContain('RETURNING inserted_event.id');
     expect(executed[0].query).not.toMatch(/RETURNING\s+id\b/);
@@ -342,14 +349,17 @@ describe('Phase 8 deal service writes', () => {
       { id: 50, deal_id: 31, created_by: 4, status: 'accepted' },
     ]);
     await respondToOffer(31, 50, 7, 'accept');
-    expect(executed.at(-1).query).toContain('status = \'pending\'');
-    expect(executed.at(-1).query).toContain('created_by <> ?');
+    const responseStatement = executed.at(-1).query;
+    expect(responseStatement).toContain('status = \'pending\'');
+    expect(responseStatement).toContain('created_by <> ?');
+    expect(responseStatement.match(/'dealId', \?::integer/g)).toHaveLength(2);
     db.executeResults.push([
       { id: 52, deal_id: 31, created_by: 7, status: 'withdrawn' },
     ]);
     await withdrawOffer(31, 52, 7);
     expect(executed.at(-1).query).toContain('status = \'pending\'');
     expect(executed.at(-1).query).toContain('created_by = ?');
+    expect(executed.at(-1).query.match(/'dealId', \?::integer/g)).toHaveLength(2);
   });
 
   it('does not report acceptance when the locked deal transition fails', async () => {

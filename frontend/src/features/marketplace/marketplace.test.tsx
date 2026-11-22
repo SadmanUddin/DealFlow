@@ -152,6 +152,9 @@ describe("public marketplace", () => {
     expect(container.querySelector("img")?.getAttribute("src")).toBe(
       "http://localhost:3000/api/listings/8/image?v=1795281600000",
     );
+    expect(container.querySelector("img")?.getAttribute("alt")).toBe(
+      "Seller-provided image for Independent neighborhood bakery",
+    );
   });
 
   it("loads the public listing image on the detail page", async () => {
@@ -166,6 +169,9 @@ describe("public marketplace", () => {
     });
     expect(container.querySelector("img")?.getAttribute("src")).toBe(
       "http://localhost:3000/api/listings/8/image?v=1795281600000",
+    );
+    expect(container.querySelector("img")?.getAttribute("alt")).toBe(
+      "Seller-provided image for Independent neighborhood bakery",
     );
   });
 

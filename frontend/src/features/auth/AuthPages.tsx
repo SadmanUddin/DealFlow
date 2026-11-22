@@ -250,6 +250,7 @@ export function LoginPage() {
 export function RegisterPage() {
   const { register: createAccount, isSigningUp } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [formError, setFormError] = useState("");
   const {
     register,
@@ -257,7 +258,9 @@ export function RegisterPage() {
     formState: { errors },
   } = useForm<SignUpValues>({
     resolver: zodResolver(signUpSchema),
-    defaultValues: { role: "buyer" },
+    defaultValues: {
+      role: searchParams.get("role") === "seller" ? "seller" : "buyer",
+    },
   });
 
   const submit = handleSubmit(async (values) => {
@@ -370,7 +373,7 @@ export function ForgotPasswordPage() {
     try {
       const result = await requestPasswordReset(values.email);
       setSuccess(
-        `${result.message} This backend currently does not deliver password reset emails, so a reset link may not arrive.`,
+        `${result.message} If an account exists for this address, reset instructions will be sent shortly.`,
       );
     } catch (error) {
       setFormError(toApiError(error).message);

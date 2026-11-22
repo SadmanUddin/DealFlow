@@ -138,8 +138,8 @@ export function SellerOverviewPage() {
               }
             />
           </section>
-          <section className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-            <SectionCard>
+          <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+            <SectionCard className="min-w-0">
               <SectionHeading
                 action={
                   <Link
@@ -180,7 +180,7 @@ export function SellerOverviewPage() {
                 />
               )}
             </SectionCard>
-            <SectionCard>
+            <SectionCard className="min-w-0">
               <SectionHeading
                 action={
                   <Link

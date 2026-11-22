@@ -289,6 +289,15 @@ describe('Arcjet request middleware', () => {
     expect(arcjetMocks.rules.every(rule => rule.mode === 'DRY_RUN')).toBe(true);
   });
 
+  it('provides Arcjet a pseudonymous user characteristic for anonymous requests', async () => {
+    const { req } = await runMiddleware({ path: '/api/listings' });
+    const characteristics = arcjetMocks.protect.mock.calls[0][1];
+
+    expect(characteristics.userId).toMatch(/^guest:[a-f0-9]{64}$/);
+    expect(characteristics.accountKey).toMatch(/^[a-f0-9]{64}$/);
+    expect(characteristics.userId).not.toContain(req.ip);
+  });
+
   it('does not trust a forwarded address over Express’s configured client IP', async () => {
     const { req } = await runMiddleware({
       path: '/api/listings',

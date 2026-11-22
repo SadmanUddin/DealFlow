@@ -222,7 +222,7 @@ export function ListingDetailsPage() {
       <div className="relative mt-5 flex min-h-56 items-end overflow-hidden rounded-[1.75rem] border border-emerald-900/[0.05] bg-[radial-gradient(ellipse_at_80%_5%,#d8eee1,transparent_40%),linear-gradient(135deg,#fff,#eef3f7_58%,#edf3f0)] p-6 sm:min-h-72 sm:p-10 lg:min-h-80">
         {listing.imageUrl && !imageFailed ? (
           <img
-            alt=""
+            alt={`Seller-provided image for ${listing.title}`}
             className="absolute inset-0 size-full object-cover"
             src={listingImageSrc(listing.imageUrl)}
             onError={() => setFailedImageUrl(listing.imageUrl ?? null)}

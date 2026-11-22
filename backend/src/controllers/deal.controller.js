@@ -64,16 +64,14 @@ export const offers = async (req, res) => {
     .json(await listOffers(id, req.user.id, dealListSchema.parse(req.query)));
 };
 export const respond = async (req, res) => {
-  const { id } = dealIdSchema.parse(req.params);
-  const { offerId } = dealOfferIdSchema.parse(req.params);
+  const { id, offerId } = dealOfferIdSchema.parse(req.params);
   const { action } = respondOfferSchema.parse(req.body);
   res
     .status(200)
     .json({ offer: await respondToOffer(id, offerId, req.user.id, action) });
 };
 export const withdraw = async (req, res) => {
-  const { id } = dealIdSchema.parse(req.params);
-  const { offerId } = dealOfferIdSchema.parse(req.params);
+  const { id, offerId } = dealOfferIdSchema.parse(req.params);
   res
     .status(200)
     .json({ offer: await withdrawOffer(id, offerId, req.user.id) });

@@ -14,6 +14,7 @@ import {
 } from '#controllers/listing.controller.js';
 import {
   authorizeRoles,
+  optionalAuthentication,
   requireAuthentication,
   requireCsrf,
 } from '#middleware/auth.middleware.js';
@@ -48,7 +49,7 @@ router.delete(
   requireCsrf,
   removeListingImageController
 );
-router.get('/:id', getPublishedListing);
+router.get('/:id', optionalAuthentication, getPublishedListing);
 router.patch(
   '/:id',
   requireAuthentication,

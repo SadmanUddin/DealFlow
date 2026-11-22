@@ -4,6 +4,7 @@ import {
   createDealSchema,
   createOfferSchema,
   dealIdSchema,
+  dealOfferIdSchema,
   dealStatusSchema,
   respondOfferSchema,
 } from '#validations/deal.validation.js';
@@ -57,6 +58,10 @@ describe('Phase 8 deal rules and request validation', () => {
   it('rejects malformed ids and unsupported offer actions', () => {
     expect(dealIdSchema.safeParse({ id: '12' }).success).toBe(true);
     expect(dealIdSchema.safeParse({ id: '0' }).success).toBe(false);
+    expect(dealOfferIdSchema.safeParse({ id: '12', offerId: '4' }).success).toBe(
+      true
+    );
+    expect(dealOfferIdSchema.safeParse({ offerId: '4' }).success).toBe(false);
     expect(respondOfferSchema.safeParse({ action: 'accept' }).success).toBe(
       true
     );

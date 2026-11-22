@@ -312,9 +312,10 @@ const securityMiddleware = async (req, res, next) => {
       );
     }
 
+    const accountKey = policy.accountKey || requestAccountKey(req);
     const characteristics = {
-      ...(req.user ? { userId: String(req.user.id) } : {}),
-      accountKey: policy.accountKey || requestAccountKey(req),
+      userId: req.user ? String(req.user.id) : `guest:${accountKey}`,
+      accountKey,
     };
     const decision = await requestProtector.protect(req, characteristics);
 

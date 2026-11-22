@@ -748,4 +748,35 @@ describe('verification email outbox delivery', () => {
       })
     );
   });
+
+  it('delivers password reset links through the mocked provider without exposing the stored token', async () => {
+    resetDatabase();
+    const token = 'r'.repeat(43);
+    const event = {
+      id: 992,
+      eventKey: 'auth:password-reset:mock-event',
+      type: 'auth.password_reset',
+      attempts: 1,
+      lockToken: 'mock-lock',
+      payload: {
+        email: 'reset-user@example.test',
+        encryptedToken: encryptVerificationToken(token),
+      },
+    };
+    sendEmail.mockResolvedValueOnce({ id: 'mock:password-reset' });
+
+    await processOutboxEvent(event);
+
+    expect(sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'reset-user@example.test',
+        subject: 'Reset your DealFlow password',
+        text: expect.stringContaining('http://localhost:5173/reset-password'),
+      })
+    );
+    expect(sendEmail.mock.calls[0][0].text).toContain(
+      `token=${encodeURIComponent(token)}`
+    );
+    expect(event.payload.encryptedToken).not.toContain(token);
+  });
 });

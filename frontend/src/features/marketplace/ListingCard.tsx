@@ -22,7 +22,7 @@ export function ListingCard({ listing }: { listing: PublicListing }) {
         <div className="relative flex aspect-[1.9/1] items-end overflow-hidden border-b border-line bg-[linear-gradient(125deg,#eff5f1_0%,#e5efe8_58%,#d6e6db_100%)] p-5 sm:p-6">
           {imageUrl ? (
             <img
-              alt=""
+              alt={`Seller-provided image for ${listing.title}`}
               className="absolute inset-0 size-full object-cover"
               loading="lazy"
               src={listingImageSrc(imageUrl)}

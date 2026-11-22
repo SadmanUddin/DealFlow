@@ -159,8 +159,8 @@ function ConversationInboxPage({ role }: { role: "buyer" | "seller" }) {
         </SectionCard>
       ) : null}
       {active ? (
-        <div className="grid min-h-[32rem] gap-4 lg:grid-cols-[minmax(16rem,0.38fr)_minmax(0,1fr)]">
-          <SectionCard className="p-2 sm:p-2">
+        <div className="grid min-h-[32rem] min-w-0 grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(16rem,0.38fr)_minmax(0,1fr)]">
+          <SectionCard className="min-w-0 p-2 sm:p-2">
             <h2 className="px-3 py-2 text-sm font-semibold">
               Your conversations
             </h2>
@@ -199,7 +199,7 @@ function ConversationInboxPage({ role }: { role: "buyer" | "seller" }) {
               ))}
             </ul>
           </SectionCard>
-          <SectionCard className="flex min-h-[32rem] flex-col">
+          <SectionCard className="flex min-h-[32rem] min-w-0 flex-col">
             <div className="border-b border-line pb-3">
               <h2 className="text-base font-semibold">{active.listingTitle}</h2>
               <p className="mt-1 text-xs text-ink-soft">

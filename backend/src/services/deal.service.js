@@ -251,11 +251,14 @@ export const createOffer = async (dealId, userId, input) => {
       RETURNING inserted_activity.id
     ), notification_events AS (
       SELECT
-        CASE WHEN offer.created_by = ${deal.buyer_id} THEN ${deal.seller_id} ELSE ${deal.buyer_id} END AS user_id,
+        CAST(
+          CASE WHEN offer.created_by = ${deal.buyer_id} THEN ${deal.seller_id} ELSE ${deal.buyer_id} END
+          AS integer
+        ) AS user_id,
         'deal:' || ${dealId} || ':offer:' || offer.id AS dedupe_key,
         CASE WHEN offer.parent_offer_id IS NULL THEN 'deal.offer' ELSE 'deal.counteroffer' END AS type,
         jsonb_build_object(
-          'dealId', ${dealId},
+          'dealId', ${dealId}::integer,
           'offerId', offer.id,
           'senderName', (SELECT sender.name FROM users AS sender WHERE sender.id = offer.created_by),
           'listingTitle', (SELECT listing.title FROM business_listings AS listing WHERE listing.id = ${deal.listing_id})
@@ -269,7 +272,7 @@ export const createOffer = async (dealId, userId, input) => {
       FROM deal_progress CROSS JOIN LATERAL unnest(ARRAY[deal_progress.buyer_id, deal_progress.seller_id]) AS recipients(user_id)
       WHERE recipients.user_id <> ${userId}
     ), notify AS (
-      INSERT INTO notifications(user_id, dedupe_key, type, payload)
+      INSERT INTO notifications AS inserted_notification(user_id, dedupe_key, type, payload)
       SELECT notification_events.user_id, notification_events.dedupe_key, notification_events.type, notification_events.payload
       FROM notification_events
       ON CONFLICT (dedupe_key) DO NOTHING RETURNING inserted_notification.id
@@ -277,7 +280,7 @@ export const createOffer = async (dealId, userId, input) => {
       SELECT
         'deal:' || ${dealId} || ':offer:' || offer.id AS event_key,
         CASE WHEN offer.parent_offer_id IS NULL THEN 'deal.offer' ELSE 'deal.counteroffer' END AS type,
-        jsonb_build_object('dealId', ${dealId}, 'offerId', offer.id, 'recipientIds', jsonb_build_array(CASE WHEN offer.created_by = ${deal.buyer_id} THEN ${deal.seller_id} ELSE ${deal.buyer_id} END)) AS payload
+        jsonb_build_object('dealId', ${dealId}::integer, 'offerId', offer.id, 'recipientIds', jsonb_build_array(CASE WHEN offer.created_by = ${deal.buyer_id} THEN ${deal.seller_id} ELSE ${deal.buyer_id} END)) AS payload
       FROM offer
       UNION ALL
       SELECT 'deal:' || deal_progress.id || ':negotiating',
@@ -359,12 +362,12 @@ export const respondToOffer = async (dealId, offerId, userId, action) => {
     ), notify AS (
       INSERT INTO notifications(user_id, dedupe_key, type, payload)
       SELECT changed.created_by,
-        'deal:' || ${dealId} || ':offer:' || changed.id || ':' || ${action}, ${action === 'accept' ? 'deal.offer_accepted' : 'deal.offer_rejected'}, jsonb_build_object('dealId', ${dealId}, 'offerId', changed.id)
+        'deal:' || ${dealId} || ':offer:' || changed.id || ':' || ${action}, ${action === 'accept' ? 'deal.offer_accepted' : 'deal.offer_rejected'}, jsonb_build_object('dealId', ${dealId}::integer, 'offerId', changed.id)
       FROM changed ON CONFLICT (dedupe_key) DO NOTHING RETURNING id
     ), email_event AS (
       INSERT INTO outbox_events(event_key, type, payload)
       SELECT 'deal:' || ${dealId} || ':offer:' || changed.id || ':' || ${action}, ${action === 'accept' ? 'deal.offer_accepted' : 'deal.offer_rejected'},
-        jsonb_build_object('dealId', ${dealId}, 'offerId', changed.id, 'recipientIds', jsonb_build_array(changed.created_by))
+        jsonb_build_object('dealId', ${dealId}::integer, 'offerId', changed.id, 'recipientIds', jsonb_build_array(changed.created_by))
       FROM changed ON CONFLICT (event_key) DO NOTHING RETURNING id
     ), status_activity AS (
       INSERT INTO deal_activities(deal_id, actor_id, event_type, metadata)
@@ -410,11 +413,11 @@ export const withdrawOffer = async (dealId, offerId, userId) => {
       SELECT deal_id, ${userId}, 'offer.withdrawn', jsonb_build_object('offerId', id) FROM changed RETURNING id
     ), notice AS (
       INSERT INTO notifications(user_id, dedupe_key, type, payload)
-      SELECT CASE WHEN ${userId} = changed.buyer_id THEN changed.seller_id ELSE changed.buyer_id END, 'deal:' || ${dealId} || ':offer:' || changed.id || ':withdrawn', 'deal.offer_withdrawn', jsonb_build_object('dealId', ${dealId}, 'offerId', changed.id)
+      SELECT CASE WHEN ${userId} = changed.buyer_id THEN changed.seller_id ELSE changed.buyer_id END, 'deal:' || ${dealId} || ':offer:' || changed.id || ':withdrawn', 'deal.offer_withdrawn', jsonb_build_object('dealId', ${dealId}::integer, 'offerId', changed.id)
       FROM changed ON CONFLICT (dedupe_key) DO NOTHING RETURNING id
     ), email_event AS (
       INSERT INTO outbox_events(event_key, type, payload)
-      SELECT 'deal:' || ${dealId} || ':offer:' || changed.id || ':withdrawn', 'deal.offer_withdrawn', jsonb_build_object('dealId', ${dealId}, 'offerId', changed.id, 'recipientIds', jsonb_build_array(CASE WHEN ${userId} = changed.buyer_id THEN changed.seller_id ELSE changed.buyer_id END))
+      SELECT 'deal:' || ${dealId} || ':offer:' || changed.id || ':withdrawn', 'deal.offer_withdrawn', jsonb_build_object('dealId', ${dealId}::integer, 'offerId', changed.id, 'recipientIds', jsonb_build_array(CASE WHEN ${userId} = changed.buyer_id THEN changed.seller_id ELSE changed.buyer_id END))
       FROM changed ON CONFLICT (event_key) DO NOTHING RETURNING id
     ) SELECT changed.* FROM changed CROSS JOIN activity`);
   const rows = Array.isArray(result) ? result : (result?.rows ?? []);

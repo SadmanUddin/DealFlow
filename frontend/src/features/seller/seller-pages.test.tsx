@@ -131,6 +131,30 @@ function renderPage(path: string, element: React.ReactNode) {
   );
 }
 
+function renderSellerListingLifecycle(path: string) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={client}>
+      <AuthContext.Provider value={auth}>
+        <MemoryRouter initialEntries={[path]}>
+          <Routes>
+            <Route
+              path="/seller/listings"
+              element={<SellerListingsPage />}
+            />
+            <Route
+              path="/seller/listings/:id/edit"
+              element={<SellerListingFormPage />}
+            />
+          </Routes>
+        </MemoryRouter>
+      </AuthContext.Provider>
+    </QueryClientProvider>,
+  );
+}
+
 beforeEach(() => {
   vi.mocked(sellerApi.listMyListings)
     .mockReset()
@@ -242,6 +266,21 @@ describe("seller workspace", () => {
         expect.any(Object),
       ),
     );
+  });
+
+  it("keeps the editor reachable for pending image updates while locking business details", async () => {
+    const user = userEvent.setup();
+    vi.mocked(sellerApi.listMyListings).mockResolvedValue({
+      listings: [{ ...listing, status: "pending" }],
+      pagination: page(1),
+    });
+    renderSellerListingLifecycle("/seller/listings");
+    await screen.findByText("pending");
+    await user.click(screen.getByRole("link", { name: "Edit" }));
+
+    expect(await screen.findByText(/awaiting review/i)).toBeInTheDocument();
+    expect(screen.getByLabelText("Business name")).toBeDisabled();
+    expect(screen.getByLabelText("Upload or replace image")).toBeEnabled();
   });
 
   it("requires a confirmation before deleting a seller draft", async () => {

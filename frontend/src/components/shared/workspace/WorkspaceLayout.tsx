@@ -83,7 +83,7 @@ export function WorkspaceLayout({ role }: { role: UserRole }) {
       <div className="page-container grid min-h-[calc(100vh-4.5rem)] gap-7 py-6 lg:grid-cols-[14.5rem_minmax(0,1fr)] lg:gap-10 lg:py-9">
         <aside
           aria-label={`${role} workspace navigation`}
-          className="lg:sticky lg:top-24 lg:h-[calc(100vh-7rem)]"
+          className="min-w-0 lg:sticky lg:top-24 lg:h-[calc(100vh-7rem)]"
         >
           <div className="hidden h-full flex-col lg:flex">
             <div className="border-b border-line pb-5">

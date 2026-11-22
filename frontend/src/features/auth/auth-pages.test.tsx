@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StrictMode } from "react";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -209,6 +209,13 @@ describe("authentication pages", () => {
       password: "long-secure-password",
       role: "seller",
     });
+  });
+
+  it("uses the seller role selected by a seller registration link", async () => {
+    renderApp(<RegisterPage />, "/register?role=seller");
+    expect(await screen.findByLabelText("I’m joining as a")).toHaveValue(
+      "seller",
+    );
   });
 
   it("shows the verification completion message and requires explicit sign in", async () => {
@@ -492,10 +499,62 @@ describe("profile updates", () => {
     );
     expect(apiMocks.deactivateAccount).toHaveBeenCalledWith("current-password");
   });
+
+  it("sends only editable preference fields on repeated saves", async () => {
+    const user = userEvent.setup();
+    apiMocks.restoreSession.mockResolvedValueOnce(buyer);
+    apiMocks.getProfile.mockResolvedValue(profile);
+    apiMocks.getEmailPreferences.mockResolvedValue({
+      listingStatus: true,
+      listingPrice: true,
+      listingDetails: true,
+      dealUpdates: true,
+      user_id: buyer.id,
+      updatedAt: "2026-11-22T00:00:00.000Z",
+    });
+    apiMocks.updateEmailPreferences.mockImplementation(async (value) => ({
+      ...value,
+      user_id: buyer.id,
+      updatedAt: "2026-11-22T00:00:01.000Z",
+    }));
+    renderApp(<AccountPage />, "/account");
+
+    const dealUpdates = await screen.findByLabelText("Deal updates");
+    await user.click(dealUpdates);
+    await waitFor(() =>
+      expect(apiMocks.updateEmailPreferences).toHaveBeenCalledTimes(1),
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText("Deal updates")).not.toBeChecked(),
+    );
+    await user.click(screen.getByLabelText("Deal updates"));
+    await waitFor(() =>
+      expect(apiMocks.updateEmailPreferences).toHaveBeenCalledTimes(2),
+    );
+
+    expect(apiMocks.updateEmailPreferences.mock.calls).toEqual([
+      [
+        {
+          listingStatus: true,
+          listingPrice: true,
+          listingDetails: true,
+          dealUpdates: false,
+        },
+      ],
+      [
+        {
+          listingStatus: true,
+          listingPrice: true,
+          listingDetails: true,
+          dealUpdates: true,
+        },
+      ],
+    ]);
+  });
 });
 
 describe("backend-supported recovery and verification forms", () => {
-  it("shows the backend response without claiming a reset email was sent", async () => {
+  it("shows the backend response for password reset requests", async () => {
     const user = userEvent.setup();
     apiMocks.requestPasswordReset.mockResolvedValueOnce({
       message: "Password reset request received.",
@@ -507,7 +566,7 @@ describe("backend-supported recovery and verification forms", () => {
     );
     await user.click(screen.getByRole("button", { name: "Request reset" }));
     expect(await screen.findByRole("status")).toHaveTextContent(
-      "does not deliver password reset emails",
+      "reset instructions will be sent shortly",
     );
     expect(apiMocks.requestPasswordReset.mock.calls[0]?.[0]).toBe(
       "alex@example.com",

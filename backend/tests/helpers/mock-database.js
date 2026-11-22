@@ -335,6 +335,14 @@ const project = (projection, rowSet, fallback) => {
   const projectSql = column => {
     const query = column?.__sql ?? column?.query ?? '';
     const values = column?.values ?? [];
+    if (query.includes('EXISTS (SELECT 1 FROM favorites')) {
+      const listingId = valueFor(rowSet, values.find(value => value?.table));
+      const viewerId = values.find(value => !value?.table);
+      return databaseState.favorites.some(
+        favorite =>
+          favorite.listing_id === listingId && favorite.user_id === viewerId
+      );
+    }
     if (query.includes('SELECT name FROM users')) {
       let userId;
       if (query.includes('CASE WHEN')) {

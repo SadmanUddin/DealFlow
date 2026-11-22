@@ -322,8 +322,8 @@ export function DealDetailPage() {
           />
         </section>
 
-        <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_19rem]">
-          <div className="space-y-5">
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] items-start gap-5 xl:grid-cols-[minmax(0,1fr)_19rem]">
+          <div className="min-w-0 space-y-5">
             <SectionCard>
               <SectionHeading
                 description="The backend shares participant IDs but does not expose names or contact details in the deal response."
@@ -623,7 +623,7 @@ export function DealDetailPage() {
             <DealDocumentsPanel dealId={deal.id} />
           </div>
 
-          <aside className="space-y-5">
+          <aside className="min-w-0 space-y-5">
             <SectionCard>
               <SectionHeading
                 description="These transitions mirror the backend lifecycle. The server validates every request."

@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { getDealDocumentDownload } = vi.hoisted(() => ({
+const { getDealDocumentDownload, respondToOffer, withdrawOffer } = vi.hoisted(() => ({
   getDealDocumentDownload: vi.fn(),
+  respondToOffer: vi.fn(),
+  withdrawOffer: vi.fn(),
 }));
 
 vi.mock('../src/services/deal.service.js', () => ({
@@ -14,9 +16,9 @@ vi.mock('../src/services/deal.service.js', () => ({
   listDealDocuments: vi.fn(),
   listDeals: vi.fn(),
   listOffers: vi.fn(),
-  respondToOffer: vi.fn(),
+  respondToOffer,
   updateDealStatus: vi.fn(),
-  withdrawOffer: vi.fn(),
+  withdrawOffer,
 }));
 
 describe('deal document download controller', () => {
@@ -51,5 +53,39 @@ describe('deal document download controller', () => {
       })
     );
     expect(stream.pipe).toHaveBeenCalledWith(response);
+  });
+});
+
+describe('deal offer response controllers', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('accepts the combined deal and offer route params for responding', async () => {
+    const { respond } = await import('../src/controllers/deal.controller.js');
+    const response = { status: vi.fn(() => response), json: vi.fn() };
+    respondToOffer.mockResolvedValue({ id: 90, status: 'accepted' });
+
+    await respond(
+      { params: { id: '31', offerId: '90' }, body: { action: 'accept' }, user: { id: 7 } },
+      response
+    );
+
+    expect(respondToOffer).toHaveBeenCalledWith(31, 90, 7, 'accept');
+    expect(response.status).toHaveBeenCalledWith(200);
+  });
+
+  it('accepts the combined deal and offer route params for withdrawal', async () => {
+    const { withdraw } = await import('../src/controllers/deal.controller.js');
+    const response = { status: vi.fn(() => response), json: vi.fn() };
+    withdrawOffer.mockResolvedValue({ id: 90, status: 'withdrawn' });
+
+    await withdraw(
+      { params: { id: '31', offerId: '90' }, user: { id: 7 } },
+      response
+    );
+
+    expect(withdrawOffer).toHaveBeenCalledWith(31, 90, 7);
+    expect(response.status).toHaveBeenCalledWith(200);
   });
 });

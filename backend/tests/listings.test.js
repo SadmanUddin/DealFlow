@@ -171,6 +171,37 @@ describe('public listing visibility', () => {
     expect(hiddenDetails.every(response => response.status === 404)).toBe(true);
   });
 
+  it('returns a buyer-specific saved state without sharing it through public caching', async () => {
+    const seller = credentialsFor(
+      await signup('seller', 'seller@listing.test')
+    );
+    const buyer = credentialsFor(await signup('buyer', 'buyer@listing.test'));
+    const created = await createAs(seller);
+    const listingId = created.body.listing.id;
+    mock.databaseState.business_listings[0].status = 'published';
+    mock.databaseState.business_listings[0].published_at = new Date();
+
+    const publicResponse = await request(app).get(`/api/listings/${listingId}`);
+    expect(publicResponse.body.listing.isFavorite).toBeUndefined();
+    expect(publicResponse.headers['cache-control']).toBe('public, max-age=60');
+
+    await signed(request(app).post(`/api/favorites/${listingId}`), buyer).send({});
+    const savedResponse = await request(app)
+      .get(`/api/listings/${listingId}`)
+      .set('Cookie', buyer.cookie);
+    expect(savedResponse.body.listing.isFavorite).toBe(true);
+    expect(savedResponse.headers['cache-control']).toBe('private, no-store');
+
+    await signed(
+      request(app).delete(`/api/favorites/${listingId}`),
+      buyer
+    );
+    const unsavedResponse = await request(app)
+      .get(`/api/listings/${listingId}`)
+      .set('Cookie', buyer.cookie);
+    expect(unsavedResponse.body.listing.isFavorite).toBe(false);
+  });
+
   it('validates listing IDs and pagination', async () => {
     expect((await request(app).get('/api/listings?page=0')).status).toBe(400);
     expect((await request(app).get('/api/listings/not-an-id')).status).toBe(

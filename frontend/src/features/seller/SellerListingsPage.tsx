@@ -305,6 +305,7 @@ function ListingRow({
           ) : null}
           {listing.status === "draft" ||
           listing.status === "rejected" ||
+          listing.status === "pending" ||
           listing.status === "published" ? (
             <Button asChild size="sm" variant="outline">
               <Link to={`/seller/listings/${listing.id}/edit`}>Edit</Link>

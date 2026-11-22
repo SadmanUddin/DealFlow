@@ -276,13 +276,27 @@ export const verifyEmail = async token => {
 
 export const requestPasswordReset = async email => {
   const [user] = await db
-    .select({ id: users.id })
+    .select({ id: users.id, email: users.email })
     .from(users)
     .where(and(eq(users.email, email), eq(users.is_active, true)))
     .limit(1);
   if (!user) return { token: null, decoyToken: newToken() };
+  const token = await issueOneTimeToken(
+    user.id,
+    'password_reset',
+    RESET_TOKEN_MS
+  );
+  await db.insert(outboxEvents).values({
+    event_key: `auth:password-reset:${randomUUID()}`,
+    type: 'auth.password_reset',
+    payload: {
+      userId: user.id,
+      email: user.email,
+      encryptedToken: encryptVerificationToken(token),
+    },
+  });
   return {
-    token: await issueOneTimeToken(user.id, 'password_reset', RESET_TOKEN_MS),
+    token,
   };
 };
 

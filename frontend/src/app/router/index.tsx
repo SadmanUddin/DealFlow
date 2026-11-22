@@ -4,7 +4,7 @@ import { LoadingState } from "@/components/shared/LoadingState";
 import { MarketingLayout } from "@/components/shared/MarketingLayout";
 import { NotFoundPage } from "@/features/landing/NotFoundPage";
 import { LandingPage } from "@/features/landing/LandingPage";
-import { PlaceholderPage } from "@/features/landing/PlaceholderPage";
+import { AudienceLandingPage } from "@/features/landing/AudienceLandingPage";
 import { RouteErrorPage } from "@/features/landing/RouteErrorPage";
 import {
   RequireAuth,
@@ -197,11 +197,11 @@ const router = createBrowserRouter([
       { path: "unauthorized", element: <UnauthorizedPage /> },
       {
         path: "buyers",
-        element: lazyPage(<MarketplacePage />),
+        element: <AudienceLandingPage audience="buyers" />,
       },
       {
         path: "sellers",
-        element: <PlaceholderPage audience="sellers" />,
+        element: <AudienceLandingPage audience="sellers" />,
       },
       { path: "*", element: <NotFoundPage /> },
     ],

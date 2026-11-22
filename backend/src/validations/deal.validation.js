@@ -11,7 +11,7 @@ const pagination = {
   limit: z.coerce.number().int().min(1).max(100).default(20),
 };
 export const dealIdSchema = z.object({ id }).strict();
-export const dealOfferIdSchema = z.object({ offerId: id }).strict();
+export const dealOfferIdSchema = z.object({ id, offerId: id }).strict();
 export const dealDocumentIdSchema = z.object({ documentId: id }).strict();
 export const dealDocumentDownloadParamsSchema = z
   .object({ id, documentId: id })

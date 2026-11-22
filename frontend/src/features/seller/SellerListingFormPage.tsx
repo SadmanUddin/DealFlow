@@ -233,6 +233,7 @@ export function SellerListingFormPage() {
           />
           <div className="mt-5 grid gap-5">
             <Field
+              disabled={locked}
               errors={form.formState.errors.title?.message}
               label="Business name"
               name="title"
