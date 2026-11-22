@@ -1,3 +1,10 @@
+import {
+  activateAdminMfa,
+  beginAdminMfa,
+  getAdminMfaStatus,
+  removeAdminMfa,
+  replaceAdminMfaRecovery,
+} from '#services/admin-mfa.service.js';
 import { getEnvironment } from '#config/env.js';
 import {
   authenticateUser,
@@ -14,6 +21,8 @@ import {
 import { cookies } from '#utils/cookies.js';
 import {
   forgotPasswordSchema,
+  mfaEnrollmentSchema,
+  mfaConfirmationSchema,
   resetPasswordSchema,
   signInSchema,
   signupSchema,
@@ -89,4 +98,33 @@ export const resetPasswordWithToken = async (req, res) => {
   const input = resetPasswordSchema.parse(req.body);
   await resetPassword(input.token, input.password);
   res.status(200).json({ message: 'Password reset successfully' });
+};
+
+export const mfaStatus = async (req, res) =>
+  res.json(await getAdminMfaStatus(req.user.id));
+
+export const mfaBegin = async (req, res) => {
+  const { password } = mfaEnrollmentSchema.parse(req.body);
+  res.json(await beginAdminMfa(req.user.id, password));
+};
+
+export const mfaActivate = async (req, res) => {
+  const { password, code } = mfaConfirmationSchema.parse(req.body);
+  const result = await activateAdminMfa(req.user.id, password, code);
+  cookies.clearSession(res);
+  res.json(result);
+};
+
+export const mfaReplaceRecovery = async (req, res) => {
+  const { password, code } = mfaConfirmationSchema.parse(req.body);
+  const result = await replaceAdminMfaRecovery(req.user.id, password, code);
+  cookies.clearSession(res);
+  res.json(result);
+};
+
+export const mfaRemove = async (req, res) => {
+  const { password, code } = mfaConfirmationSchema.parse(req.body);
+  await removeAdminMfa(req.user.id, password, code);
+  cookies.clearSession(res);
+  res.json({ message: 'Administrator MFA removed' });
 };

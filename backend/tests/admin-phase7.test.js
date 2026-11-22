@@ -422,7 +422,7 @@ describe('Phase 7 authorization and user moderation', () => {
     ).toBe('SELF_SESSION_REVOCATION_DENIED');
   });
 
-  it('does not add a second session-revocation audit when the update changes zero rows', async () => {
+  it('audits a generation advance even if no stored sessions remain', async () => {
     const credentials = cookieFor(3);
     const first = await signed(
       request(app).post('/api/admin/users/2/revoke-sessions'),
@@ -438,7 +438,7 @@ describe('Phase 7 authorization and user moderation', () => {
       mock.databaseState.admin_audit_logs.filter(
         row => row.action === 'user.sessions_revoked'
       )
-    ).toHaveLength(1);
+    ).toHaveLength(2);
   });
 });
 

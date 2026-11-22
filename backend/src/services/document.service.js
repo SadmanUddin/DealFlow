@@ -93,6 +93,7 @@ export const uploadConversationDocument = async (
     const hash = createHash('sha256');
     const key = `documents/${randomUUID()}`;
     let uploadPromise;
+    let inspection;
     let completed = false;
     let parser;
     try {
@@ -118,7 +119,7 @@ export const uploadConversationDocument = async (
       const spec = allowed[extension];
       if (!spec) invalid = true;
       mime = spec?.mime;
-      const inspect = new Transform({
+      inspection = new Transform({
         transform(chunk, _encoding, callback) {
           size += chunk.length;
           hash.update(chunk);
@@ -170,7 +171,7 @@ export const uploadConversationDocument = async (
       });
       uploadPromise = uploadObject(
         key,
-        stream.pipe(inspect),
+        stream.pipe(inspection),
         mime ?? 'application/octet-stream'
       );
       uploadPromise.catch(() => {});
@@ -178,14 +179,29 @@ export const uploadConversationDocument = async (
     parser.on('filesLimit', () => {
       invalid = true;
     });
-    parser.on('error', () =>
+    const cleanup = async () => {
+      if (!uploadPromise) return;
+      await uploadPromise.catch(() => {});
+      await removeObject(key).catch(() => {});
+    };
+    const terminate = async () => {
+      if (completed) return;
+      completed = true;
+      req.off('aborted', terminate);
+      req.unpipe(parser);
+      fileStream?.unpipe(inspection);
+      inspection?.destroy();
+      await cleanup();
       reject(
         fail(400, 'INVALID_MULTIPART', 'Multipart upload could not be parsed')
-      )
-    );
+      );
+    };
+    parser.on('error', terminate);
+    req.once('aborted', terminate);
     parser.on('close', async () => {
       if (completed) return;
       completed = true;
+      req.off('aborted', terminate);
       try {
         if (!fileStream || !uploadPromise)
           throw fail(400, 'FILE_REQUIRED', 'A file field is required');
@@ -199,6 +215,9 @@ export const uploadConversationDocument = async (
             'File type or content is not supported'
           );
         const checksum = hash.digest('hex');
+        const status = env.DOCUMENT_QUARANTINE_REQUIRED
+          ? 'pending'
+          : 'available';
         const [row] = await db
           .insert(conversationDocuments)
           .values({
@@ -209,19 +228,12 @@ export const uploadConversationDocument = async (
             mime_type: mime,
             size_bytes: size,
             sha256: checksum,
-            status: 'available',
+            status,
           })
           .returning(publicFields);
-        resolve({ document: row });
+        resolve({ document: { ...row, status } });
       } catch (error) {
-        if (uploadPromise) {
-          try {
-            await uploadPromise;
-            await removeObject(key);
-          } catch {
-            /* retry cleanup is recorded below when possible */
-          }
-        }
+        await cleanup();
         reject(error);
       }
     });

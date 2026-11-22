@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import request from 'supertest';
 
+const probe = vi.hoisted(() => vi.fn());
+vi.mock('#config/database.js', () => ({ db: {}, checkDatabase: probe }));
 vi.mock('../src/config/logger.js', () => ({
   default: {
     error: vi.fn(),
@@ -33,4 +35,15 @@ describe('Health Endpoint', () => {
 
     expect(response.headers['content-type']).toContain('application/json');
   });
+});
+
+it('reports database readiness without leaking provider diagnostics', async () => {
+  probe
+    .mockResolvedValueOnce(undefined)
+    .mockRejectedValueOnce(new Error('fixture provider detail'));
+  expect((await request(app).get('/ready')).status).toBe(200);
+  const response = await request(app).get('/ready');
+  expect(response.status).toBe(503);
+  expect(response.body).toEqual({ status: 'unavailable' });
+  expect(response.headers['cache-control']).toBe('no-store');
 });

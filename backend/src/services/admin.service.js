@@ -313,17 +313,21 @@ export const revokeUserSessions = async (
   const rows = await executeRows(sql`
     /* phase7:session-revoke */
     WITH args AS (SELECT ${payload}::jsonb AS value),
-    changed AS (
+    invalidated AS (
+      UPDATE users SET session_generation = session_generation + 1
+      FROM args WHERE id = (args.value->>'targetId')::integer
+      RETURNING id
+    ), changed AS (
       UPDATE auth_sessions AS session SET revoked_at = now()
-      FROM args
-      WHERE session.user_id = (args.value->>'targetId')::integer AND session.revoked_at IS NULL
+      FROM invalidated
+      WHERE session.user_id = invalidated.id AND session.revoked_at IS NULL
       RETURNING session.id
     ), audited AS (
       INSERT INTO admin_audit_logs(actor_id, action, target_type, target_id, reason, before_state, after_state, request_id)
       SELECT (args.value->>'actorId')::integer, 'user.sessions_revoked', 'user', args.value->>'targetId',
         args.value->>'reason', jsonb_build_object('activeSessions', (SELECT count(*) FROM changed)),
         jsonb_build_object('activeSessions', 0), args.value->>'requestId'
-      FROM args WHERE EXISTS (SELECT 1 FROM changed)
+      FROM args WHERE EXISTS (SELECT 1 FROM invalidated)
       RETURNING id AS audit_id
     )
     SELECT (SELECT count(*)::integer FROM changed) AS "revokedCount",

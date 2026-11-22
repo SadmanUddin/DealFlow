@@ -1,14 +1,11 @@
-const isPublicListingRead = req =>
-  ['GET', 'HEAD'].includes(req.method) &&
-  (req.path === '/api/listings' ||
-    /^\/api\/listings\/[1-9]\d*$/.test(req.path));
-
-const isApiRequest = req => req.path === '/api' || req.path.startsWith('/api/');
-
 export const privateCacheMiddleware = (req, res, next) => {
-  if (!isApiRequest(req)) return next();
+  const path = req.path.toLowerCase().replace(/\/+$/, '');
+  if (path !== '/api' && !path.startsWith('/api/')) return next();
 
-  if (isPublicListingRead(req)) {
+  if (
+    ['GET', 'HEAD'].includes(req.method) &&
+    (path === '/api/listings' || /^\/api\/listings\/[1-9]\d*$/.test(path))
+  ) {
     // Availability can change as soon as both parties confirm closing.
     res.set('Cache-Control', 'public, no-cache');
     return next();

@@ -108,8 +108,12 @@ export function SellerInquiryDetailPage() {
   });
   const uploadMutation = useMutation({
     mutationFn: (file: File) => uploadInquiryDocument(id, file),
-    onSuccess: async () => {
-      setNotice("Document uploaded securely.");
+    onSuccess: async (document) => {
+      setNotice(
+        document.status === "pending"
+          ? "Document uploaded and awaiting security review."
+          : "Document uploaded securely.",
+      );
       setError("");
       await client.invalidateQueries({
         queryKey: ["conversations", id, "documents"],

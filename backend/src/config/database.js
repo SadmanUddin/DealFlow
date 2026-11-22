@@ -11,3 +11,8 @@ const connectionString =
 const sql = neon(connectionString);
 const db = drizzle(sql);
 export { db, sql };
+
+export const checkDatabase = () =>
+  sql.query('SELECT 1', [], {
+    fetchOptions: { signal: globalThis.AbortSignal.timeout(1500) },
+  });

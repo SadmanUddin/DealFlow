@@ -10,6 +10,10 @@ export const modelTables = {
     'name',
     'email',
     'password',
+    'session_generation',
+    'mfa_secret',
+    'mfa_pending_secret',
+    'mfa_pending_until',
     'role',
     'email_verified',
     'is_active',
@@ -23,6 +27,7 @@ export const modelTables = {
     'id',
     'user_id',
     'csrf_token_hash',
+    'session_generation',
     'expires_at',
     'revoked_at',
     'created_at',
@@ -272,8 +277,9 @@ const orderValueFor = (rowSet, order) => {
     const conversation = rowSet.conversations;
     const latestMessage = databaseState.messages
       .filter(message => message.conversation_id === conversation.id)
-      .sort((left, right) =>
-        right.created_at - left.created_at || right.id - left.id
+      .sort(
+        (left, right) =>
+          right.created_at - left.created_at || right.id - left.id
       )[0];
     return latestMessage?.created_at ?? conversation.created_at;
   }
@@ -339,7 +345,10 @@ const project = (projection, rowSet, fallback) => {
     const query = column?.__sql ?? column?.query ?? '';
     const values = column?.values ?? [];
     if (query.includes('EXISTS (SELECT 1 FROM favorites')) {
-      const listingId = valueFor(rowSet, values.find(value => value?.table));
+      const listingId = valueFor(
+        rowSet,
+        values.find(value => value?.table)
+      );
       const viewerId = values.find(value => !value?.table);
       return databaseState.favorites.some(
         favorite =>
@@ -589,6 +598,7 @@ class Query {
       const now = new Date();
       const row = { ...values };
       if (this.target.__name === 'users') {
+        row.session_generation ??= 0;
         if (rows.some(user => user.email === values.email)) {
           const error = new Error('Unique constraint violation');
           error.code = '23505';
@@ -706,6 +716,22 @@ export const db = {
   delete: target => new Query('delete', null, target),
   execute: async statement => {
     const authMarker = statement.__sql?.match(/auth:([a-z-]+)/)?.[1];
+    if (authMarker === 'issue-session') {
+      const [id, csrfHash, expires, userId, generation] = statement.values;
+      const user = databaseState.users.find(
+        row => row.id === userId && row.is_active && row.email_verified
+      );
+      if (!user || (user.session_generation ?? 0) !== generation) return [];
+      databaseState.auth_sessions.push({
+        id,
+        user_id: userId,
+        csrf_token_hash: csrfHash,
+        expires_at: new Date(expires),
+        session_generation: user.session_generation,
+        revoked_at: null,
+      });
+      return [{ id }];
+    }
     if (authMarker === 'verify-email' || authMarker === 'reset-password') {
       const error = databaseState.failNext;
       const shouldFail =
@@ -737,6 +763,8 @@ export const db = {
       if (!user) return [];
       token.consumed_at = new Date();
       if (authMarker === 'verify-email') {
+        if (!user.email_verified)
+          user.session_generation = (user.session_generation ?? 0) + 1;
         user.email_verified = true;
         user.updated_at = new Date();
         for (const session of databaseState.auth_sessions.filter(
@@ -745,6 +773,7 @@ export const db = {
           session.revoked_at = new Date();
       } else {
         user.password = passwordHash;
+        user.session_generation = (user.session_generation ?? 0) + 1;
         user.updated_at = new Date();
         for (const session of databaseState.auth_sessions.filter(
           row => row.user_id === user.id && row.revoked_at == null
@@ -761,7 +790,7 @@ export const db = {
     if (
       !statement.__sql.includes('INSERT INTO admin_audit_logs') ||
       (marker === 'session-revoke'
-        ? !statement.__sql.includes('EXISTS (SELECT 1 FROM changed)')
+        ? !statement.__sql.includes('EXISTS (SELECT 1 FROM invalidated)')
         : !statement.__sql.includes('FROM changed'))
     ) {
       throw new Error(
@@ -904,11 +933,13 @@ export const db = {
       return [{ id: user.id, role: user.role, auditId }];
     }
     if (marker === 'session-revoke') {
+      const user = databaseState.users.find(row => row.id === payload.targetId);
+      if (user) user.session_generation = (user.session_generation ?? 0) + 1;
       const sessions = databaseState.auth_sessions.filter(
         row => row.user_id === payload.targetId && row.revoked_at == null
       );
       for (const session of sessions) session.revoked_at = new Date();
-      if (sessions.length)
+      if (user)
         insertAudit({
           actorId: payload.actorId,
           action: 'user.sessions_revoked',
@@ -919,9 +950,7 @@ export const db = {
           after: { activeSessions: 0 },
           requestId: payload.requestId,
         });
-      return [
-        { revokedCount: sessions.length, auditCount: sessions.length ? 1 : 0 },
-      ];
+      return [{ revokedCount: sessions.length, auditCount: user ? 1 : 0 }];
     }
     if (marker === 'listing-moderation' || marker === 'listing-availability') {
       const listing = databaseState.business_listings.find(

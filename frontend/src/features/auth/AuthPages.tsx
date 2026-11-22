@@ -180,6 +180,7 @@ export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [formError, setFormError] = useState("");
+  const [mfaRequired, setMfaRequired] = useState(false);
   const {
     register,
     handleSubmit,
@@ -192,7 +193,10 @@ export function LoginPage() {
       await login(values);
       navigate(safeReturnTo(location.state), { replace: true });
     } catch (error) {
-      setFormError(toApiError(error).message);
+      const failure = toApiError(error);
+      if (failure.code === "MFA_REQUIRED" || failure.code === "MFA_INVALID")
+        setMfaRequired(true);
+      setFormError(failure.message);
     }
   });
 
@@ -231,6 +235,16 @@ export function LoginPage() {
             </Link>
           </div>
         </div>
+        {mfaRequired && (
+          <TextField
+            autoComplete="one-time-code"
+            autoFocus
+            error={errors.mfaCode?.message}
+            id="mfa-code"
+            label="Authenticator or recovery code"
+            {...register("mfaCode")}
+          />
+        )}
         <FormAlert>{formError}</FormAlert>
         <SubmitButton pending={isSigningIn}>Sign in</SubmitButton>
       </form>

@@ -39,6 +39,14 @@ const environmentSchema = z
     NODE_ENV: z
       .enum(['development', 'test', 'production'])
       .default('development'),
+    ADMIN_MFA_REQUIRED: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform(value => value === 'true'),
+    ADMIN_MFA_ENCRYPTION_KEY: z
+      .string()
+      .regex(/^[a-fA-F0-9]{64}$/)
+      .optional(),
     PORT: z.coerce.number().int().positive().default(3000),
     DATABASE_URL: postgresUrl.optional(),
     TEST_DATABASE_URL: postgresUrl.optional(),
@@ -74,6 +82,10 @@ const environmentSchema = z
         );
       }, 'FRONTEND_URL must use HTTP(S) without credentials')
       .optional(),
+    DOCUMENT_QUARANTINE_REQUIRED: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform(value => value === 'true'),
     DOCUMENT_STORAGE_DRIVER: z.enum(['r2', 'mock']).default('mock'),
     R2_ACCOUNT_ID: z.string().optional(),
     R2_ACCESS_KEY_ID: z.string().optional(),
@@ -99,6 +111,17 @@ const environmentSchema = z
     OUTBOX_BATCH_SIZE: z.coerce.number().int().min(1).max(100).default(20),
   })
   .superRefine((environment, context) => {
+    if (
+      environment.ADMIN_MFA_REQUIRED &&
+      !environment.ADMIN_MFA_ENCRYPTION_KEY
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['ADMIN_MFA_ENCRYPTION_KEY'],
+        message:
+          'An encryption key is required when administrator MFA is enforced',
+      });
+    }
     if (environment.NODE_ENV === 'production') {
       for (const [key, urls] of [
         ['CORS_ORIGINS', environment.CORS_ORIGINS.split(',')],

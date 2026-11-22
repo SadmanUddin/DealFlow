@@ -144,6 +144,7 @@ export const markInquiryRead = (id: number) =>
   );
 
 const documentSchema = z.object({
+  status: z.enum(["pending", "available"]).optional(),
   id: z.number().int().positive(),
   originalFilename: z.string(),
   mimeType: z.string(),

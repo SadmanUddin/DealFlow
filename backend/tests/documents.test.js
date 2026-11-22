@@ -395,3 +395,30 @@ describe('conversation documents', () => {
     });
   });
 });
+
+it('keeps newly quarantined uploads inaccessible to both participants', async () => {
+  vi.stubEnv('DOCUMENT_QUARANTINE_REQUIRED', 'true');
+  try {
+    const response = await upload(seller);
+    expect(response.status).toBe(201);
+    const document = response.body.document;
+    expect(document.status).toBe('pending');
+    expect(document).not.toHaveProperty('storage_key');
+    for (const party of [buyer, seller]) {
+      const list = await signed(
+        request(app).get(`/api/conversations/${conversationId}/documents`),
+        party
+      );
+      expect(list.body.documents).toEqual([]);
+      const download = await signed(
+        request(app).get(
+          `/api/conversations/${conversationId}/documents/${document.id}/download`
+        ),
+        party
+      );
+      expect(download.status).toBe(404);
+    }
+  } finally {
+    vi.unstubAllEnvs();
+  }
+});

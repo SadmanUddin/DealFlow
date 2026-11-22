@@ -498,3 +498,18 @@ it('applies the same protection to Express-equivalent route spellings', async ()
     ).name
   ).toBe('deal-negotiation-write');
 });
+
+it('uses a dedicated account and network limit for administrator MFA changes', () => {
+  const policy = getRateLimitPolicy(
+    createRequest({
+      method: 'POST',
+      path: '/api/auth/admin-mfa/recovery',
+      role: 'admin',
+    })
+  );
+  expect(policy.name).toBe('administrator-mfa');
+  expect(policy.limits).toEqual([
+    expect.objectContaining({ max: 10, characteristics: ['userId'] }),
+    expect.objectContaining({ max: 60, characteristics: ['ip.src'] }),
+  ]);
+});

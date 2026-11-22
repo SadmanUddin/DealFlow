@@ -45,9 +45,7 @@ describe('API HTTP cache policy', () => {
       app.get(path, (_req, res) => res.json({ listing: 'published' }));
 
       const first = await request(app).get(path).expect(200);
-      expect(first.headers['cache-control']).toBe(
-        'public, no-cache'
-      );
+      expect(first.headers['cache-control']).toBe('public, no-cache');
 
       const revalidated = await request(app)
         .get(path)
@@ -65,4 +63,20 @@ describe('API HTTP cache policy', () => {
     const response = await request(app).get('/marketplace').expect(200);
     expect(response.headers['cache-control']).toBeUndefined();
   });
+});
+
+it('applies no-store to protected route spellings accepted by Express', () => {
+  const values = {};
+  const req = {
+    method: 'GET',
+    path: '/API/AUTH/ADMIN-MFA/',
+    headers: { 'if-none-match': 'fixture' },
+  };
+  privateCacheMiddleware(
+    req,
+    { set: value => Object.assign(values, value) },
+    () => {}
+  );
+  expect(values['Cache-Control']).toContain('no-store');
+  expect(req.headers).not.toHaveProperty('if-none-match');
 });

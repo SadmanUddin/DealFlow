@@ -1,6 +1,11 @@
 import express from 'express';
 import {
   forgotPassword,
+  mfaStatus,
+  mfaBegin,
+  mfaActivate,
+  mfaReplaceRecovery,
+  mfaRemove,
   getCsrfToken,
   getCurrentUser,
   resetPasswordWithToken,
@@ -12,6 +17,7 @@ import {
 } from '#controllers/auth.controller.js';
 import {
   requireAuthentication,
+  requireAdmin,
   requireCsrf,
 } from '#middleware/auth.middleware.js';
 
@@ -25,5 +31,16 @@ router.post('/verify-email', verifyEmailAddress);
 router.post('/resend-verification', resendEmailVerification);
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPasswordWithToken);
+
+router.get('/admin-mfa', ...requireAdmin, mfaStatus);
+router.post('/admin-mfa/enroll', ...requireAdmin, requireCsrf, mfaBegin);
+router.post('/admin-mfa/activate', ...requireAdmin, requireCsrf, mfaActivate);
+router.post(
+  '/admin-mfa/recovery',
+  ...requireAdmin,
+  requireCsrf,
+  mfaReplaceRecovery
+);
+router.post('/admin-mfa/remove', ...requireAdmin, requireCsrf, mfaRemove);
 
 export default router;

@@ -23,6 +23,14 @@ export const signInSchema = z.object({
       (value) => passwordBytes(value) <= 72,
       "Password must be no more than 72 UTF-8 bytes",
     ),
+  mfaCode: z
+    .string()
+    .trim()
+    .regex(
+      /^(?:\d{6}|[a-fA-F0-9]{32})$/,
+      "Enter the six-digit code or a recovery code.",
+    )
+    .optional(),
 });
 
 export const signUpSchema = z

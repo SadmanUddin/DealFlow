@@ -3,6 +3,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
 import { drizzle } from 'drizzle-orm/pglite';
 import request from 'supertest';
+import { Secret, TOTP } from 'otpauth';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 let engine;
@@ -21,7 +22,8 @@ vi.mock('#config/arcjet.js', () => {
   return { default: protector };
 });
 const { default: app } = await import('../src/app.js');
-const { createSession } = await import('#services/auth.service.js');
+const { createSession, authenticateUser, hashPassword } =
+  await import('#services/auth.service.js');
 
 const {
   createDeal,
@@ -61,7 +63,8 @@ beforeAll(async () => {
       (1, 'Buyer', 'buyer@example.test', 'fixture', 'buyer', true),
       (2, 'Seller', 'seller@example.test', 'fixture', 'seller', true),
       (3, 'Other Buyer', 'other@example.test', 'fixture', 'buyer', true),
-      (4, 'New Buyer', 'new@example.test', 'fixture', 'buyer', true);
+      (4, 'New Buyer', 'new@example.test', 'fixture', 'buyer', true),
+      (5, 'Admin', 'admin@example.test', 'fixture', 'admin', true);
   `);
 }, 30000);
 
@@ -337,8 +340,17 @@ it('enforces session, CSRF, participant and admin boundaries through the API', a
   const listingId = await listing();
   const dealId = await accepted(listingId);
   const { conversation } = await startConversation(buyer, listingId);
-  const owner = await createSession({ id: buyer });
-  const outsider = await createSession({ id: otherBuyer });
+  const password = 'Fixture-Only-Password';
+  const hashed = await hashPassword(password);
+  await engine.query('UPDATE users SET password = $1 WHERE id IN (1, 3)', [
+    hashed,
+  ]);
+  const owner = await createSession(
+    await authenticateUser({ email: 'buyer@example.test', password })
+  );
+  const outsider = await createSession(
+    await authenticateUser({ email: 'other@example.test', password })
+  );
   const ownerCookie = `token=${owner.accessToken}`;
   const outsiderCookie = `token=${outsider.accessToken}`;
   const dealUrl = `/api/deals/${dealId}`;
@@ -386,3 +398,179 @@ it('enforces session, CSRF, participant and admin boundaries through the API', a
     closing_amount: '115000.00',
   });
 });
+
+it('mounts administrator MFA status and distinguishes anonymous and authorized sessions', async () => {
+  vi.stubEnv('ADMIN_MFA_ENCRYPTION_KEY', undefined);
+  vi.stubEnv('ADMIN_MFA_REQUIRED', 'false');
+  try {
+    for (const route of ['/api/auth/admin-mfa', '/api/auth/me']) {
+      const response = await request(app).get(route);
+      expect(response.status).toBe(401);
+      expect(response.body.error.code).toBe('UNAUTHENTICATED');
+    }
+
+    const password = 'Mfa-Fixture-Password-Only';
+    await engine.query('UPDATE users SET password = $1 WHERE id = 5', [
+      await hashPassword(password),
+    ]);
+    const signIn = await request(app)
+      .post('/api/auth/sign-in')
+      .send({ email: 'admin@example.test', password });
+    expect(signIn.status).toBe(200);
+    const cookie = signIn.headers['set-cookie'][0].split(';')[0];
+    const status = await request(app)
+      .get('/api/auth/admin-mfa')
+      .set('Cookie', cookie);
+    expect(status.status).toBe(200);
+    expect(status.body).toEqual({
+      enrolled: false,
+      required: false,
+      configured: false,
+    });
+    expect(status.headers['cache-control']).toContain('no-store');
+    const session = await request(app).get('/api/auth/me').set('Cookie', cookie);
+    expect(session.status).toBe(200);
+    expect(session.body.user.role).toBe('admin');
+
+    const logout = await request(app)
+      .post('/api/auth/sign-out')
+      .set('Cookie', cookie)
+      .set('X-CSRF-Token', signIn.body.csrfToken);
+    expect(logout.status).toBe(200);
+    const revoked = await request(app).get('/api/auth/me').set('Cookie', cookie);
+    expect(revoked.status).toBe(401);
+    expect(revoked.body.error.code).toBe('INVALID_SESSION');
+  } finally {
+    vi.unstubAllEnvs();
+  }
+});
+
+it('enrolls administrator MFA and enforces fresh factors and single-use recovery', async () => {
+  const password = 'Mfa-Fixture-Password-Only';
+  vi.stubEnv('ADMIN_MFA_ENCRYPTION_KEY', 'ab'.repeat(32));
+  try {
+    await engine.query('UPDATE users SET password = $1 WHERE id = 5', [
+      await hashPassword(password),
+    ]);
+    const input = { email: 'admin@example.test', password };
+    const signIn = mfaCode =>
+      request(app)
+        .post('/api/auth/sign-in')
+        .send({ ...input, ...(mfaCode ? { mfaCode } : {}) });
+    const auth = response => ({
+      cookie: response.headers['set-cookie'][0].split(';')[0],
+      csrf: response.body.csrfToken,
+    });
+    const post = (path, session, values) =>
+      request(app)
+        .post(`/api/auth/admin-mfa/${path}`)
+        .set('Cookie', session.cookie)
+        .set('X-CSRF-Token', session.csrf)
+        .send(values);
+    const original = await signIn();
+    expect(original.status).toBe(200);
+    const session = auth(original);
+    const anonymous = await request(app)
+      .post('/api/auth/admin-mfa/enroll')
+      .send({ password });
+    expect(anonymous.status).toBe(401);
+    const rejectedSetup = await post('enroll', session, {
+      password: 'Incorrect fixture password',
+    });
+    expect(rejectedSetup.body.error.code).toBe('MFA_REAUTH_REQUIRED');
+    const setup = await post('enroll', session, { password });
+    expect(setup.status).toBe(200);
+    expect(setup.body.qr.startsWith('data:image/png;base64,')).toBe(true);
+    const totp = new TOTP({ secret: Secret.fromBase32(setup.body.secret) });
+    const currentCode = totp.generate();
+    const activation = await post('activate', session, {
+      password,
+      code: currentCode,
+    });
+    expect(activation.status).toBe(200);
+    expect(activation.body.recoveryCodes).toHaveLength(10);
+    const codes = activation.body.recoveryCodes;
+    const [state] = (
+      await engine.query(
+        'SELECT mfa_secret, mfa_recovery FROM users WHERE id = 5'
+      )
+    ).rows;
+    expect(state.mfa_secret === setup.body.secret).toBe(false);
+    expect(state.mfa_recovery.includes(codes[0])).toBe(false);
+    expect(
+      (await request(app).get('/api/admin/users').set('Cookie', session.cookie))
+        .status
+    ).toBe(401);
+    expect((await signIn()).body.error.code).toBe('MFA_REQUIRED');
+    expect((await signIn(currentCode)).body.error.code).toBe('MFA_INVALID');
+    const clock = Date.now();
+    const windowCodes = [-30000, 0, 30000].map(offset =>
+      totp.generate({ timestamp: clock + offset })
+    );
+    const incorrect = ['000000', '111111', '222222', '333333'].find(
+      candidate => !windowCodes.includes(candidate)
+    );
+    expect((await signIn(incorrect)).body.error.code).toBe('MFA_INVALID');
+    const expired = totp.generate({ timestamp: Date.now() - 120_000 });
+    expect((await signIn(expired)).status).toBe(403);
+    const fresh = totp.generate({ timestamp: Date.now() + 30_000 });
+    expect((await signIn(fresh)).status).toBe(200);
+    expect((await signIn(fresh)).status).toBe(403);
+    const recovered = await signIn(codes[0]);
+    expect(recovered.status).toBe(200);
+    expect((await signIn(codes[0])).status).toBe(403);
+    vi.stubEnv('ADMIN_MFA_REQUIRED', 'true');
+    expect(
+      (await post('remove', auth(recovered), { password, code: codes[1] })).body
+        .error.code
+    ).toBe('MFA_ENFORCED');
+    vi.stubEnv('ADMIN_MFA_REQUIRED', 'false');
+    const replacement = await post('recovery', auth(recovered), {
+      password,
+      code: codes[1],
+    });
+    expect(replacement.status).toBe(200);
+    expect((await signIn(codes[2])).status).toBe(403);
+    const freshSession = await signIn(replacement.body.recoveryCodes[0]);
+    expect(freshSession.status).toBe(200);
+    expect(
+      (
+        await post('remove', auth(freshSession), {
+          password,
+          code: replacement.body.recoveryCodes[1],
+        })
+      ).status
+    ).toBe(200);
+    vi.stubEnv('ADMIN_MFA_REQUIRED', 'true');
+    expect((await signIn()).body.error.code).toBe('MFA_ENROLLMENT_REQUIRED');
+  } finally {
+    vi.unstubAllEnvs();
+  }
+}, 20000);
+
+it('does not issue or honor sessions from an obsolete password generation', async () => {
+  const { findActiveSession, requestPasswordReset, resetPassword } =
+    await import('#services/auth.service.js');
+  const { verifyAccessToken } = await import('#utils/jwt.js');
+  const email = 'new@example.test';
+  const password = 'Old-fixture-passphrase';
+  await engine.query('UPDATE users SET password = $1 WHERE id = 4', [
+    await hashPassword(password),
+  ]);
+  const verified = await authenticateUser({ email, password });
+  const previous = await createSession(verified);
+  const { token } = await requestPasswordReset(email);
+  await resetPassword(token, 'New-fixture-passphrase');
+  await expect(createSession(verified)).rejects.toMatchObject({ status: 401 });
+  await expect(
+    findActiveSession(verifyAccessToken(previous.accessToken))
+  ).resolves.toBeUndefined();
+  const reverified = await authenticateUser({
+    email,
+    password: 'New-fixture-passphrase',
+  });
+  const valid = await createSession(reverified);
+  expect(
+    await findActiveSession(verifyAccessToken(valid.accessToken))
+  ).toMatchObject({ userId: 4 });
+}, 10000);

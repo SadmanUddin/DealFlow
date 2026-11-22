@@ -90,7 +90,13 @@ export function DealDocumentsPanel({ dealId }: { dealId: number }) {
         conversation.id,
         file,
       );
-      await linkMutation.mutateAsync(uploaded.id);
+      if (uploaded.status === "pending") {
+        setNotice(
+          "Document uploaded. It will be available to link after security review.",
+        );
+      } else {
+        await linkMutation.mutateAsync(uploaded.id);
+      }
       await client.invalidateQueries({
         queryKey: ["conversations", conversation.id, "documents"],
       });

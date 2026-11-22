@@ -18,6 +18,7 @@ export type UserProfile = AuthUser & {
 export type SignInInput = {
   email: string;
   password: string;
+  mfaCode?: string;
 };
 
 export type SignUpInput = {

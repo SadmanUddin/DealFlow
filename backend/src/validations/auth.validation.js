@@ -24,6 +24,11 @@ export const signInSchema = z
   .object({
     email,
     password: passwordInput,
+    mfaCode: z
+      .string()
+      .trim()
+      .regex(/^(?:\d{6}|[a-fA-F0-9]{32})$/)
+      .optional(),
   })
   .strict();
 
@@ -56,3 +61,13 @@ export const deactivateAccountSchema = z
     password: passwordInput,
   })
   .strict();
+
+export const mfaEnrollmentSchema = z
+  .object({ password: passwordInput })
+  .strict();
+export const mfaConfirmationSchema = mfaEnrollmentSchema.extend({
+  code: z
+    .string()
+    .trim()
+    .regex(/^(?:\d{6}|[a-fA-F0-9]{32})$/),
+});

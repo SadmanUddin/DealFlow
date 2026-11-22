@@ -13,8 +13,10 @@ import { authSessions, authTokens, users } from '#models/user.model.js';
 import { outboxEvents } from '#models/phase6.model.js';
 import { AppError } from '#utils/app-error.js';
 import { signAccessToken } from '#utils/jwt.js';
+import { verifyAdminFactor } from '#services/admin-mfa.service.js';
 import { getEnvironment } from '#config/env.js';
 
+const sessionGeneration = Symbol('sessionGeneration');
 const BCRYPT_ROUNDS = 12;
 // A dummy hash with the same cost keeps missing-user sign-in on the bcrypt path.
 const DUMMY_PASSWORD_HASH =
@@ -121,13 +123,15 @@ export const requestEmailVerification = async email => {
   if (user && !user.emailVerified) await queueEmailVerification(user);
 };
 
-export const authenticateUser = async ({ email, password }) => {
+export const authenticateUser = async ({ email, password, mfaCode }) => {
   const [user] = await db
     .select({
       id: users.id,
       name: users.name,
       email: users.email,
       passwordHash: users.password,
+      generation: users.session_generation,
+      secret: users.mfa_secret,
       role: users.role,
       emailVerified: users.email_verified,
       isActive: users.is_active,
@@ -162,7 +166,9 @@ export const authenticateUser = async ({ email, password }) => {
       'Verify your email address before signing in'
     );
   }
+  if (user.role === 'admin') await verifyAdminFactor(user, mfaCode);
   return {
+    [sessionGeneration]: user.generation,
     id: user.id,
     name: user.name,
     email: user.email,
@@ -176,12 +182,22 @@ export const createSession = async user => {
   const id = randomUUID();
   const csrfToken = csrfTokenForSession(id);
   const expiresAt = new Date(Date.now() + ACCESS_TOKEN_MS);
-  await db.insert(authSessions).values({
-    id,
-    user_id: user.id,
-    csrf_token_hash: hashToken(csrfToken),
-    expires_at: expiresAt,
-  });
+  const generation = user[sessionGeneration];
+  if (!Number.isInteger(generation)) {
+    throw new AppError(401, 'INVALID_CREDENTIALS', 'Sign in again');
+  }
+  const issued = await db.execute(sql`
+    /* auth:issue-session */
+    INSERT INTO auth_sessions(id, user_id, csrf_token_hash, expires_at, session_generation)
+    SELECT ${id}, id, ${hashToken(csrfToken)}, ${expiresAt.toISOString()}, session_generation
+    FROM users
+    WHERE id = ${user.id} AND session_generation = ${generation}
+      AND is_active AND email_verified
+    RETURNING id
+  `);
+  if (!extractRows(issued).length) {
+    throw new AppError(401, 'INVALID_CREDENTIALS', 'Sign in again');
+  }
   return {
     accessToken: signAccessToken({ userId: user.id, sessionId: id }),
     csrfToken,
@@ -197,6 +213,7 @@ export const findActiveSession = async ({ userId, sessionId }) => {
       email: users.email,
       role: users.role,
       emailVerified: users.email_verified,
+      mfaEnrolled: sql`${users.mfa_secret} IS NOT NULL`,
       csrfTokenHash: authSessions.csrf_token_hash,
     })
     .from(authSessions)
@@ -205,6 +222,7 @@ export const findActiveSession = async ({ userId, sessionId }) => {
       and(
         eq(authSessions.id, sessionId),
         eq(authSessions.user_id, userId),
+        eq(authSessions.session_generation, users.session_generation),
         isNull(authSessions.revoked_at),
         gt(authSessions.expires_at, new Date()),
         eq(users.is_active, true),
@@ -212,6 +230,12 @@ export const findActiveSession = async ({ userId, sessionId }) => {
       )
     )
     .limit(1);
+  if (
+    session?.role === 'admin' &&
+    getEnvironment().ADMIN_MFA_REQUIRED &&
+    !session.mfaEnrolled
+  )
+    return undefined;
   return session;
 };
 

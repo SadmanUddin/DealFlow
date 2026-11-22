@@ -150,6 +150,15 @@ export function getRateLimitPolicy(request) {
     };
   }
 
+  if (req.method === 'POST' && req.path.startsWith('/api/auth/admin-mfa/')) {
+    return {
+      name: 'administrator-mfa',
+      limits: req.user
+        ? intervalLimits('administrator-mfa', '15m', 10, 60)
+        : [ipLimit('administrator-mfa-guest-ip', '15m', 20)],
+    };
+  }
+
   if (isAuthEmailOperation(req)) {
     const key = emailKey(req);
     return {
@@ -308,6 +317,18 @@ const securityMiddleware = async (req, res, next) => {
   if (path !== '/api' && !path.startsWith('/api/')) return next();
 
   const policy = getRateLimitPolicy(req);
+  const essentialMfaProtection =
+    mode === 'LIVE' &&
+    (policy.name === 'administrator-mfa' ||
+      (policy.name === 'authentication-sign-in' &&
+        typeof req.body?.mfaCode === 'string'));
+  const unavailable = () =>
+    new AppError(
+      503,
+      'SECURITY_CHECK_UNAVAILABLE',
+      'The security check is temporarily unavailable'
+    );
+
   if (policy.limits.length === 0) return next();
 
   try {
@@ -370,6 +391,7 @@ const securityMiddleware = async (req, res, next) => {
     }
 
     if (decision.conclusion === 'ERROR') {
+      if (essentialMfaProtection) return next(unavailable());
       logger.warn('Arcjet decision returned an error; request allowed', {
         requestId: req.requestId,
         method: req.method,
@@ -381,6 +403,7 @@ const securityMiddleware = async (req, res, next) => {
     }
     return next();
   } catch (error) {
+    if (essentialMfaProtection) return next(unavailable());
     // Arcjet's SDK is designed to fail open when its cloud decision service is
     // unavailable. Keep that availability behavior and record a safe diagnostic.
     logger.error('Arcjet protection threw unexpectedly; request allowed', {

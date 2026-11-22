@@ -15,6 +15,8 @@ import {
 import { RequireAuth } from "./RouteGuards";
 import { AccountPage } from "@/features/account/AccountPage";
 import { SiteHeader } from "@/components/shared/SiteHeader";
+import { apiClient } from "@/lib/api-client";
+import { ApiError } from "@/lib/api-error";
 import type { AuthUser, UserProfile } from "./types";
 
 const apiMocks = vi.hoisted(() => ({
@@ -88,6 +90,34 @@ beforeEach(() => {
 });
 
 describe("authentication pages", () => {
+  it("distinguishes a missing administrator MFA route from unavailable enrollment", async () => {
+    const admin = { ...buyer, role: "admin" as const };
+    apiMocks.restoreSession.mockResolvedValue(admin);
+    apiMocks.getProfile.mockResolvedValue({ ...profile, ...admin });
+    const get = vi
+      .spyOn(apiClient, "get")
+      .mockRejectedValueOnce(new ApiError("Not found", { status: 404 }))
+      .mockResolvedValueOnce({
+        data: { enrolled: false, required: false, configured: false },
+      });
+    try {
+      renderApp(<AccountPage />, "/account");
+      const panel = await screen.findByRole("region", {
+        name: "Administrator MFA",
+      });
+      expect(await within(panel).findByRole("alert")).toHaveTextContent(
+        "The connected API does not provide administrator MFA settings.",
+      );
+      expect(get).toHaveBeenCalledWith("/auth/admin-mfa");
+      await userEvent.click(within(panel).getByRole("button", { name: "Try again" }));
+      expect(
+        await within(panel).findByText("MFA enrollment is unavailable. Contact your operator."),
+      ).toBeVisible();
+    } finally {
+      get.mockRestore();
+    }
+  });
+
   it("validates login fields and shows or hides the password", async () => {
     const user = userEvent.setup();
     renderApp(<LoginPage />, "/login");
@@ -680,5 +710,47 @@ describe("backend-supported recovery and verification forms", () => {
     expect(await screen.findByRole("status")).toHaveTextContent(
       "Token is invalid, expired, or already used",
     );
+  });
+});
+
+it("asks for an authenticator or recovery code only after a server MFA challenge", async () => {
+  const user = userEvent.setup();
+  apiMocks.signIn
+    .mockRejectedValueOnce({
+      response: {
+        status: 403,
+        data: {
+          error: {
+            code: "MFA_REQUIRED",
+            message: "Enter your authenticator code",
+          },
+        },
+      },
+      isAxiosError: true,
+    })
+    .mockResolvedValueOnce({ ...buyer, role: "admin" });
+  renderApp(
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/account" element={<p>Account destination</p>} />
+    </Routes>,
+    "/login",
+  );
+  await user.type(
+    await screen.findByLabelText("Email address"),
+    "admin@example.test",
+  );
+  await user.type(screen.getByLabelText("Password"), "fixture-password");
+  expect(
+    screen.queryByLabelText("Authenticator or recovery code"),
+  ).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Sign in" }));
+  const code = await screen.findByLabelText("Authenticator or recovery code");
+  expect(code).toHaveFocus();
+  await user.type(code, "123456");
+  await user.click(screen.getByRole("button", { name: "Sign in" }));
+  expect(await screen.findByText("Account destination")).toBeInTheDocument();
+  expect(apiMocks.signIn.mock.lastCall?.[0]).toMatchObject({
+    mfaCode: "123456",
   });
 });

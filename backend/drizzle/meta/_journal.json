@@ -148,6 +148,13 @@
       "when": 1795348967083,
       "tag": "0020_acquisition_closing",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1795378912856,
+      "tag": "0021_session_generation_and_admin_mfa",
+      "breakpoints": true
     }
   ]
 }

@@ -2,6 +2,8 @@ import {
   boolean,
   index,
   integer,
+  jsonb,
+  text,
   pgEnum,
   pgTable,
   serial,
@@ -31,6 +33,12 @@ export const users = pgTable(
     password: varchar('password', {
       length: 255,
     }).notNull(),
+    session_generation: integer('session_generation').notNull().default(0),
+    mfa_secret: text('mfa_secret'),
+    mfa_pending_secret: text('mfa_pending_secret'),
+    mfa_pending_until: timestamp('mfa_pending_until', { withTimezone: true }),
+    mfa_last_step: integer('mfa_last_step'),
+    mfa_recovery: jsonb('mfa_recovery').notNull().default([]),
     role: userRole('role').notNull().default('buyer'),
     email_verified: boolean('email_verified').notNull().default(false),
     is_active: boolean('is_active').notNull().default(true),
@@ -58,6 +66,7 @@ export const authSessions = pgTable(
     user_id: integer('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
+    session_generation: integer('session_generation').notNull().default(0),
     csrf_token_hash: varchar('csrf_token_hash', { length: 64 }).notNull(),
     expires_at: timestamp({ withTimezone: true }).notNull(),
     revoked_at: timestamp({ withTimezone: true }),

@@ -23,6 +23,7 @@ import {
   errorMiddleware,
   notFoundMiddleware,
 } from '#middleware/error.middleware.js';
+import { checkDatabase } from '#config/database.js';
 import { getEnvironment } from '#config/env.js';
 import { AppError } from '#utils/app-error.js';
 
@@ -85,8 +86,6 @@ app.use(
     return undefined;
   })
 );
-app.use(optionalAuthentication);
-app.use(privateCacheMiddleware);
 
 app.get('/', (req, res) => {
   logger.info('Hello from DealFlow');
@@ -99,6 +98,20 @@ app.get('/health', (req, res) => {
     uptime: process.uptime(),
   });
 });
+app.get('/ready', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  try {
+    await checkDatabase();
+    res.status(200).json({ status: 'ready' });
+  } catch {
+    logger.warn('Database readiness check failed', {
+      requestId: req.requestId,
+    });
+    res.status(503).json({ status: 'unavailable' });
+  }
+});
+app.use(optionalAuthentication);
+app.use(privateCacheMiddleware);
 app.use(securityMiddleware);
 app.get('/api', (req, res) => {
   res.status(200).json({

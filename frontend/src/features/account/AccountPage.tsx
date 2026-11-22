@@ -23,6 +23,8 @@ import {
   type EmailPreferences,
 } from "@/features/auth/api";
 
+import { AdminMfaPanel } from "./AdminMfaPanel";
+
 export function AccountPage() {
   const queryClient = useQueryClient();
   const location = useLocation();
@@ -363,6 +365,7 @@ export function AccountPage() {
           </CardContent>
         </Card>
       </div>
+      {sessionUser?.role === "admin" && <AdminMfaPanel />}
       {deactivateOpen ? (
         <ConfirmDialog
           title="Deactivate your account?"
