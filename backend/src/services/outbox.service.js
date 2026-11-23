@@ -9,6 +9,7 @@ import {
 import { users } from '#models/user.model.js';
 import { sendEmail } from '#services/email/email.adapter.js';
 import { listingEmailTemplate } from '#services/email/templates/listing-notification.js';
+import { matchSavedSearchPublication, sendSavedSearchEmail } from '#services/saved-search-alert.service.js';
 import { decryptVerificationToken } from '#services/auth.service.js';
 import { getEnvironment } from '#config/env.js';
 import logger from '#config/logger.js';
@@ -244,6 +245,12 @@ export const processOutboxEvent = async (
     });
     return;
   }
+  if (event.type === 'saved_search.publication') {
+    await assertLease();
+    return matchSavedSearchPublication(event.payload);
+  }
+  if (event.type === 'saved_search.email')
+    return sendSavedSearchEmail(event, assertLease);
   if (event.type.startsWith('deal.'))
     return processDealEvent(event, assertLease);
   if (!event.type.startsWith('listing.')) {

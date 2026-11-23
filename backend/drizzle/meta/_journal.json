@@ -162,6 +162,13 @@
       "when": 1795458280403,
       "tag": "0022_advanced_deal_diligence",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1795463683657,
+      "tag": "0023_buyer_saved_searches",
+      "breakpoints": true
     }
   ]
 }

@@ -31,6 +31,7 @@ const navigation: Record<UserRole, WorkspaceLink[]> = {
   buyer: [
     { label: "Overview", to: "/buyer", icon: LayoutDashboard, end: true },
     { label: "Saved businesses", to: "/buyer/saved", icon: Bookmark },
+    { label: "Saved searches", to: "/buyer/saved-searches", icon: Bookmark },
     {
       label: "Conversations",
       to: "/buyer/conversations",

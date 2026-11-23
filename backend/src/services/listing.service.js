@@ -3,16 +3,14 @@ import {
   asc,
   desc,
   eq,
-  gte,
-  ilike,
   inArray,
-  lte,
   or,
   sql,
 } from 'drizzle-orm';
 import { db } from '#config/database.js';
 import { businessListings } from '#models/listing.model.js';
 import { users } from '#models/user.model.js';
+import { marketplaceCriteria } from '#utils/marketplace-criteria.js';
 import { AppError } from '#utils/app-error.js';
 
 const publicFields = {
@@ -100,17 +98,9 @@ export const getMyListing = async (sellerId, id) => {
 export const getPublicListings = async ({
   page,
   limit,
-  q,
-  industry,
-  location,
-  minPrice,
-  maxPrice,
-  minRevenue,
-  maxRevenue,
-  minEbitda,
-  maxEbitda,
   sort = 'newest',
   availability = 'available',
+  ...criteria
 }) => {
   const filters = [
     availability === 'all'
@@ -120,26 +110,7 @@ export const getPublicListings = async ({
         availability === 'sold' ? 'sold' : 'published'
       ),
   ];
-  if (q) {
-    const keyword = `%${q.replace(/[\\%_]/g, '\\$&')}%`;
-    filters.push(
-      or(
-        ilike(businessListings.title, keyword),
-        ilike(businessListings.description, keyword)
-      )
-    );
-  }
-  if (industry) filters.push(ilike(businessListings.industry, `%${industry}%`));
-  if (location) filters.push(ilike(businessListings.location, `%${location}%`));
-  for (const [column, minimum, maximum] of [
-    [businessListings.asking_price, minPrice, maxPrice],
-    [businessListings.annual_revenue, minRevenue, maxRevenue],
-    [businessListings.ebitda, minEbitda, maxEbitda],
-  ]) {
-    if (minimum !== undefined) filters.push(gte(column, minimum));
-    if (maximum !== undefined) filters.push(lte(column, maximum));
-  }
-  const where = and(...filters);
+  const where = and(...filters, ...marketplaceCriteria(criteria));
   const listingDate =
     availability === 'available'
       ? businessListings.published_at

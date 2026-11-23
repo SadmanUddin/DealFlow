@@ -58,7 +58,26 @@ const diligenceNotificationTypes = new Set([
   "deal.document_accepted",
 ]);
 
+function notificationDescription(item: DealFlowNotification) {
+  if (item.type === "saved_search.match") {
+    const names = Array.isArray(item.payload.searchNames)
+      ? item.payload.searchNames.filter(
+          (name): name is string => typeof name === "string",
+        )
+      : [];
+    const title =
+      typeof item.payload.title === "string"
+        ? item.payload.title
+        : "A business";
+    return names.length
+      ? `${title} matches ${names.join(", ")}.`
+      : `${title} matches your saved search.`;
+  }
+  return String(item.payload.listingTitle ?? "Open this update for details.");
+}
+
 const notificationLabels: Record<string, string> = {
+  "saved_search.match": "New business matches your saved search",
   "deal.closing_proposed": "Review the proposed closing amount",
   "deal.closing_agreed": "Closing amount agreed",
   "deal.closing_confirmed":
@@ -241,10 +260,7 @@ export function BuyerNotificationsPage() {
                     </div>
                     <p className="mt-1 break-words text-xs leading-5 text-ink-soft">
                       {target
-                        ? String(
-                            item.payload.listingTitle ??
-                              "Open this update for details.",
-                          )
+                        ? notificationDescription(item)
                         : "Account activity"}
                     </p>
                     <p className="mt-1.5 text-[0.68rem] text-ink-faint">

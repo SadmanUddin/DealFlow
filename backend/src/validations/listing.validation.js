@@ -67,43 +67,78 @@ export const paginationSchema = z
   })
   .strict();
 
+const searchAmountPattern = /^\d{1,16}(\.\d{1,2})?$/;
 const searchAmount = z
   .string()
-  .regex(/^\d{1,16}(\.\d{1,2})?$/, 'Must be a non-negative amount')
+  .regex(searchAmountPattern, 'Must be a non-negative amount')
   .optional();
 
+export const marketplaceCriteriaFields = {
+  q: z.string().trim().min(1).max(200).optional(),
+  industry: z.string().trim().min(1).max(120).optional(),
+  location: z.string().trim().min(1).max(160).optional(),
+  minPrice: searchAmount,
+  maxPrice: searchAmount,
+  minRevenue: searchAmount,
+  maxRevenue: searchAmount,
+  minEbitda: searchAmount,
+  maxEbitda: searchAmount,
+  sort: z
+    .enum(['newest', 'oldest', 'price_asc', 'price_desc'])
+    .default('newest'),
+};
+
+const validateRanges = (query, context) => {
+  for (const [minKey, maxKey] of [
+    ['minPrice', 'maxPrice'],
+    ['minRevenue', 'maxRevenue'],
+    ['minEbitda', 'maxEbitda'],
+  ]) {
+    if (
+      query[minKey] &&
+      query[maxKey] &&
+      searchAmountPattern.test(query[minKey]) &&
+      searchAmountPattern.test(query[maxKey]) &&
+      amountInCents(query[minKey]) > amountInCents(query[maxKey])
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: [maxKey],
+        message: `${maxKey} must be greater than or equal to ${minKey}`,
+      });
+    }
+  }
+};
+
+const amountInCents = value => {
+  const [whole, fraction = ''] = value.split('.');
+  return BigInt(whole + fraction.padEnd(2, '0'));
+};
 export const publicListingQuerySchema = paginationSchema
   .extend({
     availability: z.enum(['available', 'sold', 'all']).optional(),
-    q: z.string().trim().min(1).max(200).optional(),
-    industry: z.string().trim().min(1).max(120).optional(),
-    location: z.string().trim().min(1).max(160).optional(),
-    minPrice: searchAmount,
-    maxPrice: searchAmount,
-    minRevenue: searchAmount,
-    maxRevenue: searchAmount,
-    minEbitda: searchAmount,
-    maxEbitda: searchAmount,
-    sort: z
-      .enum(['newest', 'oldest', 'price_asc', 'price_desc'])
-      .default('newest'),
+    ...marketplaceCriteriaFields,
   })
   .strict()
-  .superRefine((query, context) => {
-    for (const [minKey, maxKey] of [
-      ['minPrice', 'maxPrice'],
-      ['minRevenue', 'maxRevenue'],
-      ['minEbitda', 'maxEbitda'],
-    ]) {
+  .superRefine(validateRanges);
+
+export const savedMarketplaceFiltersSchema = z
+  .object({
+    availability: z.enum(['available', 'sold', 'all']).default('available'),
+    ...marketplaceCriteriaFields,
+  })
+  .strict()
+  .superRefine((filters, context) => {
+    validateRanges(filters, context);
+    for (const key of ['q', 'industry', 'location']) {
       if (
-        query[minKey] &&
-        query[maxKey] &&
-        Number(query[minKey]) > Number(query[maxKey])
+        filters[key] &&
+        (!filters[key].isWellFormed() || filters[key].includes('\0'))
       ) {
         context.addIssue({
           code: 'custom',
-          path: [maxKey],
-          message: `${maxKey} must be greater than or equal to ${minKey}`,
+          path: [key],
+          message: 'Enter valid search text',
         });
       }
     }

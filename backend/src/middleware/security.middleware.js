@@ -230,6 +230,16 @@ export function getRateLimitPolicy(request) {
       };
   }
 
+  if (['POST', 'PATCH', 'DELETE'].includes(req.method) &&
+    /^\/api\/saved-searches(?:\/[1-9]\d*)?$/.test(req.path.replace(/%3([0-9])/g, '$1'))) {
+    return {
+      name: 'saved-search-write',
+      limits: req.user
+        ? authenticatedLimits('saved-search-write', 30, 180)
+        : [ipLimit('saved-search-write-guest', '1m', 20)],
+    };
+  }
+
   if (isListingWrite(req)) {
     return req.user
       ? {

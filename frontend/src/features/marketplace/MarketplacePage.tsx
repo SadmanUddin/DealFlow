@@ -11,7 +11,11 @@ import {
   X,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useSearchParams } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
+import { useAuth } from "@/features/auth/useAuth";
+import { SaveSearchForm } from "@/features/saved-searches/SaveSearchForm";
+import { getSavedSearch, savedSearchKey } from "@/features/saved-searches/api";
+import { fromMarketplace } from "@/features/saved-searches/search-filters";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ErrorState } from "@/components/shared/ErrorState";
@@ -39,6 +43,11 @@ type SearchDraft = {
   maxEbitda: string;
 };
 
+function amountInCents(value: string) {
+  const [whole, fraction = ""] = value.split(".");
+  return BigInt(whole + fraction.padEnd(2, "0"));
+}
+
 function hasCriteria(filters: MarketplaceFilters) {
   return Boolean(
     filters.q ||
@@ -56,7 +65,32 @@ function hasCriteria(filters: MarketplaceFilters) {
 export function MarketplacePage() {
   const comparison = useComparison();
   const limitReached = comparison.ids.length >= comparisonLimit;
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams, writeSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const buyer = user?.role === "buyer";
+  const rawEditId = searchParams.get("editSavedSearch");
+  const editId =
+    buyer &&
+    rawEditId &&
+    /^[1-9]\d*$/.test(rawEditId) &&
+    Number(rawEditId) <= 2147483647
+      ? Number(rawEditId)
+      : null;
+  const edit = useQuery({
+    queryKey: [...savedSearchKey, "detail", editId],
+    queryFn: () => getSavedSearch(editId!),
+    enabled: editId !== null,
+  });
+  const [savingSearch, setSavingSearch] = useState(false);
+  const [savedNotice, setSavedNotice] = useState(false);
+  const setSearchParams = (
+    params: URLSearchParams,
+    options?: { replace: boolean },
+  ) => {
+    if (editId !== null) params.set("editSavedSearch", String(editId));
+    writeSearchParams(params, options);
+  };
   const filters = useMemo(
     () => parseMarketplaceFilters(searchParams.toString()),
     [searchParams],
@@ -121,13 +155,13 @@ export function MarketplacePage() {
     if (
       (draft.minPrice &&
         draft.maxPrice &&
-        Number(draft.minPrice) > Number(draft.maxPrice)) ||
+        amountInCents(draft.minPrice) > amountInCents(draft.maxPrice)) ||
       (draft.minRevenue &&
         draft.maxRevenue &&
-        Number(draft.minRevenue) > Number(draft.maxRevenue)) ||
+        amountInCents(draft.minRevenue) > amountInCents(draft.maxRevenue)) ||
       (draft.minEbitda &&
         draft.maxEbitda &&
-        Number(draft.minEbitda) > Number(draft.maxEbitda))
+        amountInCents(draft.minEbitda) > amountInCents(draft.maxEbitda))
     ) {
       setFilterError("Each minimum must be less than or equal to its maximum.");
       return;
@@ -502,6 +536,59 @@ export function MarketplacePage() {
             )}
           </div>
         </div>
+
+        {buyer && editId === null && !savingSearch && (
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSavedNotice(false);
+                setSavingSearch(true);
+              }}
+            >
+              Save this search
+            </Button>
+            {savedNotice && (
+              <p role="status" className="text-sm text-emerald-900">
+                Search saved.{" "}
+                <Link className="underline" to="/buyer/saved-searches">
+                  Manage saved searches
+                </Link>
+              </p>
+            )}
+          </div>
+        )}
+        {editId !== null && edit.isPending && (
+          <p role="status" className="mt-4 text-sm">
+            Loading saved search…
+          </p>
+        )}
+        {editId !== null && edit.isError && (
+          <ErrorState
+            title="Saved search unavailable"
+            error={edit.error}
+            onRetry={() => void edit.refetch()}
+          />
+        )}
+        {buyer && (savingSearch || (editId !== null && edit.data)) && (
+          <SaveSearchForm
+            key={editId ?? "new"}
+            filters={fromMarketplace(filters)}
+            saved={editId === null ? undefined : edit.data}
+            cancel={() =>
+              editId === null
+                ? setSavingSearch(false)
+                : navigate("/buyer/saved-searches")
+            }
+            onSaved={() => {
+              if (editId !== null) void navigate("/buyer/saved-searches");
+              else {
+                setSavingSearch(false);
+                setSavedNotice(true);
+              }
+            }}
+          />
+        )}
 
         {comparison.ids.length > 0 && (
           <aside

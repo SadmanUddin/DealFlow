@@ -1,4 +1,4 @@
-const escapeHtml = value =>
+export const escapeHtml = value =>
   String(value ?? '').replace(
     /[&<>"']/g,
     character =>
