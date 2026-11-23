@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate, useParams } from "react-router";
+import { Link, useLocation, useNavigate, useParams } from "react-router";
 import { ArrowLeft, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -16,7 +16,7 @@ import {
   WorkspaceSkeleton,
 } from "@/components/shared/workspace/WorkspaceUI";
 import {
-  listMyListings,
+  getMyListing,
   createListing,
   updateListing,
   type ListingInput,
@@ -86,6 +86,22 @@ const textareaClass =
 export function SellerListingFormPage() {
   const { id: rawId } = useParams();
   const id = rawId ? Number(rawId) : undefined;
+  if (
+    rawId &&
+    (!id || !Number.isSafeInteger(id) || id < 1 || String(id) !== rawId)
+  ) {
+    return (
+      <ErrorState
+        title="Listing not found"
+        description="Choose a listing from your seller workspace."
+      />
+    );
+  }
+  return <ListingEditor key={rawId ?? "new"} id={id} />;
+}
+
+function ListingEditor({ id }: { id?: number }) {
+  const location = useLocation();
   const navigate = useNavigate();
   const client = useQueryClient();
   const [confirmRemoveImage, setConfirmRemoveImage] = useState(false);
@@ -95,41 +111,57 @@ export function SellerListingFormPage() {
     defaultValues: blank,
     mode: "onBlur",
   });
-  const listingsQuery = useQuery({
-    queryKey: ["seller", "listings", 1, 100],
-    queryFn: () => listMyListings(1, 100),
+  const listingQuery = useQuery({
+    queryKey: ["seller", "listings", "detail", id],
+    queryFn: () => getMyListing(id!),
     enabled: Boolean(id),
   });
-  const listing = listingsQuery.data?.listings.find((item) => item.id === id);
+  const listing = listingQuery.data?.listing;
+  const { dirtyFields, isDirty } = form.formState;
   useEffect(() => {
     if (!listing) return;
-    form.reset({
-      title: listing.title,
-      description: listing.description,
-      industry: listing.industry ?? "",
-      location: listing.location ?? "",
-      website: listing.website ?? "",
-      asking_price: listing.askingPrice ?? "",
-      annual_revenue: listing.annualRevenue ?? "",
-      ebitda: listing.ebitda ?? "",
-      currency: listing.currency,
-    });
+    form.reset(
+      {
+        title: listing.title,
+        description: listing.description,
+        industry: listing.industry ?? "",
+        location: listing.location ?? "",
+        website: listing.website ?? "",
+        asking_price: listing.askingPrice ?? "",
+        annual_revenue: listing.annualRevenue ?? "",
+        ebitda: listing.ebitda ?? "",
+        currency: listing.currency,
+      },
+      { keepDirtyValues: true },
+    );
   }, [form, listing]);
   useEffect(() => {
     const protect = (event: BeforeUnloadEvent) => {
-      if (form.formState.isDirty) event.preventDefault();
+      if (isDirty) event.preventDefault();
     };
     window.addEventListener("beforeunload", protect);
     return () => window.removeEventListener("beforeunload", protect);
-  }, [form.formState.isDirty]);
+  }, [isDirty]);
   const save = useMutation({
     mutationFn: (input: ListingInput) =>
       id ? updateListing(id, input) : createListing(input),
     onSuccess: async ({ listing: savedListing }) => {
-      await client.invalidateQueries({ queryKey: ["seller", "listings"] });
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ["seller", "listings"] }),
+        client.invalidateQueries({ queryKey: ["marketplace"] }),
+      ]);
       navigate(
         id ? "/seller/listings" : `/seller/listings/${savedListing.id}/edit`,
-        { replace: true },
+        {
+          replace: true,
+          state: {
+            listingNotice: !id
+              ? "Draft saved. You can now add a listing image."
+              : savedListing.status === "pending"
+                ? "Changes saved and sent for review."
+                : "Changes saved.",
+          },
+        },
       );
     },
   });
@@ -174,24 +206,16 @@ export function SellerListingFormPage() {
     ["draft", "pending", "rejected", "published"].includes(listing.status),
   );
 
-  if (id && listingsQuery.isPending) return <WorkspaceSkeleton rows={4} />;
-  if (id && listingsQuery.isError)
+  if (id && listingQuery.isPending) return <WorkspaceSkeleton rows={4} />;
+  if (id && listingQuery.isError && !listing)
     return (
       <ErrorState
-        error={listingsQuery.error}
+        error={listingQuery.error}
         description="The listing could not be loaded for editing."
-        onRetry={() => void listingsQuery.refetch()}
+        onRetry={() => void listingQuery.refetch()}
         title="Listing unavailable"
       />
     );
-  if (id && !listing && listingsQuery.data)
-    return (
-      <ErrorState
-        description="Only your own listing records are available in the seller workspace."
-        title="Listing not found"
-      />
-    );
-
   return (
     <>
       <Link
@@ -205,6 +229,14 @@ export function SellerListingFormPage() {
         eyebrow="Seller workspace · Listing editor"
         title={id ? "Edit business listing" : "Create business listing"}
       />
+      {location.state?.listingNotice && (
+        <p
+          className="mb-5 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
+          role="status"
+        >
+          {location.state.listingNotice}
+        </p>
+      )}
       {listing ? (
         <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-line bg-white px-4 py-3 text-sm text-ink-soft">
           <StatusBadge status={listing.status} />
@@ -224,7 +256,15 @@ export function SellerListingFormPage() {
         </p>
       ) : null}
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_13rem]">
-        <form className="min-w-0 space-y-5" noValidate onSubmit={submit}>
+        <form
+          className="min-w-0 space-y-5"
+          noValidate
+          onSubmit={submit}
+          aria-busy={save.isPending}
+        >
+          <p className="text-sm text-ink-soft">
+            Fields marked with an asterisk are required.
+          </p>
           <SectionCard id="listing-overview" className="scroll-mt-28">
             <SectionHeading
               description="Keep the title concise and describe the business as it operates today."
@@ -236,14 +276,21 @@ export function SellerListingFormPage() {
                 errors={form.formState.errors.title?.message}
                 label="Business name"
                 name="title"
+                required
                 register={form.register("title")}
               />
               <div>
                 <label className={labelClass} htmlFor="description">
-                  Business description
+                  Business description <span aria-hidden="true">*</span>
                 </label>
                 <textarea
-                  aria-describedby="description-help description-error"
+                  aria-describedby={
+                    form.formState.errors.description
+                      ? "description-help description-error"
+                      : "description-help"
+                  }
+                  aria-invalid={Boolean(form.formState.errors.description)}
+                  required
                   className={textareaClass}
                   disabled={locked}
                   id="description"
@@ -293,6 +340,73 @@ export function SellerListingFormPage() {
               />
             </div>
           </SectionCard>
+          <SectionCard id="listing-financials" className="scroll-mt-28">
+            <SectionHeading
+              description="Use the same currency for all amounts. Enter digits with a decimal point for cents, for example 125000.50. Leave an amount blank if you do not have it."
+              title="Asking price and financials"
+            />
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className={labelClass} htmlFor="currency">
+                  Currency <span aria-hidden="true">*</span>
+                </label>
+                <select
+                  className={inputClass}
+                  disabled={locked}
+                  id="currency"
+                  required
+                  aria-invalid={Boolean(form.formState.errors.currency)}
+                  aria-describedby={
+                    form.formState.errors.currency
+                      ? "currency-error"
+                      : undefined
+                  }
+                  {...form.register("currency")}
+                >
+                  {listing && !currencySet.has(listing.currency) && (
+                    <option value={listing.currency} disabled>
+                      {listing.currency} (select a supported currency)
+                    </option>
+                  )}
+                  {[...currencySet].sort().map((currency) => (
+                    <option key={currency} value={currency}>
+                      {currency}
+                    </option>
+                  ))}
+                </select>
+                <FieldError id="currency-error">
+                  {form.formState.errors.currency?.message}
+                </FieldError>
+              </div>
+              <Field
+                errors={form.formState.errors.asking_price?.message}
+                label="Asking price"
+                name="asking_price"
+                inputMode="decimal"
+                register={form.register("asking_price")}
+                disabled={locked}
+                type="text"
+              />
+              <Field
+                errors={form.formState.errors.annual_revenue?.message}
+                label="Annual revenue"
+                name="annual_revenue"
+                inputMode="decimal"
+                register={form.register("annual_revenue")}
+                disabled={locked}
+                type="text"
+              />
+              <Field
+                errors={form.formState.errors.ebitda?.message}
+                label="EBITDA"
+                name="ebitda"
+                inputMode="decimal"
+                register={form.register("ebitda")}
+                disabled={locked}
+                type="text"
+              />
+            </div>
+          </SectionCard>
           {id && listing ? (
             <SectionCard id="listing-media" className="scroll-mt-28">
               <SectionHeading
@@ -328,7 +442,12 @@ export function SellerListingFormPage() {
                 className="mt-2 block w-full min-w-0 rounded-xl border border-dashed border-line bg-paper p-3 text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-white file:px-3 file:py-2 file:font-semibold file:text-emerald-900"
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
-                disabled={imageUpload.isPending || !canEditImage}
+                disabled={
+                  save.isPending ||
+                  imageUpload.isPending ||
+                  imageRemoval.isPending ||
+                  !canEditImage
+                }
                 onChange={(event) => {
                   const file = event.target.files?.[0];
                   if (file) imageUpload.mutate(file);
@@ -355,7 +474,12 @@ export function SellerListingFormPage() {
               {listing.imageUrl ? (
                 <Button
                   className="mt-3"
-                  disabled={imageRemoval.isPending || !canEditImage}
+                  disabled={
+                    save.isPending ||
+                    imageUpload.isPending ||
+                    imageRemoval.isPending ||
+                    !canEditImage
+                  }
                   onClick={() => setConfirmRemoveImage(true)}
                   type="button"
                   variant="outline"
@@ -377,59 +501,14 @@ export function SellerListingFormPage() {
                 </p>
               ) : null}
             </SectionCard>
-          ) : null}
-          <SectionCard id="listing-financials" className="scroll-mt-28">
-            <SectionHeading
-              description="Enter values in the selected currency. Financial details are optional when unavailable."
-              title="Asking price and financials"
-            />
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className={labelClass} htmlFor="currency">
-                  Currency
-                </label>
-                <select
-                  className={inputClass}
-                  disabled={locked}
-                  id="currency"
-                  {...form.register("currency")}
-                >
-                  {[...currencySet].sort().map((currency) => (
-                    <option key={currency} value={currency}>
-                      {currency}
-                    </option>
-                  ))}
-                </select>
-                <FieldError>
-                  {form.formState.errors.currency?.message}
-                </FieldError>
-              </div>
-              <Field
-                errors={form.formState.errors.asking_price?.message}
-                label="Asking price"
-                name="asking_price"
-                register={form.register("asking_price")}
-                disabled={locked}
-                type="text"
+          ) : (
+            <SectionCard id="listing-media" className="scroll-mt-28">
+              <SectionHeading
+                title="Listing image"
+                description="Save your draft to upload an optional business photo."
               />
-              <Field
-                errors={form.formState.errors.annual_revenue?.message}
-                label="Annual revenue"
-                name="annual_revenue"
-                register={form.register("annual_revenue")}
-                disabled={locked}
-                type="text"
-              />
-              <Field
-                errors={form.formState.errors.ebitda?.message}
-                label="EBITDA"
-                name="ebitda"
-                register={form.register("ebitda")}
-                disabled={locked}
-                type="text"
-              />
-            </div>
-          </SectionCard>
+            </SectionCard>
+          )}
           {locked ? (
             <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
               This listing is {listing?.status} and its business details cannot
@@ -437,25 +516,40 @@ export function SellerListingFormPage() {
               remain available while it is pending review.
             </p>
           ) : (
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button asChild variant="outline">
-                <Link to="/seller/listings">Cancel</Link>
-              </Button>
-              <Button
-                disabled={save.isPending || !form.formState.isDirty}
-                type="submit"
-                variant="accent"
-              >
-                <Save size={16} />
-                {save.isPending
-                  ? "Saving…"
-                  : listing?.status === "published"
-                    ? "Save and send for review"
-                    : id
-                      ? "Save changes"
-                      : "Save draft"}
-              </Button>
-            </div>
+            <SectionCard>
+              <SectionHeading
+                title="Review and save"
+                description={
+                  listing?.status === "published"
+                    ? "Saving sends this listing back to the review queue."
+                    : "Save your changes here. Submit the listing for review from Your listings when it is ready."
+                }
+              />
+              <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <Button asChild variant="outline">
+                  <Link to="/seller/listings">Cancel</Link>
+                </Button>
+                <Button
+                  disabled={
+                    save.isPending ||
+                    imageUpload.isPending ||
+                    imageRemoval.isPending ||
+                    !Object.keys(dirtyFields).length
+                  }
+                  type="submit"
+                  variant="accent"
+                >
+                  <Save size={16} />
+                  {save.isPending
+                    ? "Saving…"
+                    : listing?.status === "published"
+                      ? "Save and send for review"
+                      : id
+                        ? "Save changes"
+                        : "Save draft"}
+                </Button>
+              </div>
+            </SectionCard>
           )}
         </form>
         <aside
@@ -469,13 +563,11 @@ export function SellerListingFormPage() {
             <a className={sectionLink} href="#listing-category">
               Category &amp; location
             </a>
-            {id && listing ? (
-              <a className={sectionLink} href="#listing-media">
-                Listing image
-              </a>
-            ) : null}
             <a className={sectionLink} href="#listing-financials">
               Financials
+            </a>
+            <a className={sectionLink} href="#listing-media">
+              Listing image
             </a>
           </nav>
         </aside>
@@ -510,6 +602,8 @@ function Field({
   register,
   errors,
   type = "text",
+  inputMode,
+  required,
   disabled = false,
 }: {
   label: string;
@@ -517,6 +611,8 @@ function Field({
   register: React.InputHTMLAttributes<HTMLInputElement>;
   errors?: string;
   type?: string;
+  inputMode?: React.InputHTMLAttributes<HTMLInputElement>["inputMode"];
+  required?: boolean;
   disabled?: boolean;
 }) {
   const errorId = `${name}-error`;
@@ -524,9 +620,13 @@ function Field({
     <div>
       <label className={labelClass} htmlFor={name}>
         {label}
+        {required && <span aria-hidden="true"> *</span>}
       </label>
       <input
         aria-describedby={errors ? errorId : undefined}
+        aria-invalid={Boolean(errors)}
+        required={required}
+        inputMode={inputMode}
         className={inputClass}
         id={name}
         type={type}

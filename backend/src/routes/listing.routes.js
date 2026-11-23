@@ -3,6 +3,7 @@ import {
   archiveListing,
   createListing,
   deleteListing,
+  getMyListing,
   getMyListings,
   getPublicListings,
   getPublishedListing,
@@ -27,6 +28,12 @@ router.get(
   requireAuthentication,
   authorizeRoles('seller'),
   getMyListings
+);
+router.get(
+  '/mine/:id',
+  requireAuthentication,
+  authorizeRoles('seller'),
+  getMyListing
 );
 router.post(
   '/',

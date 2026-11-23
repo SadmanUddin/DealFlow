@@ -7,7 +7,7 @@ import { SellerListingFormPage } from "./SellerListingFormPage";
 import type { SellerListing } from "./api";
 
 const mocks = vi.hoisted(() => ({
-  listMyListings: vi.fn(),
+  getMyListing: vi.fn(),
   uploadListingImage: vi.fn(),
   removeListingImage: vi.fn(),
   createListing: vi.fn(),
@@ -38,14 +38,19 @@ const listing = {
   updatedAt: "2026-10-01T10:00:00.000Z",
 };
 
-function renderEditor() {
+function renderEditor(path = "/seller/listings/5/edit") {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={["/seller/listings/5/edit"]}>
+      <MemoryRouter initialEntries={[path]}>
         <Routes>
+          <Route
+            path="/seller/listings/new"
+            element={<SellerListingFormPage />}
+          />
+          <Route path="/seller/listings" element={<p>Seller listings</p>} />
           <Route
             path="/seller/listings/:id/edit"
             element={<SellerListingFormPage />}
@@ -59,18 +64,16 @@ function renderEditor() {
 describe("seller listing image workflow", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.listMyListings.mockResolvedValue({
-      listings: [listing],
-      pagination: { page: 1, limit: 100, total: 1, totalPages: 1 },
+    mocks.getMyListing.mockResolvedValue({
+      listing,
     });
   });
 
   it("shows the uploaded preview, explains reapproval, and permits another image change while pending", async () => {
     const user = userEvent.setup();
     let currentListing: SellerListing = listing;
-    mocks.listMyListings.mockImplementation(async () => ({
-      listings: [currentListing],
-      pagination: { page: 1, limit: 100, total: 1, totalPages: 1 },
+    mocks.getMyListing.mockImplementation(async () => ({
+      listing: currentListing,
     }));
     mocks.uploadListingImage.mockImplementation(async () => {
       currentListing = {
@@ -92,7 +95,7 @@ describe("seller listing image workflow", () => {
     expect(
       await screen.findByText(/updated image will be public after approval/i),
     ).toBeInTheDocument();
-    await waitFor(() => expect(mocks.listMyListings).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(mocks.getMyListing).toHaveBeenCalledTimes(2));
     expect(screen.getByText(/awaiting review/i)).toBeInTheDocument();
     expect(screen.getByLabelText("Upload or replace image")).toBeEnabled();
     expect(screen.getByRole("button", { name: "Remove image" })).toBeEnabled();
@@ -101,6 +104,73 @@ describe("seller listing image workflow", () => {
     ).toHaveAttribute(
       "src",
       "http://localhost:3000/api/listings/5/image?v=new",
+    );
+  });
+
+  it("preserves unsaved draft edits after an image change refetches the listing", async () => {
+    const user = userEvent.setup();
+    const draft = { ...listing, status: "draft" as const };
+    mocks.getMyListing.mockResolvedValue({ listing: draft });
+    mocks.uploadListingImage.mockImplementation(async () => {
+      const imageUrl = "/api/listings/5/image?v=new";
+      mocks.getMyListing.mockResolvedValue({ listing: { ...draft, imageUrl } });
+      return { imageUrl, status: "draft" };
+    });
+    mocks.updateListing.mockResolvedValue({ listing: draft });
+    renderEditor();
+    const title = await screen.findByRole("textbox", { name: "Business name" });
+    await user.clear(title);
+    await user.type(title, "Updated roastery");
+    await user.upload(
+      await screen.findByLabelText("Upload or replace image"),
+      new File(["image"], "draft.png", { type: "image/png" }),
+    );
+    await waitFor(() => expect(mocks.getMyListing).toHaveBeenCalledTimes(2));
+    await screen.findByText("Image uploaded.");
+    expect(title).toHaveValue("Updated roastery");
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(await screen.findByText("Seller listings")).toBeInTheDocument();
+    expect(mocks.updateListing).toHaveBeenCalledWith(
+      5,
+      expect.objectContaining({ title: "Updated roastery" }),
+    );
+  });
+
+  it("announces field validation and saves new businesses as drafts", async () => {
+    const user = userEvent.setup();
+    mocks.createListing.mockResolvedValue({
+      listing: { ...listing, status: "draft" },
+    });
+    mocks.getMyListing.mockResolvedValue({
+      listing: { ...listing, status: "draft" },
+    });
+    renderEditor("/seller/listings/new");
+    const title = screen.getByRole("textbox", { name: "Business name" });
+    await user.type(title, "AB");
+    await user.click(screen.getByRole("button", { name: "Save draft" }));
+    expect(
+      await screen.findByText("Enter at least 3 characters."),
+    ).toBeInTheDocument();
+    expect(title).toHaveAttribute("aria-invalid", "true");
+    expect(mocks.createListing).not.toHaveBeenCalled();
+    await user.type(title, " Roasters");
+    await user.type(
+      screen.getByRole("textbox", { name: "Business description" }),
+      "A neighborhood coffee roasting business.",
+    );
+    await user.type(
+      screen.getByRole("textbox", { name: "Asking price" }),
+      "125000.50",
+    );
+    await user.click(screen.getByRole("button", { name: "Save draft" }));
+    expect(
+      await screen.findByText("Draft saved. You can now add a listing image."),
+    ).toBeInTheDocument();
+    expect(mocks.createListing).toHaveBeenCalledWith(
+      expect.objectContaining({
+        asking_price: "125000.50",
+        annual_revenue: null,
+      }),
     );
   });
 });

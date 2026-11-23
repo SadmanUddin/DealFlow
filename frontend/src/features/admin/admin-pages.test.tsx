@@ -299,6 +299,48 @@ describe("admin workspace", () => {
     );
   });
 
+  it("shows review completeness and seller financials and supports all statuses", async () => {
+    const user = userEvent.setup();
+    vi.mocked(adminApi.listAdminListings).mockResolvedValue({
+      listings: [
+        {
+          ...listing,
+          currency: "EUR",
+          askingPrice: "125000",
+          annualRevenue: null,
+          ebitda: null,
+          hasImage: false,
+        },
+      ],
+      pagination: pageMeta(1),
+    });
+    renderPage("/admin/moderation", <AdminModerationPage />);
+    expect(
+      await screen.findByText("63% listing completeness"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Add recommended information: annual revenue, EBITDA, business image/,
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Financial information · EUR" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /public view/i }),
+    ).not.toBeInTheDocument();
+    const filter = screen.getByRole("combobox", {
+      name: "Filter by listing status",
+    });
+    await user.selectOptions(filter, "all");
+    expect(filter).toHaveValue("all");
+    await waitFor(() =>
+      expect(adminApi.listAdminListings).toHaveBeenLastCalledWith(
+        expect.objectContaining({ status: "all" }),
+      ),
+    );
+  });
+
   it("requires a rejection reason and confirms a pending listing decision", async () => {
     const user = userEvent.setup();
     renderPage("/admin/moderation", <AdminModerationPage />);

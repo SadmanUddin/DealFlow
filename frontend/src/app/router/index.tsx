@@ -60,6 +60,11 @@ const MarketplacePage = lazy(() =>
     default: module.MarketplacePage,
   })),
 );
+const ComparisonPage = lazy(() =>
+  import("@/features/marketplace/ComparisonPage").then((module) => ({
+    default: module.ComparisonPage,
+  })),
+);
 const ListingDetailsPage = lazy(() =>
   import("@/features/marketplace/ListingDetailsPage").then((module) => ({
     default: module.ListingDetailsPage,
@@ -197,6 +202,7 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: lazyPage(<LandingPage />) },
       { path: "marketplace", element: lazyPage(<MarketplacePage />) },
+      { path: "marketplace/compare", element: lazyPage(<ComparisonPage />) },
       { path: "listings/:id", element: lazyPage(<ListingDetailsPage />) },
       {
         path: "account",

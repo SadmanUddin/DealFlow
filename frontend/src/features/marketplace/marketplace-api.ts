@@ -145,8 +145,11 @@ export async function getPublicListings(filters: MarketplaceFilters) {
   return parseApiResponse(listingPageSchema, data);
 }
 
-export async function getPublishedListing(id: number) {
-  const { data } = await apiClient.get<unknown>(`/listings/${id}`);
+export async function getPublishedListing(
+  id: number,
+  options?: { signal: AbortSignal; withCredentials: boolean },
+) {
+  const { data } = await apiClient.get<unknown>(`/listings/${id}`, options);
   return parseApiResponse(listingResponseSchema, data).listing;
 }
 

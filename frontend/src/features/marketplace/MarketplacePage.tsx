@@ -11,7 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { useSearchParams } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ErrorState } from "@/components/shared/ErrorState";
@@ -24,6 +24,8 @@ import {
 } from "./marketplace-api";
 import { ListingCard } from "./ListingCard";
 import { ListingCardSkeleton } from "./ListingCardSkeleton";
+
+import { comparisonLimit, useComparison } from "./comparison-context";
 
 type SearchDraft = {
   q: string;
@@ -52,6 +54,8 @@ function hasCriteria(filters: MarketplaceFilters) {
 }
 
 export function MarketplacePage() {
+  const comparison = useComparison();
+  const limitReached = comparison.ids.length >= comparisonLimit;
   const [searchParams, setSearchParams] = useSearchParams();
   const filters = useMemo(
     () => parseMarketplaceFilters(searchParams.toString()),
@@ -490,9 +494,39 @@ export function MarketplacePage() {
                 />
               </span>
             </label>
+            {filters.sort.startsWith("price_") && (
+              <p className="w-full text-xs text-ink-soft">
+                Price sorting uses the amounts as listed in their original
+                currencies.
+              </p>
+            )}
           </div>
         </div>
 
+        {comparison.ids.length > 0 && (
+          <aside
+            aria-label="Comparison selection"
+            className="sticky top-24 z-10 mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-white p-3 shadow-card"
+          >
+            <p role="status" className="text-sm font-semibold text-navy-950">
+              {comparison.ids.length} of {comparisonLimit} selected
+              {limitReached && ". Remove a selection to add another."}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={comparison.clear}>
+                Clear all
+              </Button>
+              <Button asChild variant="accent" size="sm">
+                <Link
+                  to="/marketplace/compare"
+                  state={{ marketplaceSearch: searchParams.toString() }}
+                >
+                  Compare businesses
+                </Link>
+              </Button>
+            </div>
+          </aside>
+        )}
         {listingsQuery.isError && !listingsQuery.data ? (
           <div className="mt-8">
             <ErrorState
@@ -528,7 +562,18 @@ export function MarketplacePage() {
             className={`mt-7 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 ${listingsQuery.isFetching ? "opacity-60 transition-opacity" : ""}`}
           >
             {listingsQuery.data.listings.map((listing) => (
-              <ListingCard key={listing.id} listing={listing} />
+              <ListingCard
+                key={listing.id}
+                listing={listing}
+                comparison={{
+                  selected: comparison.ids.includes(listing.id),
+                  limitReached,
+                  onToggle: () =>
+                    comparison.ids.includes(listing.id)
+                      ? comparison.remove(listing.id)
+                      : comparison.add(listing.id),
+                }}
+              />
             ))}
           </div>
         ) : null}

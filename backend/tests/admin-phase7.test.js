@@ -464,6 +464,38 @@ describe('Phase 7 listing moderation and audit', () => {
     return row;
   };
 
+  it('returns review financials and image presence only to administrators', async () => {
+    const row = createListing('pending');
+    Object.assign(row, {
+      asking_price: '50000.00',
+      annual_revenue: '42000.00',
+      ebitda: null,
+      currency: 'EUR',
+      image_key: 'private-storage-key',
+    });
+    const path = '/api/admin/listings?status=pending';
+    expect((await request(app).get(path)).status).toBe(401);
+    for (const user of [1, 2]) {
+      expect(
+        (await request(app).get(path).set('Cookie', cookieFor(user).cookie))
+          .status
+      ).toBe(403);
+    }
+    const result = await request(app)
+      .get(path)
+      .set('Cookie', cookieFor(3).cookie);
+    expect(result.status).toBe(200);
+    expect(result.body.listings[0]).toMatchObject({
+      askingPrice: '50000.00',
+      annualRevenue: '42000.00',
+      ebitda: null,
+      currency: 'EUR',
+      hasImage: true,
+    });
+    expect(JSON.stringify(result.body)).not.toContain('private-storage-key');
+    expect((await request(app).get('/api/listings/10')).status).toBe(404);
+  });
+
   it('approves and rejects pending listings with actor, reason, and audit state', async () => {
     createListing('pending');
     const approved = await signed(

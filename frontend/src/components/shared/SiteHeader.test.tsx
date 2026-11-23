@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "@/features/auth/AuthProvider";
 import { authQueryKeys } from "@/features/auth/api";
+import { ComparisonProvider } from "@/features/marketplace/ComparisonProvider";
 import { MarketplacePage } from "@/features/marketplace/MarketplacePage";
 import { SiteHeader } from "./SiteHeader";
 
@@ -69,13 +70,15 @@ function renderApp() {
   const view = render(
     <QueryClientProvider client={client}>
       <AuthProvider>
-        <MemoryRouter initialEntries={["/marketplace"]}>
-          <SiteHeader />
-          <CurrentPath />
-          <Routes>
-            <Route element={<MarketplacePage />} path="/marketplace" />
-          </Routes>
-        </MemoryRouter>
+        <ComparisonProvider>
+          <MemoryRouter initialEntries={["/marketplace"]}>
+            <SiteHeader />
+            <CurrentPath />
+            <Routes>
+              <Route element={<MarketplacePage />} path="/marketplace" />
+            </Routes>
+          </MemoryRouter>
+        </ComparisonProvider>
       </AuthProvider>
     </QueryClientProvider>,
   );

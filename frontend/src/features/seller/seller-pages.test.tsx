@@ -19,6 +19,7 @@ import * as dealApi from "@/features/deals/api";
 vi.mock("./api", async (original) => ({
   ...(await original<typeof import("./api")>()),
   listMyListings: vi.fn(),
+  getMyListing: vi.fn(),
   createListing: vi.fn(),
   updateListing: vi.fn(),
   submitListing: vi.fn(),
@@ -153,6 +154,7 @@ function renderSellerListingLifecycle(path: string) {
 }
 
 beforeEach(() => {
+  vi.mocked(sellerApi.getMyListing).mockResolvedValue({ listing });
   vi.mocked(sellerApi.listMyListings)
     .mockReset()
     .mockResolvedValue({ listings: [listing], pagination: page(1) });
@@ -271,12 +273,17 @@ describe("seller workspace", () => {
       listings: [{ ...listing, status: "pending" }],
       pagination: page(1),
     });
+    vi.mocked(sellerApi.getMyListing).mockResolvedValue({
+      listing: { ...listing, status: "pending" },
+    });
     renderSellerListingLifecycle("/seller/listings");
     await screen.findByText("pending");
-    await user.click(screen.getByRole("link", { name: "Edit" }));
+    await user.click(screen.getByRole("link", { name: "Edit listing" }));
 
     expect(await screen.findByText(/awaiting review/i)).toBeInTheDocument();
-    expect(screen.getByLabelText("Business name")).toBeDisabled();
+    expect(
+      screen.getByRole("textbox", { name: "Business name" }),
+    ).toBeDisabled();
     expect(screen.getByLabelText("Upload or replace image")).toBeEnabled();
   });
 
@@ -298,8 +305,14 @@ describe("seller workspace", () => {
   it("validates listing creation before calling the backend", async () => {
     const user = userEvent.setup();
     renderPage("/seller/listings/new", <SellerListingFormPage />);
-    await user.type(screen.getByLabelText("Business name"), "AB");
-    await user.type(screen.getByLabelText("Business description"), "Too short");
+    await user.type(
+      screen.getByRole("textbox", { name: "Business name" }),
+      "AB",
+    );
+    await user.type(
+      screen.getByRole("textbox", { name: "Business description" }),
+      "Too short",
+    );
     await user.click(screen.getByRole("button", { name: "Save draft" }));
     expect(
       await screen.findByText("Enter at least 3 characters."),
@@ -311,11 +324,11 @@ describe("seller workspace", () => {
     const user = userEvent.setup();
     renderPage("/seller/listings/new", <SellerListingFormPage />);
     await user.type(
-      screen.getByLabelText("Business name"),
+      screen.getByRole("textbox", { name: "Business name" }),
       "Neighborhood bakery",
     );
     await user.type(
-      screen.getByLabelText("Business description"),
+      screen.getByRole("textbox", { name: "Business description" }),
       "A well established bakery with a loyal customer base.",
     );
     await user.click(screen.getByRole("button", { name: "Save draft" }));

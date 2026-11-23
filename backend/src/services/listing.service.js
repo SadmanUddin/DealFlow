@@ -85,6 +85,18 @@ export const getMyListings = async (sellerId, { page, limit }) => {
   };
 };
 
+export const getMyListing = async (sellerId, id) => {
+  const [listing] = await db
+    .select(sellerFields)
+    .from(businessListings)
+    .where(
+      and(eq(businessListings.id, id), eq(businessListings.seller_id, sellerId))
+    )
+    .limit(1);
+  if (!listing) throw notFound();
+  return listing;
+};
+
 export const getPublicListings = async ({
   page,
   limit,

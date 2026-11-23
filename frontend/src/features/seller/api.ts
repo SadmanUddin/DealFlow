@@ -59,6 +59,8 @@ export type ListingInput = {
 
 export const listMyListings = (page = 1, limit = 100) =>
   getValidated("/listings/mine", listingPage, { page, limit });
+export const getMyListing = (id: number) =>
+  getValidated(`/listings/mine/${id}`, listingResponse);
 export const createListing = (input: ListingInput) =>
   postValidated("/listings", input, listingResponse);
 export const updateListing = (id: number, input: Partial<ListingInput>) =>

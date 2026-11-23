@@ -344,6 +344,7 @@ const project = (projection, rowSet, fallback) => {
   const projectSql = column => {
     const query = column?.__sql ?? column?.query ?? '';
     const values = column?.values ?? [];
+    if (query === '(? IS NOT NULL)') return valueFor(rowSet, values[0]) != null;
     if (query.includes('EXISTS (SELECT 1 FROM favorites')) {
       const listingId = valueFor(
         rowSet,

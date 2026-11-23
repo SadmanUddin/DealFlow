@@ -22,7 +22,7 @@ import { startListingConversation } from "@/features/buyer/api";
 import { SoldListingDetail } from "./SoldListingPresentation";
 import { ListingMedia } from "./ListingMedia";
 import { listingImageSrc } from "./listing-image-url";
-import { formatListingMoney } from "./marketplace-format";
+import { financialDisclosure, formatListingMoney } from "./marketplace-format";
 import { getPublishedListing } from "./marketplace-api";
 import { createDeal } from "@/features/deals/api";
 import {
@@ -572,7 +572,7 @@ export function ListingDetailsPage() {
             />
           </dl>
           <p className="mt-3 text-sm leading-6 text-ink-soft">
-            The seller provided these figures in {listing.currency}.
+            {financialDisclosure} Currency: {listing.currency}.
           </p>
         </section>
         <section className="lg:col-start-1 lg:row-start-3 min-w-0 rounded-2xl border border-line bg-white p-5 sm:p-7">

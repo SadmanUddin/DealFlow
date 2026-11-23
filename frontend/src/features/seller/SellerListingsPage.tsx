@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "react-router";
+import { Link, useLocation } from "react-router";
 import {
   Archive,
   ArrowUpRight,
@@ -23,6 +23,7 @@ import {
   formatListingMoney,
   formatSoldDate,
 } from "@/features/marketplace/marketplace-format";
+import { ListingCompleteness } from "@/features/marketplace/ListingCompleteness";
 import { listingImageSrc } from "@/features/marketplace/listing-image-url";
 import { toApiError } from "@/lib/api-error";
 import {
@@ -43,7 +44,10 @@ export function SellerListingsPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [action, setAction] = useState<ListingAction>(null);
-  const [notice, setNotice] = useState("");
+  const location = useLocation();
+  const [notice, setNotice] = useState<string>(
+    location.state?.listingNotice ?? "",
+  );
   const [actionError, setActionError] = useState("");
   const query = useQuery({
     queryKey: ["seller", "listings", page, 100],
@@ -306,15 +310,16 @@ function ListingRow({
             {listing.title}
           </h2>
           <p className="mt-1 line-clamp-2 text-sm leading-6 text-ink-soft">
-            {listing.industry ?? "Industry not specified"} ·{" "}
-            {listing.location ?? "Location not specified"}
+            {listing.industry ?? "Industry not provided"} ·{" "}
+            {listing.location ?? "Location not provided"}
           </p>
           <p className="mt-2 text-xs text-ink-faint">
-            Asking price ·{" "}
+            Asking price · {listing.currency}{" "}
             <span className="font-semibold text-navy-950">
               {formatListingMoney(listing.askingPrice, listing.currency)}
             </span>
           </p>
+          <ListingCompleteness listing={listing} />
           {listing.soldAt && (
             <p className="mt-2 text-xs font-medium text-emerald-900">
               Sold {formatSoldDate(listing.soldAt)}
@@ -342,7 +347,9 @@ function ListingRow({
           listing.status === "pending" ||
           listing.status === "published" ? (
             <Button asChild size="sm" variant="outline">
-              <Link to={`/seller/listings/${listing.id}/edit`}>Edit</Link>
+              <Link to={`/seller/listings/${listing.id}/edit`}>
+                Edit listing
+              </Link>
             </Button>
           ) : null}
           {listing.status === "published" ? (

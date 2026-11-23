@@ -1,8 +1,11 @@
+export const financialDisclosure =
+  "Financial figures are provided by the seller and have not been independently verified by DealFlow.";
+
 export function formatListingMoney(
-  amount: string | number | null,
+  amount: string | number | null | undefined,
   currency: string,
 ) {
-  if (amount === null || amount === "") return "Not disclosed";
+  if (amount == null || amount === "") return "Not disclosed";
   const value = Number(amount);
   if (!Number.isFinite(value)) return "Not disclosed";
   // PostgreSQL returns exact decimal strings. Format the integer separately to

@@ -1,13 +1,24 @@
 import { MapPin } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { PublicListing } from "./marketplace-api";
 import { PublicSalePrice, SoldBadge } from "./SoldListingPresentation";
 import { formatListingMoney, formatSoldDate } from "./marketplace-format";
 import { ListingMedia } from "./ListingMedia";
 
-export function ListingCard({ listing }: { listing: PublicListing }) {
+export function ListingCard({
+  listing,
+  comparison,
+}: {
+  listing: PublicListing;
+  comparison?: {
+    selected: boolean;
+    limitReached: boolean;
+    onToggle: () => void;
+  };
+}) {
   const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
   const imageUrl =
     listing.imageUrl && failedImageUrl !== listing.imageUrl
@@ -17,14 +28,14 @@ export function ListingCard({ listing }: { listing: PublicListing }) {
   const financials = [
     ["Asking price", listing.askingPrice],
     ["Annual revenue", listing.annualRevenue],
-    ...(listing.ebitda != null ? [["EBITDA", listing.ebitda] as const] : []),
+    ["EBITDA", listing.ebitda],
   ] as const;
 
   return (
-    <Card className="group h-full overflow-hidden rounded-2xl border-line bg-white shadow-none transition-[border-color,box-shadow] duration-200 hover:border-emerald-800/50 hover:shadow-card">
+    <Card className="group flex h-full flex-col overflow-hidden rounded-2xl border-line bg-white shadow-none transition-[border-color,box-shadow] duration-200 hover:border-emerald-800/50 hover:shadow-card">
       <Link
         aria-label={`View ${listing.title}`}
-        className="flex h-full flex-col rounded-[inherit] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-emerald-700/40"
+        className="flex flex-1 flex-col rounded-[inherit] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-emerald-700/40"
         to={`/listings/${listing.id}`}
       >
         <div className="relative aspect-[16/10] overflow-hidden border-b border-line bg-mist">
@@ -49,11 +60,9 @@ export function ListingCard({ listing }: { listing: PublicListing }) {
           </div>
         </div>
         <div className="flex flex-1 flex-col p-5">
-          {listing.industry && (
-            <p className="mb-2 break-words text-xs font-semibold tracking-wide text-emerald-900">
-              {listing.industry}
-            </p>
-          )}
+          <p className="mb-2 break-words text-xs font-semibold tracking-wide text-emerald-900">
+            {listing.industry || "Industry not provided"}
+          </p>
           <h3 className="break-words font-display text-[1.65rem] leading-[1.05] text-navy-950 group-hover:text-emerald-900">
             {listing.title}
           </h3>
@@ -63,7 +72,7 @@ export function ListingCard({ listing }: { listing: PublicListing }) {
               className="shrink-0 text-emerald-800"
               size={15}
             />
-            <span>{listing.location || "Location undisclosed"}</span>
+            <span>{listing.location || "Location not provided"}</span>
           </p>
           {!sold && (
             <p className="mt-3 line-clamp-2 text-sm leading-6 text-ink-soft">
@@ -91,7 +100,7 @@ export function ListingCard({ listing }: { listing: PublicListing }) {
                 {financials.map(([label, amount]) => (
                   <div
                     key={label}
-                    className={`min-w-0 px-3 py-2.5 ${label === "Asking price" ? "col-span-2 border-b border-line bg-emerald-50/70" : financials.length === 2 ? "col-span-2" : "even:border-r even:border-line"}`}
+                    className={`min-w-0 px-3 py-2.5 ${label === "Asking price" ? "col-span-2 border-b border-line bg-emerald-50/70" : "even:border-r even:border-line"}`}
                   >
                     <dt className="text-xs leading-4 text-ink-soft">{label}</dt>
                     <dd
@@ -102,10 +111,28 @@ export function ListingCard({ listing }: { listing: PublicListing }) {
                   </div>
                 ))}
               </dl>
+              <p className="mt-2 text-xs text-ink-soft">
+                Seller-provided figures · {listing.currency}
+              </p>
             </div>
           )}
         </div>
       </Link>
+      {comparison && (
+        <div className="border-t border-line px-5 py-2">
+          <Button
+            type="button"
+            variant={comparison.selected ? "secondary" : "outline"}
+            size="sm"
+            aria-label={`Compare ${listing.title}`}
+            aria-pressed={comparison.selected}
+            disabled={comparison.limitReached && !comparison.selected}
+            onClick={comparison.onToggle}
+          >
+            {comparison.selected ? "Selected for comparison" : "Compare"}
+          </Button>
+        </div>
+      )}
     </Card>
   );
 }

@@ -2,6 +2,7 @@ import {
   archiveListing as archiveListingService,
   createListing as createListingService,
   deleteDraftListing,
+  getMyListing as getMyListingService,
   getMyListings as getMyListingsService,
   getPublicListings as getPublicListingsService,
   getPublishedListing as getPublishedListingService,
@@ -63,6 +64,15 @@ export const createListing = async (req, res) => {
 export const getMyListings = async (req, res) => {
   const query = paginationSchema.parse(req.query);
   res.status(200).json(await getMyListingsService(req.user.id, query));
+};
+
+export const getMyListing = async (req, res) => {
+  res
+    .set('Cache-Control', 'private, no-store')
+    .status(200)
+    .json({
+      listing: await getMyListingService(req.user.id, listingId(req)),
+    });
 };
 
 export const getPublicListings = async (req, res) => {

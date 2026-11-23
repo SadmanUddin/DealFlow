@@ -21,6 +21,11 @@ import {
   WorkspacePageHeader,
   WorkspaceSkeleton,
 } from "@/components/shared/workspace/WorkspaceUI";
+import { ListingCompleteness } from "@/features/marketplace/ListingCompleteness";
+import {
+  financialDisclosure,
+  formatListingMoney,
+} from "@/features/marketplace/marketplace-format";
 import { toApiError } from "@/lib/api-error";
 import {
   changeAdminListingAvailability,
@@ -98,12 +103,7 @@ export function AdminModerationPage() {
   }) => {
     const next = new URLSearchParams(params);
     for (const [key, value] of Object.entries(values)) {
-      if (
-        !value ||
-        value === "all" ||
-        (key === "status" && value === "pending")
-      )
-        next.delete(key);
+      if (!value || (key === "status" && value === "pending")) next.delete(key);
       else next.set(key, String(value));
     }
     if (values.status !== undefined || values.q !== undefined)
@@ -208,34 +208,78 @@ export function AdminModerationPage() {
                       </div>
                       <p className="mt-1.5 text-xs text-ink-soft">
                         Listing #{listing.id} · seller #{listing.sellerId} ·
-                        submitted{" "}
+                        created{" "}
                         {new Intl.DateTimeFormat(undefined, {
                           dateStyle: "medium",
                         }).format(new Date(listing.createdAt))}
                       </p>
                     </div>
-                    <Link
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-800 hover:text-emerald-950"
-                      to={`/listings/${listing.id}`}
-                    >
-                      <ExternalLink aria-hidden="true" size={14} /> Open public
-                      view
-                    </Link>
+                    {(listing.status === "published" ||
+                      listing.status === "sold") && (
+                      <Link
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-800 hover:text-emerald-950"
+                        to={`/listings/${listing.id}`}
+                      >
+                        <ExternalLink aria-hidden="true" size={14} /> Open
+                        public view
+                      </Link>
+                    )}
                   </header>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <dl className="mt-4 grid gap-3 sm:grid-cols-2">
                     <Info
                       label="Industry"
-                      value={listing.industry ?? "Not specified"}
+                      value={listing.industry || "Not provided"}
                     />
                     <Info
                       label="Location"
-                      value={listing.location ?? "Not specified"}
+                      value={listing.location || "Not provided"}
                     />
-                  </div>
+                  </dl>
                   <p className="mt-4 break-words whitespace-pre-line rounded-xl border border-line bg-paper p-4 text-sm leading-6 text-ink-soft">
                     {listing.description}
                   </p>
-                  {listing.moderationReason ? (
+                  <ListingCompleteness listing={listing} />
+                  {listing.currency && (
+                    <section className="mt-4">
+                      <h3 className="text-sm font-semibold text-navy-950">
+                        Financial information · {listing.currency}
+                      </h3>
+                      <dl className="mt-2 grid gap-2 sm:grid-cols-3">
+                        <Info
+                          label="Asking price"
+                          value={formatListingMoney(
+                            listing.askingPrice,
+                            listing.currency,
+                          )}
+                        />
+                        <Info
+                          label="Annual revenue"
+                          value={formatListingMoney(
+                            listing.annualRevenue,
+                            listing.currency,
+                          )}
+                        />
+                        <Info
+                          label="EBITDA"
+                          value={formatListingMoney(
+                            listing.ebitda,
+                            listing.currency,
+                          )}
+                        />
+                      </dl>
+                      <p className="mt-2 text-xs text-ink-soft">
+                        {financialDisclosure}
+                      </p>
+                    </section>
+                  )}
+                  {listing.rejectionReason && (
+                    <p className="mt-4 rounded-lg bg-rose-50 p-3 text-xs leading-5 text-rose-900">
+                      <strong>Feedback shared with seller:</strong>{" "}
+                      {listing.rejectionReason}
+                    </p>
+                  )}
+                  {listing.moderationReason &&
+                  listing.moderationReason !== listing.rejectionReason ? (
                     <p className="mt-4 rounded-lg bg-amber-50 p-3 text-xs leading-5 text-amber-950">
                       <strong>Existing moderation note:</strong>{" "}
                       {listing.moderationReason}
@@ -405,10 +449,12 @@ export function AdminModerationPage() {
 function Info({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg bg-mist/70 px-3 py-2">
-      <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-ink-faint">
+      <dt className="text-[0.65rem] font-semibold uppercase tracking-wide text-ink-faint">
         {label}
-      </p>
-      <p className="mt-1 text-xs font-medium text-navy-950">{value}</p>
+      </dt>
+      <dd className="mt-1 break-words text-xs font-medium text-navy-950">
+        {value}
+      </dd>
     </div>
   );
 }

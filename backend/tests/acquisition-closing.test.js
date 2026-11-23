@@ -445,6 +445,45 @@ it('mounts administrator MFA status and distinguishes anonymous and authorized s
   }
 });
 
+it('reads editor and moderation data from the migrated listing schema', async () => {
+  const id = await listing('pending', 'Marketplace review fixture');
+  await engine.query(
+    `UPDATE business_listings
+     SET image_key = 'private/image.webp', image_mime_type = 'image/webp',
+         annual_revenue = 89000.50
+     WHERE id = $1`,
+    [id]
+  );
+  const password = 'Listing-review-fixture-password';
+  await engine.query('UPDATE users SET password = $1 WHERE id IN (2, 5)', [
+    await hashPassword(password),
+  ]);
+  const ownerSession = await createSession(
+    await authenticateUser({ email: 'seller@example.test', password })
+  );
+  const adminSession = await createSession(
+    await authenticateUser({ email: 'admin@example.test', password })
+  );
+  const owner = await request(app)
+    .get(`/api/listings/mine/${id}`)
+    .set('Cookie', `token=${ownerSession.accessToken}`);
+  expect(owner.status).toBe(200);
+  expect(owner.body.listing).toMatchObject({
+    id,
+    imageUrl: expect.stringContaining(`/api/listings/${id}/image`),
+    annualRevenue: '89000.50',
+  });
+  const queue = await request(app)
+    .get('/api/admin/listings?status=pending&q=Marketplace')
+    .set('Cookie', `token=${adminSession.accessToken}`);
+  expect(queue.status).toBe(200);
+  expect(queue.body.listings).toEqual([
+    expect.objectContaining({ id, hasImage: true, annualRevenue: '89000.50' }),
+  ]);
+  expect(JSON.stringify(queue.body)).not.toContain('private/image.webp');
+  expect((await request(app).get(`/api/listings/${id}`)).status).toBe(404);
+});
+
 it('enrolls administrator MFA and enforces fresh factors and single-use recovery', async () => {
   const password = 'Mfa-Fixture-Password-Only';
   vi.stubEnv('ADMIN_MFA_ENCRYPTION_KEY', 'ab'.repeat(32));

@@ -15,6 +15,8 @@ import {
 } from "@/features/auth/auth-context";
 import { ApiError } from "@/lib/api-error";
 import { ListingDetailsPage } from "./ListingDetailsPage";
+import { ComparisonPage } from "./ComparisonPage";
+import { ComparisonProvider } from "./ComparisonProvider";
 import { ListingCard } from "./ListingCard";
 import { formatListingMoney } from "./marketplace-format";
 import { MarketplacePage } from "./MarketplacePage";
@@ -115,11 +117,14 @@ function renderMarketplace(initialPath = "/marketplace", auth = guestAuth) {
       <AuthContext.Provider value={auth}>
         <MemoryRouter initialEntries={[initialPath]}>
           <LocationSearch />
-          <Routes>
-            <Route path="/marketplace" element={<MarketplacePage />} />
-            <Route path="/listings/:id" element={<ListingDetailsPage />} />
-            <Route path="/buyer/conversations" element={<p>Buyer inbox</p>} />
-          </Routes>
+          <ComparisonProvider>
+            <Routes>
+              <Route path="/marketplace" element={<MarketplacePage />} />
+              <Route path="/marketplace/compare" element={<ComparisonPage />} />
+              <Route path="/listings/:id" element={<ListingDetailsPage />} />
+              <Route path="/buyer/conversations" element={<p>Buyer inbox</p>} />
+            </Routes>
+          </ComparisonProvider>
         </MemoryRouter>
       </AuthContext.Provider>
     </QueryClientProvider>,
@@ -658,5 +663,136 @@ describe("sold businesses", () => {
     expect(
       screen.queryByRole("button", { name: /inquiry|offer/i }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("business comparison", () => {
+  it("selects across marketplace pages, enforces the limit, and removes and clears selections", async () => {
+    const user = userEvent.setup();
+    const choices = ["Bakery", "Cafe", "Bookshop", "Florist"].map(
+      (title, i) => ({
+        ...listing,
+        id: i + 1,
+        title,
+      }),
+    );
+    apiMocks.getPublicListings.mockImplementation(async ({ page }) =>
+      listingPage(page === 1 ? choices.slice(0, 2) : choices.slice(2), page, 2),
+    );
+    apiMocks.getPublishedListing.mockImplementation(
+      async (id) => choices[id - 1],
+    );
+    renderMarketplace();
+    const bakery = await screen.findByRole("button", {
+      name: "Compare Bakery",
+    });
+    await user.click(bakery);
+    expect(bakery).toHaveAttribute("aria-pressed", "true");
+    await user.click(bakery);
+    expect(bakery).toHaveAttribute("aria-pressed", "false");
+    await user.click(bakery);
+    await user.click(screen.getByRole("button", { name: "Compare Cafe" }));
+    await user.click(screen.getByRole("button", { name: /Next/ }));
+    await user.click(
+      await screen.findByRole("button", { name: "Compare Bookshop" }),
+    );
+    expect(
+      screen.getByRole("button", { name: "Compare Florist" }),
+    ).toBeDisabled();
+    expect(screen.getByText(/3 of 3 selected/)).toBeInTheDocument();
+    await user.click(screen.getByRole("link", { name: "Compare businesses" }));
+    expect(await screen.findByRole("link", { name: "Bakery" })).toHaveAttribute(
+      "href",
+      "/listings/1",
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Remove Bakery from comparison" }),
+    );
+    expect(
+      screen.queryByRole("link", { name: "Bakery" }),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Clear all" }));
+    expect(
+      screen.getByText(/Select up to three businesses/),
+    ).toBeInTheDocument();
+  });
+
+  it("preserves sold-listing financial disclosure and retries a failed public read", async () => {
+    const user = userEvent.setup();
+    const sold = {
+      ...listing,
+      status: "sold",
+      publicSalePrice: null,
+      publicSaleCurrency: null,
+    } as const;
+    apiMocks.getPublicListings.mockResolvedValue(listingPage([sold]));
+    apiMocks.getPublishedListing.mockRejectedValue(
+      new ApiError("Request failed", { status: 429 }),
+    );
+    renderMarketplace("/marketplace?availability=sold");
+    await user.click(
+      await screen.findByRole("button", { name: `Compare ${sold.title}` }),
+    );
+    await user.click(screen.getByRole("link", { name: "Compare businesses" }));
+    const retry = await screen.findByRole("button", { name: "Retry" });
+    apiMocks.getPublishedListing.mockResolvedValue(sold);
+    await user.click(retry);
+    expect(
+      await screen.findByRole("cell", { name: "Sold" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("cell", {
+        name: formatListingMoney(sold.askingPrice, sold.currency),
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("cell", {
+        name: formatListingMoney(sold.annualRevenue, sold.currency),
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Back to marketplace" }),
+    ).toHaveAttribute("href", "/marketplace?availability=sold");
+  });
+
+  it("reports mixed currencies, missing figures, and listings that are no longer public", async () => {
+    const user = userEvent.setup();
+    const choices = ["Bakery", "Cafe", "Bookshop"].map((title, i) => ({
+      ...listing,
+      id: i + 1,
+      title,
+      currency: i === 1 ? "USD" : "EUR",
+      annualRevenue: null,
+      ebitda: null,
+    }));
+    apiMocks.getPublicListings.mockResolvedValue(listingPage(choices));
+    apiMocks.getPublishedListing.mockImplementation(async (id) => {
+      if (id === 3) throw new ApiError("Not found", { status: 404 });
+      return choices[id - 1];
+    });
+    renderMarketplace();
+    for (const { title } of choices) {
+      await user.click(
+        await screen.findByRole("button", { name: `Compare ${title}` }),
+      );
+    }
+    await user.click(screen.getByRole("link", { name: "Compare businesses" }));
+    expect(
+      await screen.findByText(/These listings use different currencies/),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "EUR" })).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "USD" })).toBeInTheDocument();
+    expect(screen.getAllByRole("cell", { name: "Not disclosed" })).toHaveLength(
+      4,
+    );
+    expect(
+      await screen.findByText("This listing is no longer available."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Bookshop")).not.toBeInTheDocument();
+    expect(screen.queryByText("Actual Seller")).not.toBeInTheDocument();
+    expect(apiMocks.getPublishedListing).toHaveBeenCalledWith(
+      3,
+      expect.objectContaining({ withCredentials: false }),
+    );
   });
 });

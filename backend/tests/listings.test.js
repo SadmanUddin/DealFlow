@@ -120,6 +120,29 @@ describe('listing authorization and creation', () => {
     expect(mock.databaseState.business_listings[0].seller_id).toBe(2);
   });
 
+  it('returns a private editor record only to the owning seller', async () => {
+    const owner = credentialsFor(await signup('seller', 'owner@listing.test'));
+    const other = credentialsFor(await signup('seller', 'other@listing.test'));
+    const buyer = credentialsFor(await signup('buyer', 'buyer@listing.test'));
+    const created = await createAs(owner);
+    const path = `/api/listings/mine/${created.body.listing.id}`;
+    expect((await request(app).get(path)).status).toBe(401);
+    expect(
+      (await request(app).get(path).set('Cookie', buyer.cookie)).status
+    ).toBe(403);
+    expect(
+      (await request(app).get(path).set('Cookie', other.cookie)).status
+    ).toBe(404);
+    const result = await request(app).get(path).set('Cookie', owner.cookie);
+    expect(result.status).toBe(200);
+    expect(result.headers['cache-control']).toBe('private, no-store');
+    expect(result.body.listing).toMatchObject({
+      status: 'draft',
+      askingPrice: '1250000.00',
+      currency: 'EUR',
+    });
+  });
+
   it('rejects missing fields, invalid amounts, seller_id and client status', async () => {
     const seller = credentialsFor(
       await signup('seller', 'seller@listing.test')
@@ -144,7 +167,13 @@ describe('public listing visibility', () => {
     const registration = await signup('seller', 'seller@listing.test');
     const credentials = credentialsFor(registration);
     const created = await createAs(credentials);
-    for (const status of ['draft', 'pending', 'rejected', 'archived']) {
+    for (const status of [
+      'draft',
+      'pending',
+      'rejected',
+      'archived',
+      'suspended',
+    ]) {
       mock.databaseState.business_listings.push({
         ...mock.databaseState.business_listings[0],
         id: mock.databaseState.nextListingId++,
@@ -160,7 +189,7 @@ describe('public listing visibility', () => {
       `/api/listings/${created.body.listing.id}`
     );
     const hiddenDetails = await Promise.all(
-      [2, 3, 4, 5].map(id => request(app).get(`/api/listings/${id}`))
+      [2, 3, 4, 5, 6].map(id => request(app).get(`/api/listings/${id}`))
     );
     expect(publicList.status).toBe(200);
     expect(publicList.body.listings).toHaveLength(1);
@@ -168,6 +197,20 @@ describe('public listing visibility', () => {
     expect(publicList.body.listings[0]).not.toHaveProperty('rejectionReason');
     expect(visible.status).toBe(200);
     expect(visible.body.listing.sellerName).toBe('Test seller');
+    for (const key of [
+      'sellerId',
+      'rejectionReason',
+      'moderationReason',
+      'imageKey',
+      'salePrice',
+      'isFavorite',
+    ]) {
+      expect(visible.body.listing).not.toHaveProperty(key);
+    }
+    const ownerView = await request(app)
+      .get('/api/listings/2')
+      .set('Cookie', credentials.cookie);
+    expect(ownerView.status).toBe(404);
     expect(hiddenDetails.every(response => response.status === 404)).toBe(true);
   });
 
