@@ -242,6 +242,20 @@ export function getRateLimitPolicy(request) {
       };
   }
 
+  if (
+    ['POST', 'PATCH'].includes(req.method) &&
+    /^\/api\/deals\/[1-9]\d*\/diligence\/(?:checklist|requests)(?:\/[1-9]\d*)?$/.test(
+      req.path.replace(/%3([0-9])/g, '$1')
+    )
+  ) {
+    return {
+      name: 'deal-diligence-write',
+      limits: req.user
+        ? authenticatedLimits('deal-diligence-write', 30, 180)
+        : [ipLimit('deal-diligence-guest', '1m', 20)],
+    };
+  }
+
   if (isDealNegotiationWrite(req)) {
     return req.user
       ? {

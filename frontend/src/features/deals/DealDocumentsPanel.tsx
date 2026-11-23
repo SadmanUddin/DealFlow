@@ -11,13 +11,13 @@ import {
 } from "@/components/shared/workspace/WorkspaceUI";
 import { toApiError } from "@/lib/api-error";
 import {
-  downloadDealDocument,
   linkDealDocument,
   listDealDocuments,
   listDealConversationDocuments,
   getDealConversation,
   uploadDealConversationDocument,
 } from "./api";
+import { downloadLinkedDocument } from "./download-linked-document";
 
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -25,7 +25,13 @@ function formatBytes(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function DealDocumentsPanel({ dealId }: { dealId: number }) {
+export function DealDocumentsPanel({
+  dealId,
+  userId,
+}: {
+  dealId: number;
+  userId?: number;
+}) {
   const client = useQueryClient();
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -66,13 +72,7 @@ export function DealDocumentsPanel({ dealId }: { dealId: number }) {
     setBusyDocument(documentId);
     setError("");
     try {
-      const blob = await downloadDealDocument(dealId, documentId);
-      const url = URL.createObjectURL(blob);
-      const anchor = window.document.createElement("a");
-      anchor.href = url;
-      anchor.download = filename;
-      anchor.click();
-      URL.revokeObjectURL(url);
+      await downloadLinkedDocument(dealId, documentId, filename);
     } catch (reason) {
       setError(toApiError(reason).message);
     } finally {
@@ -108,7 +108,7 @@ export function DealDocumentsPanel({ dealId }: { dealId: number }) {
   };
 
   return (
-    <SectionCard>
+    <SectionCard id="deal-documents" className="scroll-mt-24">
       <SectionHeading
         description="Documents shared here are available to both deal participants."
         title="Deal room documents"
@@ -159,6 +159,13 @@ export function DealDocumentsPanel({ dealId }: { dealId: number }) {
                   <span className="block truncate text-sm font-semibold text-navy-950">
                     {document.filename}
                   </span>
+                  <span className="block text-xs text-ink-soft">
+                    File #{document.id}
+                    {document.uploadedBy !== undefined &&
+                      (document.uploadedBy === userId
+                        ? " · Uploaded by you"
+                        : " · Uploaded by the other participant")}
+                  </span>
                   <span className="text-xs text-ink-soft">
                     {document.mimeType} · {formatBytes(document.sizeBytes)} ·{" "}
                     {new Intl.DateTimeFormat(undefined, {
@@ -168,7 +175,7 @@ export function DealDocumentsPanel({ dealId }: { dealId: number }) {
                 </span>
               </div>
               <Button
-                aria-label={`Download ${document.filename}`}
+                aria-label={`Download ${document.filename} · File #${document.id}`}
                 disabled={busyDocument === document.id}
                 onClick={() => void download(document.id, document.filename)}
                 size="sm"
@@ -236,37 +243,45 @@ export function DealDocumentsPanel({ dealId }: { dealId: number }) {
         ) : null}
         {conversation && sourceDocumentsQuery.data ? (
           <div className="mt-3 space-y-2">
-            {sourceDocumentsQuery.data.documents
-              .filter(
-                (item) =>
-                  !documentsQuery.data?.documents.some(
-                    (linked) => linked.id === item.id,
-                  ),
-              )
-              .map((document) => (
-                <div
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line px-3 py-2"
-                  key={document.id}
-                >
-                  <span className="min-w-0">
-                    <span className="block truncate text-xs font-semibold text-navy-950">
-                      {document.originalFilename}
-                    </span>
-                    <span className="text-[0.68rem] text-ink-soft">
-                      {document.mimeType} · {formatBytes(document.sizeBytes)}
-                    </span>
-                  </span>
-                  <Button
-                    disabled={linkMutation.isPending || uploading}
-                    onClick={() => linkMutation.mutate(document.id)}
-                    size="sm"
-                    variant="outline"
+            {documentsQuery.isSuccess &&
+              sourceDocumentsQuery.data.documents
+                .filter(
+                  (item) =>
+                    !documentsQuery.data?.documents.some(
+                      (linked) => linked.id === item.id,
+                    ),
+                )
+                .map((document) => (
+                  <div
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line px-3 py-2"
+                    key={document.id}
                   >
-                    <Link2 aria-hidden="true" size={14} />
-                    {linkMutation.isPending ? "Linking…" : "Link to deal"}
-                  </Button>
-                </div>
-              ))}
+                    <span className="min-w-0">
+                      <span className="block truncate text-xs font-semibold text-navy-950">
+                        {document.originalFilename}
+                      </span>
+                      <span className="block text-[0.68rem] text-ink-soft">
+                        File #{document.id} ·{" "}
+                        {document.uploaderId === userId
+                          ? "Uploaded by you"
+                          : "Uploaded by the other participant"}
+                      </span>
+                      <span className="text-[0.68rem] text-ink-soft">
+                        {document.mimeType} · {formatBytes(document.sizeBytes)}
+                      </span>
+                    </span>
+                    <Button
+                      aria-label={`Link to deal · ${document.originalFilename} · File #${document.id}`}
+                      disabled={linkMutation.isPending || uploading}
+                      onClick={() => linkMutation.mutate(document.id)}
+                      size="sm"
+                      variant="outline"
+                    >
+                      <Link2 aria-hidden="true" size={14} />
+                      {linkMutation.isPending ? "Linking…" : "Link to deal"}
+                    </Button>
+                  </div>
+                ))}
             <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-line px-3 py-2 text-xs font-semibold text-navy-950 transition hover:bg-mist focus-within:ring-4 focus-within:ring-emerald-500/15">
               <Upload aria-hidden="true" size={14} /> Upload a private document
               <input

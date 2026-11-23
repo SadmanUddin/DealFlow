@@ -191,6 +191,14 @@ describe('Arcjet endpoint policy selection', () => {
     ).toBe('private-document-download');
   });
 
+  it('charges encoded diligence route IDs against the same write budget', () => {
+    const policy = path =>
+      getRateLimitPolicy(createRequest({ method: 'PATCH', path, role: 'buyer' }));
+    const canonical = policy('/api/deals/1/diligence/checklist/2');
+    expect(canonical.name).toBe('deal-diligence-write');
+    expect(policy('/api/deals/%31/diligence/checklist/%32')).toEqual(canonical);
+  });
+
   it('uses distinct write budgets for listings, negotiations, conversations, reports, and admin actions', () => {
     expect(
       getRateLimitPolicy(

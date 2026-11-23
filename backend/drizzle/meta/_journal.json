@@ -155,6 +155,13 @@
       "when": 1795378912856,
       "tag": "0021_session_generation_and_admin_mfa",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1795458280403,
+      "tag": "0022_advanced_deal_diligence",
+      "breakpoints": true
     }
   ]
 }

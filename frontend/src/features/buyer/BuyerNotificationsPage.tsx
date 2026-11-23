@@ -40,12 +40,23 @@ function notificationTarget(
   const dealId = idFromPayload(item.payload, "dealId");
   const listingId = idFromPayload(item.payload, "listingId");
   const conversationId = idFromPayload(item.payload, "conversationId");
-  if (dealId) return `/${audience}/deals/${dealId}`;
+  if (dealId) {
+    const diligence = diligenceNotificationTypes.has(item.type);
+    return `/${audience}/deals/${dealId}${diligence ? "#deal-diligence" : ""}`;
+  }
   if (conversationId)
     return `/${audience}/conversations?conversation=${conversationId}`;
   if (listingId) return `/listings/${listingId}`;
   return undefined;
 }
+
+const diligenceNotificationTypes = new Set([
+  "deal.task_assigned",
+  "deal.document_requested",
+  "deal.document_submitted",
+  "deal.document_changes_requested",
+  "deal.document_accepted",
+]);
 
 const notificationLabels: Record<string, string> = {
   "deal.closing_proposed": "Review the proposed closing amount",
@@ -54,6 +65,11 @@ const notificationLabels: Record<string, string> = {
     "Your confirmation is needed to complete the acquisition",
   "deal.closing_disputed": "Closing paused after a dispute",
   "deal.closing_resolved": "Closing dispute resolved",
+  "deal.task_assigned": "A diligence task was assigned to you",
+  "deal.document_requested": "A document was requested from you",
+  "deal.document_submitted": "A document is ready for your review",
+  "deal.document_changes_requested": "Changes were requested for your document",
+  "deal.document_accepted": "Your document was accepted",
   "deal.completed": "Acquisition completed and listing marked sold",
   "listing.sold": "This business has been sold",
 };

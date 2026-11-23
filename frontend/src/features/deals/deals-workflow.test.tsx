@@ -33,6 +33,27 @@ const mocks = vi.hoisted(() => ({
   getPublishedListing: vi.fn(),
 }));
 
+vi.mock("./diligence-api", async (original) => ({
+  ...(await original<typeof import("./diligence-api")>()),
+  getDiligence: async () => ({
+    checklist: [],
+    requests: [],
+    checklistTotal: 0,
+    requestTotal: 0,
+    pageSize: 20,
+    progress: {
+      total: 0,
+      completed: 0,
+      pending: 0,
+      inProgress: 0,
+      blocked: 0,
+      overdue: 0,
+      outstandingRequests: 0,
+    },
+    startedAt: null,
+    firstDocumentAcceptedAt: null,
+  }),
+}));
 vi.mock("./api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./api")>()),
   ...mocks,
@@ -174,7 +195,15 @@ describe("deal workflow", () => {
       await screen.findByRole("heading", { name: listing.title }),
     ).toBeInTheDocument();
     expect(screen.getByText("Seller proposal")).toBeInTheDocument();
-    expect(screen.getAllByText("Seller Name")).toHaveLength(2);
+    const summary = screen.getByRole("region", {
+      name: "Deal completion summary",
+    });
+    expect(within(summary).getByText("Seller Name")).toBeInTheDocument();
+    expect(
+      screen
+        .getAllByText("Seller Name")
+        .filter((node) => !summary.contains(node)),
+    ).toHaveLength(2);
     expect(screen.queryByText("#12")).not.toBeInTheDocument();
     expect(screen.getByText("Seller · Seller Name offer")).toBeInTheDocument();
     expect(screen.queryByText("seller@example.test")).not.toBeInTheDocument();

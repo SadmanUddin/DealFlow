@@ -174,6 +174,7 @@ export const listDealHistory = (dealId: number, page = 1, limit = 100) =>
 const dealDocumentSchema = z.object({
   id: z.number().int().positive(),
   filename: z.string(),
+  uploadedBy: z.number().int().positive().optional(),
   mimeType: z.string(),
   sizeBytes: z.number().int().nonnegative(),
   createdAt: dateValue,

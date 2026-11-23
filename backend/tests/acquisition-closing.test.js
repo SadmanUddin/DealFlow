@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { PGlite } from '@electric-sql/pglite';
 import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
@@ -202,6 +203,19 @@ describe('acquisition closing on the migrated PostgreSQL schema', () => {
     expect(sellerResult.seller_confirmed_at).toBeTruthy();
     expect(buyerResult.buyer_confirmed_at).toBeTruthy();
     await confirm(dealId, buyer, 5, true);
+    const afterCompletion = await listDealActivities(
+      dealId,
+      buyer,
+      false,
+      browse
+    );
+    expect(
+      afterCompletion.activities.filter(
+        event =>
+          event.event_type === 'deal.status_changed' &&
+          event.metadata.to === 'completed'
+      )
+    ).toHaveLength(1);
     expect(await getDeal(dealId, seller)).toMatchObject({
       status: 'completed',
       closing_amount: '114300.25',
@@ -483,6 +497,352 @@ it('reads editor and moderation data from the migrated listing schema', async ()
   expect(JSON.stringify(queue.body)).not.toContain('private/image.webp');
   expect((await request(app).get(`/api/listings/${id}`)).status).toBe(404);
 });
+
+it('tracks diligence and document review atomically without gating disputed or incomplete closing', async () => {
+  const listingId = await listing('published', 'Diligence fixture');
+  const dealId = await accepted(listingId);
+  const url = `/api/deals/${dealId}/diligence`;
+  const password = 'Diligence-local-fixture-password';
+  await engine.query(
+    'UPDATE users SET password = $1 WHERE id IN (1, 2, 3, 5)',
+    [await hashPassword(password)]
+  );
+  const session = async email =>
+    createSession(await authenticateUser({ email, password }));
+  const [buyerSession, sellerSession, outsider, admin] = await Promise.all(
+    ['buyer', 'seller', 'other', 'admin'].map(name =>
+      session(`${name}@example.test`)
+    )
+  );
+  const auth = (builder, current) =>
+    builder
+      .set('Cookie', `token=${current.accessToken}`)
+      .set('X-CSRF-Token', current.csrfToken);
+  const read = (current = buyerSession, query = '') =>
+    auth(request(app).get(url + query), current);
+  const post = (subpath, current, body) =>
+    auth(request(app).post(url + subpath), current).send(body);
+  const patch = (subpath, current, body) =>
+    auth(request(app).patch(url + subpath), current).send(body);
+  expect((await request(app).get(url)).status).toBe(401);
+  expect((await read(outsider)).status).toBe(404);
+  expect((await read(admin)).status).toBe(404);
+  expect(
+    (
+      await auth(
+        request(app).get('/api/deals/2147483647/diligence'),
+        buyerSession
+      )
+    ).status
+  ).toBe(404);
+  const empty = await read();
+  expect(empty.status).toBe(200);
+  expect(empty.body.progress).toMatchObject({
+    total: 0,
+    completed: 0,
+    outstandingRequests: 0,
+  });
+  expect(empty.body.startedAt).toBeNull();
+
+  const input = {
+    title: 'Reconcile statements',
+    description: 'Compare revenue to supporting statements.',
+    category: 'financial',
+    assignedTo: 'seller',
+    dueDate: '2000-01-01',
+    creationKey: randomUUID(),
+  };
+  expect(
+    (
+      await post('/checklist', buyerSession, {
+        ...input,
+        assignedTo: 'unrelated',
+      })
+    ).status
+  ).toBe(400);
+  expect((await post('/checklist', outsider, input)).status).toBe(404);
+  expect(
+    (
+      await request(app)
+        .post(url + '/checklist')
+        .set('Cookie', `token=${buyerSession.accessToken}`)
+        .send(input)
+    ).status
+  ).toBe(403);
+  for (const invalid of [
+    { dueDate: '0000-01-01' },
+    { description: 'Null\0character' },
+    { title: 'Invalid Unicode \uD800' },
+  ]) {
+    expect(
+      (await post('/checklist', buyerSession, { ...input, ...invalid })).status
+    ).toBe(400);
+  }
+  const created = await post('/checklist', buyerSession, input);
+  expect(created.status).toBe(201);
+  const task = '/checklist/' + created.body.id;
+  expect((await post('/checklist', buyerSession, input)).status).toBe(409);
+  expect(
+    (await patch(task, outsider, { status: 'completed', revision: 0 })).status
+  ).toBe(404);
+  const filtered = await read(
+    sellerSession,
+    '?assignment=mine&category=financial&status=pending'
+  );
+  expect(filtered.body.checklist).toEqual([
+    expect.objectContaining({ overdue: true, created_by: buyer }),
+  ]);
+  expect(filtered.body.progress).toMatchObject({
+    total: 1,
+    pending: 1,
+    overdue: 1,
+  });
+  expect(filtered.body.startedAt).toBeTruthy();
+  expect(
+    (await patch(task, sellerSession, { status: 'completed', revision: 0 }))
+      .status
+  ).toBe(200);
+  expect(
+    (await patch(task, sellerSession, { status: 'blocked', revision: 0 }))
+      .status
+  ).toBe(409);
+  const completed = await read();
+  expect(completed.body.checklist[0].completed_at).toBeTruthy();
+  expect(completed.body.progress).toMatchObject({ completed: 1, overdue: 0 });
+  expect(
+    (
+      await patch(task, sellerSession, {
+        status: 'blocked',
+        revision: 1,
+        assignedTo: 'buyer',
+      })
+    ).status
+  ).toBe(200);
+  expect((await read()).body.checklist[0].completed_at).toBeNull();
+
+  const requestInput = {
+    title: 'Financial statements',
+    description: '',
+    dueDate: null,
+    creationKey: randomUUID(),
+  };
+  const requested = await post('/requests', buyerSession, requestInput);
+  expect(requested.status).toBe(201);
+  const requestPath = '/requests/' + requested.body.id;
+  expect((await post('/requests', buyerSession, requestInput)).status).toBe(
+    409
+  );
+  const { conversation } = await startConversation(buyer, listingId);
+  const insertFile = async (filename, status, uploader = seller) => {
+    const { rows } = await engine.query(
+      `INSERT INTO conversation_documents(conversation_id, uploaded_by, storage_key, original_filename, mime_type, size_bytes, sha256, status)
+       VALUES ($1, $2, $3, $4, 'application/pdf', 100, repeat('a', 64), $5) RETURNING id`,
+      [conversation.id, uploader, `private/${filename}`, filename, status]
+    );
+    return rows[0].id;
+  };
+  const first = await insertFile('first.pdf', 'available');
+  const revised = await insertFile('revised.pdf', 'available');
+  const quarantined = await insertFile('pending.pdf', 'pending');
+  const buyerFile = await insertFile('buyer.pdf', 'available', buyer);
+  const otherDeal = (await createDeal(otherBuyer, listingId)).deal.id;
+  await engine.query(
+    'INSERT INTO deal_documents(deal_id, conversation_document_id, linked_by) VALUES ($1,$2,$3), ($1,$4,$3), ($1,$5,$3), ($6,$7,$3)',
+    [dealId, first, seller, quarantined, buyerFile, otherDeal, revised]
+  );
+  const actOnRequest = (current, body) => patch(requestPath, current, body);
+  expect(
+    (
+      await actOnRequest(buyerSession, {
+        action: 'submit',
+        documentId: first,
+        revision: 0,
+      })
+    ).status
+  ).toBe(403);
+  for (const documentId of [revised, quarantined, buyerFile]) {
+    expect(
+      (
+        await actOnRequest(sellerSession, {
+          action: 'submit',
+          documentId,
+          revision: 0,
+        })
+      ).status
+    ).toBe(409);
+  }
+  expect(
+    (
+      await actOnRequest(sellerSession, {
+        action: 'submit',
+        documentId: first,
+        revision: 0,
+      })
+    ).status
+  ).toBe(200);
+  expect(
+    (await actOnRequest(sellerSession, { action: 'review', revision: 1 }))
+      .status
+  ).toBe(403);
+  expect(
+    (await actOnRequest(buyerSession, { action: 'accept', revision: 1 })).status
+  ).toBe(409);
+  await engine.query(
+    'UPDATE conversation_documents SET status = \'deleted\', deleted_at = now() WHERE id = $1',
+    [first]
+  );
+  expect(
+    (await actOnRequest(buyerSession, { action: 'review', revision: 1 })).status
+  ).toBe(200);
+  expect(
+    (await actOnRequest(buyerSession, { action: 'accept', revision: 2 })).status
+  ).toBe(409);
+  expect(
+    (
+      await actOnRequest(buyerSession, {
+        action: 'request_changes',
+        revision: 2,
+        feedback: 'Include the full year.',
+      })
+    ).status
+  ).toBe(200);
+  const reviewed = await read(sellerSession);
+  expect(reviewed.body.requests[0]).toMatchObject({
+    reviewed_by: buyer,
+    status: 'changes_requested',
+    feedback: 'Include the full year.',
+  });
+  expect(reviewed.body.requests[0].reviewed_at).toBeTruthy();
+  expect(JSON.stringify(reviewed.body)).not.toContain('private/');
+  await engine.query(
+    'INSERT INTO deal_documents(deal_id, conversation_document_id, linked_by) VALUES ($1,$2,$3)',
+    [dealId, revised, seller]
+  );
+  expect(
+    (
+      await actOnRequest(sellerSession, {
+        action: 'submit',
+        documentId: revised,
+        revision: 3,
+      })
+    ).status
+  ).toBe(200);
+  expect(
+    (await actOnRequest(buyerSession, { action: 'review', revision: 4 })).status
+  ).toBe(200);
+  expect(
+    (await actOnRequest(buyerSession, { action: 'accept', revision: 5 })).status
+  ).toBe(200);
+  expect(
+    (await actOnRequest(buyerSession, { action: 'accept', revision: 5 })).status
+  ).toBe(409);
+  await engine.query(
+    'UPDATE conversation_documents SET status = \'deleted\', deleted_at = now() WHERE id = $1',
+    [revised]
+  );
+  const final = await read();
+  expect(final.body.requests[0]).toMatchObject({
+    status: 'accepted',
+    document_filename: null,
+  });
+  expect(final.body.progress).toMatchObject({
+    outstandingRequests: 0,
+    blocked: 1,
+  });
+  expect(final.body.firstDocumentAcceptedAt).toBeTruthy();
+
+  const activity = await auth(
+    request(app).get(`/api/deals/${dealId}/history`),
+    buyerSession
+  );
+  expect(activity.body.activities.map(event => event.event_type)).toEqual(
+    expect.arrayContaining([
+      'deal.checklist_created',
+      'deal.task_assigned',
+      'deal.task_completed',
+      'deal.document_requested',
+      'deal.document_submitted',
+      'deal.document_changes_requested',
+      'deal.document_accepted',
+    ])
+  );
+  expect(
+    activity.body.activities.find(
+      event => event.event_type === 'deal.document_changes_requested'
+    ).metadata.feedback
+  ).toBe('Include the full year.');
+  const adminHistory = await auth(
+    request(app).get(`/api/deals/${dealId}/history`),
+    admin
+  );
+  expect(adminHistory.status).toBe(200);
+  expect(adminHistory.body.activities.length).toBeGreaterThan(0);
+  expect(JSON.stringify(adminHistory.body)).not.toContain(
+    'Include the full year.'
+  );
+  expect(
+    adminHistory.body.activities.some(
+      event => event.event_type === 'deal.document_requested'
+    )
+  ).toBe(false);
+  const { rows: deliveries } = await engine.query(
+    `SELECT n.user_id, n.type FROM notifications n JOIN outbox_events e ON n.dedupe_key = e.event_key
+     AND NOT (n.payload ? 'feedback') AND NOT (e.payload ? 'feedback')
+     WHERE n.payload->>'dealId' = $1 AND n.dedupe_key LIKE 'deal:activity:%' ORDER BY n.id`,
+    [String(dealId)]
+  );
+  expect(deliveries).toEqual([
+    { user_id: seller, type: 'deal.task_assigned' },
+    { user_id: buyer, type: 'deal.task_assigned' },
+    { user_id: seller, type: 'deal.document_requested' },
+    { user_id: buyer, type: 'deal.document_submitted' },
+    { user_id: seller, type: 'deal.document_changes_requested' },
+    { user_id: buyer, type: 'deal.document_submitted' },
+    { user_id: seller, type: 'deal.document_accepted' },
+  ]);
+  const today = new Date().toISOString().slice(0, 10);
+  const sellerCreated = await post('/checklist', sellerSession, {
+    ...input,
+    title: 'Buyer follow-up',
+    assignedTo: 'buyer',
+    dueDate: today,
+    creationKey: randomUUID(),
+  });
+  expect(sellerCreated.status).toBe(201);
+  const followUp = '/checklist/' + sellerCreated.body.id;
+  const sellerItem = (await read()).body.checklist.find(
+    item => item.id === sellerCreated.body.id
+  );
+  expect(sellerItem).toMatchObject({
+    assigned_to: 'buyer', created_by: seller, due_date: today, overdue: false,
+  });
+  const competingUpdates = await Promise.all([
+    patch(followUp, buyerSession, { status: 'completed', revision: 0 }),
+    patch(followUp, sellerSession, { status: 'completed', revision: 0 }),
+  ]);
+  expect(competingUpdates.map(response => response.status).sort()).toEqual([
+    200, 409,
+  ]);
+  expect((await read()).body.progress).toMatchObject({
+    completed: 1, blocked: 1, overdue: 1,
+  });
+  expect((await getDeal(dealId, buyer)).status).toBe('accepted');
+  await act(dealId, seller, 'dispute', 0);
+  await expect(confirm(dealId, buyer, 1, false)).rejects.toMatchObject({
+    status: 409,
+  });
+  await act(dealId, seller, 'resolve', 1);
+  await act(dealId, buyer, 'propose', 2, { amount: '115000' });
+  await act(dealId, seller, 'agree', 3);
+  await confirm(dealId, buyer, 3, false);
+  await confirm(dealId, seller, 3, false);
+  expect((await getDeal(dealId, buyer)).status).toBe('completed');
+  expect((await getPublishedListing(listingId)).status).toBe('sold');
+  expect(
+    (await patch(task, buyerSession, { status: 'completed', revision: 2 }))
+      .status
+  ).toBe(409);
+}, 20000);
 
 it('enrolls administrator MFA and enforces fresh factors and single-use recovery', async () => {
   const password = 'Mfa-Fixture-Password-Only';

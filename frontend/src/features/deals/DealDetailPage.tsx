@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useParams } from "react-router";
+import { Link, useLocation, useParams } from "react-router";
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -47,6 +47,10 @@ import { AcquisitionClosingPanel } from "./AcquisitionClosingPanel";
 import { OfferComposer } from "./OfferComposer";
 import { OfferTimeline } from "./OfferTimeline";
 import { DealConversationPanel } from "./DealConversationPanel";
+import {
+  DealDiligencePanel,
+  DiligenceClosingNotice,
+} from "./DealDiligencePanel";
 import { DealDocumentsPanel } from "./DealDocumentsPanel";
 
 type OfferAction = { offer: Offer; action: "accept" | "reject" | "withdraw" };
@@ -79,6 +83,15 @@ const eventLabels: Record<string, string> = {
   "deal.closing_resolved": "Closing dispute resolved",
   "deal.listing_sold": "Negotiation ended because the listing sold",
   "deal.document_linked": "Document added to deal room",
+  "deal.checklist_created": "Checklist item created",
+  "deal.checklist_updated": "Checklist item updated",
+  "deal.task_assigned": "Checklist task assigned",
+  "deal.task_completed": "Checklist task completed",
+  "deal.document_requested": "Document requested",
+  "deal.document_submitted": "Document submitted",
+  "deal.document_under_review": "Document review started",
+  "deal.document_accepted": "Document accepted",
+  "deal.document_changes_requested": "Document changes requested",
 };
 
 function dateLabel(value: string | Date | null) {
@@ -109,6 +122,15 @@ export function DealDetailPage() {
       query.state.data?.status === "accepted" ? 10_000 : false,
   });
   const deal = dealQuery.data;
+  const { hash } = useLocation();
+  const loadedDealId = deal?.id;
+  useEffect(() => {
+    if (loadedDealId && hash === "#deal-diligence") {
+      const panel = document.getElementById("deal-diligence");
+      panel?.scrollIntoView?.();
+      panel?.focus({ preventScroll: true });
+    }
+  }, [hash, loadedDealId]);
   const buyerListingQuery = useQuery({
     queryKey: ["marketplace", "listing", deal?.listing_id],
     queryFn: () => getPublishedListing(deal!.listing_id),
@@ -283,7 +305,8 @@ export function DealDetailPage() {
 
       <div className="space-y-5">
         <section
-          className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+          id="deal-overview"
+          className="scroll-mt-24 grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
           aria-label="Deal summary"
         >
           <Summary
@@ -332,16 +355,48 @@ export function DealDetailPage() {
           />
         </section>
 
+        {user && [deal.buyer_id, deal.seller_id].includes(user.id) && (
+          <nav
+            aria-label="Deal room sections"
+            className="mb-4 flex flex-wrap gap-2"
+          >
+            <Button asChild size="sm" variant="outline">
+              <a href="#deal-overview">Overview</a>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <a href="#deal-negotiation">Negotiation</a>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <a href="#deal-diligence">Due diligence</a>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <a href="#deal-documents">Documents</a>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <a href="#deal-activity">Activity</a>
+            </Button>
+            {["accepted", "completed"].includes(deal.status) && (
+              <Button asChild size="sm" variant="outline">
+                <a href="#deal-closing">Closing</a>
+              </Button>
+            )}
+          </nav>
+        )}
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] items-start gap-5 xl:grid-cols-[minmax(0,1fr)_19rem]">
           <div className="min-w-0 space-y-5">
             {(deal.status === "accepted" || deal.status === "completed") &&
             user &&
             [deal.buyer_id, deal.seller_id].includes(user.id) ? (
-              <AcquisitionClosingPanel
-                deal={deal}
-                userId={user.id}
-                acceptedOffer={acceptedOffer}
-              />
+              <div id="deal-closing" className="scroll-mt-24 space-y-3">
+                {deal.status === "accepted" && (
+                  <DiligenceClosingNotice dealId={deal.id} />
+                )}
+                <AcquisitionClosingPanel
+                  deal={deal}
+                  userId={user.id}
+                  acceptedOffer={acceptedOffer}
+                />
+              </div>
             ) : null}
 
             <SectionCard>
@@ -401,7 +456,7 @@ export function DealDetailPage() {
               )}
             </SectionCard>
 
-            <SectionCard>
+            <SectionCard id="deal-negotiation" className="scroll-mt-24">
               <SectionHeading
                 description="Review each proposal in the currency it was originally made in."
                 title="Offer and counteroffer history"
@@ -574,7 +629,7 @@ export function DealDetailPage() {
               </SectionCard>
             ) : null}
 
-            <SectionCard>
+            <SectionCard id="deal-activity" className="scroll-mt-24">
               <SectionHeading
                 description="See when offers, documents, and deal updates were recorded."
                 title="Deal activity"
@@ -623,7 +678,10 @@ export function DealDetailPage() {
               <DealConversationPanel deal={deal} currentUserId={user.id} />
             ) : null}
 
-            <DealDocumentsPanel dealId={deal.id} />
+            {user && [deal.buyer_id, deal.seller_id].includes(user.id) && (
+              <DealDiligencePanel key={deal.id} deal={deal} userId={user.id} />
+            )}
+            <DealDocumentsPanel dealId={deal.id} userId={user?.id} />
           </div>
 
           <aside className="min-w-0 space-y-5">
@@ -928,10 +986,18 @@ function ActivityTimeline({
                 {typeof metadata.offerId === "number"
                   ? ` · Offer #${metadata.offerId}`
                   : ""}
+                {typeof metadata.checklistItemId === "number"
+                  ? ` · Checklist item #${metadata.checklistItemId}`
+                  : ""}
                 {typeof metadata.documentId === "number"
                   ? ` · Document #${metadata.documentId}`
                   : ""}
               </p>
+              {typeof metadata.feedback === "string" && (
+                <p className="mt-1 whitespace-pre-wrap break-words text-xs text-ink-soft">
+                  {metadata.feedback}
+                </p>
+              )}
               {amount && currency ? (
                 <p className="mt-1 text-xs font-semibold text-navy-950">
                   {formatListingMoney(amount, currency)}

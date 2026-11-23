@@ -1,5 +1,12 @@
 import express from 'express';
 import {
+  actOnDocumentRequest,
+  addChecklistItem,
+  addDocumentRequest,
+  diligence,
+  editChecklistItem,
+} from '#controllers/diligence.controller.js';
+import {
   changeStatus,
   closing,
   create,
@@ -46,4 +53,17 @@ router.get('/:id/history', history);
 router.get('/:id/documents', documents);
 router.get('/:id/documents/:documentId/download', downloadDocument);
 router.post('/:id/documents', requireCsrf, linkDocument);
+router.get('/:id/diligence', diligence);
+router.post('/:id/diligence/checklist', requireCsrf, addChecklistItem);
+router.patch(
+  '/:id/diligence/checklist/:recordId',
+  requireCsrf,
+  editChecklistItem
+);
+router.post('/:id/diligence/requests', requireCsrf, addDocumentRequest);
+router.patch(
+  '/:id/diligence/requests/:recordId',
+  requireCsrf,
+  actOnDocumentRequest
+);
 export default router;

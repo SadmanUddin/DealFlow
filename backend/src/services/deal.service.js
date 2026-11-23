@@ -23,7 +23,7 @@ const page = (pageNo, limit, total) => ({
   total,
   totalPages: Math.ceil(total / limit),
 });
-const executeDealWrite = async statement => {
+export const executeDealWrite = async statement => {
   try {
     return await db.execute(statement);
   } catch (error) {
@@ -546,7 +546,13 @@ export const listDealActivities = async (
   { page: pageNo, limit }
 ) => {
   const deal = await participantDeal(dealId, userId, isAdmin);
-  const canReadClosing = [deal.buyer_id, deal.seller_id].includes(userId);
+  const isParticipant = [deal.buyer_id, deal.seller_id].includes(userId);
+  const visibleActivity = isParticipant
+    ? eq(dealActivities.deal_id, dealId)
+    : and(
+      eq(dealActivities.deal_id, dealId),
+      sql`NOT (${dealActivities.metadata} ?| ARRAY['checklistItemId', 'documentRequestId'])`
+    );
   const [activities, counts] = await Promise.all([
     db
       .select({
@@ -560,18 +566,18 @@ export const listDealActivities = async (
       })
       .from(dealActivities)
       .leftJoin(users, eq(dealActivities.actor_id, users.id))
-      .where(eq(dealActivities.deal_id, dealId))
+      .where(visibleActivity)
       .orderBy(desc(dealActivities.created_at), desc(dealActivities.id))
       .limit(limit)
       .offset((pageNo - 1) * limit),
     db
       .select({ count: sql`count(*)::int` })
       .from(dealActivities)
-      .where(eq(dealActivities.deal_id, dealId)),
+      .where(visibleActivity),
   ]);
   const total = counts[0]?.count ?? 0;
   return {
-    activities: canReadClosing
+    activities: isParticipant
       ? activities
       : activities.map(activity =>
         activity.event_type.startsWith('deal.closing_')
@@ -642,6 +648,7 @@ export const listDealDocuments = async (
       .select({
         id: conversationDocuments.id,
         filename: conversationDocuments.original_filename,
+        uploadedBy: conversationDocuments.uploaded_by,
         mimeType: conversationDocuments.mime_type,
         sizeBytes: conversationDocuments.size_bytes,
         createdAt: conversationDocuments.created_at,
