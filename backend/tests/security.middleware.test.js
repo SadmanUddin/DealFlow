@@ -88,6 +88,25 @@ describe('Arcjet endpoint policy selection', () => {
     }
   });
 
+  it('uses dedicated rate limits for tracking and seller analytics', () => {
+    const tracking = getRateLimitPolicy(createRequest({
+      method: 'POST', path: '/api/listings/%34%32/views/', role: 'buyer',
+    }));
+    expect(tracking).toMatchObject({
+      name: 'listing-view',
+      limits: [
+        { max: 20, interval: '1m', characteristics: ['userId'] },
+        { max: 100, interval: '1m', characteristics: ['ip.src'] },
+      ],
+    });
+    expect(getRateLimitPolicy(createRequest({
+      path: '/api/seller/analytics/comparison', role: 'seller',
+    }))).toMatchObject({
+      name: 'seller-analytics',
+      limits: [{ max: 60 }, { max: 300 }],
+    });
+  });
+
   it('partitions authenticated reads by account and applies a higher shared-IP ceiling', () => {
     const policy = getRateLimitPolicy(
       createRequest({ path: '/api/notifications', role: 'buyer', userId: 17 })

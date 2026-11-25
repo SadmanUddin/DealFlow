@@ -9,6 +9,7 @@ import {
 } from 'drizzle-orm';
 import { db } from '#config/database.js';
 import { businessListings } from '#models/listing.model.js';
+import { publicListingStatuses } from '#utils/listing-visibility.js';
 import { users } from '#models/user.model.js';
 import { marketplaceCriteria } from '#utils/marketplace-criteria.js';
 import { AppError } from '#utils/app-error.js';
@@ -34,7 +35,6 @@ const saleFields = {
   publicSalePrice: businessListings.public_sale_price,
   publicSaleCurrency: businessListings.public_sale_currency,
 };
-const publicStatuses = ['published', 'sold'];
 const sellerFields = {
   ...publicFields,
   status: businessListings.status,
@@ -104,7 +104,7 @@ export const getPublicListings = async ({
 }) => {
   const filters = [
     availability === 'all'
-      ? inArray(businessListings.status, publicStatuses)
+      ? inArray(businessListings.status, publicListingStatuses)
       : eq(
         businessListings.status,
         availability === 'sold' ? 'sold' : 'published'
@@ -173,7 +173,7 @@ export const getPublishedListing = async (id, viewerId = null) => {
     .where(
       and(
         eq(businessListings.id, id),
-        inArray(businessListings.status, publicStatuses)
+        inArray(businessListings.status, publicListingStatuses)
       )
     )
     .limit(1);

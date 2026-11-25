@@ -1,4 +1,5 @@
 import express from 'express';
+import { trackListingView } from '#controllers/listing-view.controller.js';
 import {
   archiveListing,
   createListing,
@@ -56,6 +57,7 @@ router.delete(
   requireCsrf,
   removeListingImageController
 );
+router.post('/:id/views', requireAuthentication, requireCsrf, trackListingView);
 router.get('/:id', optionalAuthentication, getPublishedListing);
 router.patch(
   '/:id',

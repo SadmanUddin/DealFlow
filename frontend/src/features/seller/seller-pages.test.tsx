@@ -16,6 +16,10 @@ import { SellerOffersPage } from "./SellerOffersPage";
 import * as sellerApi from "./api";
 import * as dealApi from "@/features/deals/api";
 
+vi.mock("./analytics-api", () => ({
+  fetchSellerAnalytics: vi.fn().mockResolvedValue({ pendingOffers: 1, totals: { views: 4 } }),
+}));
+
 vi.mock("./api", async (original) => ({
   ...(await original<typeof import("./api")>()),
   listMyListings: vi.fn(),

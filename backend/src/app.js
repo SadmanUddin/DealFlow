@@ -8,6 +8,7 @@ import authRoutes from './routes/auth.routes.js';
 import securityMiddleware from '#middleware/security.middleware.js';
 import privateCacheMiddleware from '#middleware/private-cache.middleware.js';
 import userRoutes from './routes/user.routes.js';
+import sellerAnalyticsRoutes from './routes/seller-analytics.routes.js';
 import listingRoutes from './routes/listing.routes.js';
 import adminListingRoutes from './routes/admin-listing.routes.js';
 import conversationRoutes from './routes/conversation.routes.js';
@@ -122,6 +123,7 @@ app.get('/api', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/listings', listingRoutes);
+app.use('/api/seller/analytics', sellerAnalyticsRoutes);
 app.use('/api/admin/listings', adminListingRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/reports', reportRoutes);

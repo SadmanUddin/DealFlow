@@ -1,9 +1,9 @@
-import { useMemo } from "react";
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import {
   BriefcaseBusiness,
   Building2,
+  ChartNoAxesCombined,
   FileText,
   Handshake,
   MessageSquareText,
@@ -19,8 +19,10 @@ import {
   WorkspacePageHeader,
   WorkspaceSkeleton,
 } from "@/components/shared/workspace/WorkspaceUI";
-import { listDeals, listOffers } from "@/features/deals/api";
+import { listDeals } from "@/features/deals/api";
 import { listInquiries, listMyListings } from "./api";
+import { fetchSellerAnalytics } from "./analytics-api";
+import { useAuth } from "@/features/auth/useAuth";
 
 export function SellerOverviewPage() {
   const listings = useQuery({
@@ -33,38 +35,21 @@ export function SellerOverviewPage() {
     queryFn: () => listInquiries(1, 100),
     staleTime: 45_000,
   });
-  const deals = useQuery({
-    queryKey: ["deals", "mine", 1, 20],
-    queryFn: () => listDeals(1, 20),
-    staleTime: 45_000,
+  const { user } = useAuth();
+  const analytics = useQuery({
+    queryKey: ["seller", "analytics", user?.id, "overview", "30"],
+    queryFn: () => fetchSellerAnalytics("30"),
+    staleTime: 60_000,
+    enabled: Boolean(user),
   });
   const activeDeals = useQuery({
     queryKey: ["deals", "mine", 1, 1, "open"],
     queryFn: () => listDeals(1, 1, "open"),
   });
-  const dealRows = useMemo(() => deals.data?.deals ?? [], [deals.data?.deals]);
-  const offerQueries = useQueries({
-    queries: dealRows.map((deal) => ({
-      queryKey: ["deals", deal.id, "offers"],
-      queryFn: () => listOffers(deal.id),
-      staleTime: 15_000,
-    })),
-  });
   const listingRows = listings.data?.listings ?? [];
   const inquiryRows = inquiries.data?.conversations ?? [];
-  const pendingOffers = offerQueries
-    .flatMap((query) => query.data?.offers ?? [])
-    .filter((offer) => offer.status === "pending").length;
-  const loading =
-    listings.isPending ||
-    inquiries.isPending ||
-    deals.isPending ||
-    offerQueries.some((query) => query.isPending);
-  const failed =
-    listings.isError ||
-    inquiries.isError ||
-    deals.isError ||
-    offerQueries.some((query) => query.isError);
+  const loading = listings.isPending || inquiries.isPending;
+  const failed = listings.isError || inquiries.isError;
   return (
     <>
       <WorkspacePageHeader
@@ -84,12 +69,11 @@ export function SellerOverviewPage() {
       {loading ? <WorkspaceSkeleton rows={3} /> : null}
       {failed ? (
         <ErrorState
-          error={listings.error ?? inquiries.error ?? deals.error}
+          error={listings.error ?? inquiries.error}
           description="Some seller workspace data could not be loaded."
           onRetry={() => {
             void listings.refetch();
             void inquiries.refetch();
-            void deals.refetch();
           }}
           title="Seller overview unavailable"
         />
@@ -115,11 +99,11 @@ export function SellerOverviewPage() {
               value={inquiries.data?.pagination.total ?? 0}
             />
             <MetricCard
-              detail="Awaiting a response in your latest 20 deals"
+              detail="Awaiting a response across your listings"
               href="/seller/deals"
               icon={<Tag size={18} />}
               label="Pending offers"
-              value={pendingOffers}
+              value={analytics.data?.pendingOffers ?? "—"}
             />
             <MetricCard
               detail="Acquisitions still in progress"
@@ -146,6 +130,13 @@ export function SellerOverviewPage() {
                     item.status === "draft" || item.status === "rejected",
                 ).length
               }
+            />
+            <MetricCard
+              detail="Recorded traffic in the last 30 UTC days"
+              href="/seller/analytics"
+              icon={<ChartNoAxesCombined size={18} />}
+              label="Listing views"
+              value={analytics.data?.totals.views ?? "N/A"}
             />
           </section>
           <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">

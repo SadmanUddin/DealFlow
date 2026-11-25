@@ -35,7 +35,7 @@ function fetchCsrfToken(): Promise<string> {
   return csrfRequest;
 }
 
-async function withCsrfRetry<T>(operation: () => Promise<T>): Promise<T> {
+export async function withCsrfRetry<T>(operation: () => Promise<T>): Promise<T> {
   if (!hasCsrfToken()) await fetchCsrfToken();
   try {
     return await operation();

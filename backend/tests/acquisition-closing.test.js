@@ -973,3 +973,284 @@ it('does not issue or honor sessions from an obsolete password generation', asyn
     await findActiveSession(verifyAccessToken(valid.accessToken))
   ).toMatchObject({ userId: 4 });
 }, 10000);
+
+describe('seller analytics on the migrated schema', () => {
+  it('counts eligible public views once per listing, verified account and UTC day and expires keys', async () => {
+    const { recordListingView, clearExpiredListingViewKeys } =
+      await import('#services/listing-view.service.js');
+    const { getSellerAnalytics } =
+      await import('#services/seller-analytics.service.js');
+    const id = await listing();
+    const archived = await listing('archived');
+    const draft = await listing('draft');
+    const pending = await listing('pending');
+    const options = { since: '2026-01-07T12:00:00Z', secret: 'local-test-key' };
+    const viewer = { id: buyer, role: 'buyer', emailVerified: true };
+    const before = new Date('2026-01-07T23:59:59Z');
+    const after = new Date('2026-01-08T00:00:00Z');
+
+    await Promise.all(
+      Array.from({ length: 8 }, () =>
+        recordListingView(id, viewer, options, before)
+      )
+    );
+    await recordListingView(id, viewer, options, after);
+    for (const invalid of [
+      undefined,
+      { ...viewer, emailVerified: false },
+      { ...viewer, id: seller, role: 'seller' },
+      { ...viewer, id: 5, role: 'admin' },
+    ])
+      await recordListingView(id, invalid, options, after);
+    for (const hidden of [archived, draft, pending, 2147483647])
+      await recordListingView(hidden, viewer, options, after);
+    await recordListingView(
+      id,
+      viewer,
+      options,
+      new Date('2026-01-07T11:59:59Z')
+    );
+
+    const analytics = await getSellerAnalytics(
+      seller,
+      '7',
+      [id],
+      options.since,
+      after
+    );
+    expect(analytics.window.from).toBe('2026-01-02');
+    expect(analytics.trends.slice(-3).map(point => point.views)).toEqual([
+      null,
+      1,
+      1,
+    ]);
+    expect(analytics.listingViews).toEqual({ total: 2, recent: 2 });
+    expect(analytics.offerAcceptanceRate).toBeNull();
+    expect(
+      (await getSellerAnalytics(seller, 'all', [id], undefined, after)).totals
+        .views
+    ).toBeNull();
+    expect(
+      (await getSellerAnalytics(otherBuyer, 'all', [id], options.since, after))
+        .listings
+    ).toEqual([]);
+
+    await clearExpiredListingViewKeys(new Date('2026-01-09T01:00:00Z'));
+    const { rows } = await engine.query(
+      'SELECT viewer_key FROM listing_view_events ORDER BY viewed_on'
+    );
+    expect(rows.map(row => row.viewer_key)).toEqual([
+      null,
+      expect.stringMatching(/^[a-f0-9]{64}$/),
+    ]);
+    expect(
+      (await getSellerAnalytics(seller, 'all', [], options.since, after)).totals
+        .views
+    ).toBe(2);
+    await engine.query('DELETE FROM business_listings WHERE id = $1', [id]);
+    expect((await engine.query('SELECT listing_id FROM listing_view_events')).rows).toEqual([]);
+  });
+
+  it('groups real inquiries, buyer offers, acceptances and confirmed closings using their own dates', async () => {
+    const { getSellerAnalytics } =
+      await import('#services/seller-analytics.service.js');
+    const id = await listing();
+    const first = await startConversation(buyer, id);
+    const second = await startConversation(otherBuyer, id);
+    await engine.query(
+      'UPDATE conversations SET created_at = $1 WHERE id = $2',
+      ['2026-01-01T23:59:59Z', first.conversation.id]
+    );
+    await engine.query(
+      'UPDATE conversations SET created_at = $1 WHERE id = $2',
+      ['2026-01-02T00:00:00Z', second.conversation.id]
+    );
+    const since = '2026-01-01T00:00:00Z';
+    const beforeOffers = await getSellerAnalytics(
+      seller,
+      '7',
+      [id],
+      since,
+      new Date('2026-01-08T01:00:00Z')
+    );
+    expect(beforeOffers.totals.inquiries).toBe(1);
+    expect(beforeOffers.trends[0].inquiries).toBe(1);
+
+    const deal = (await createDeal(buyer, id)).deal;
+    const proposal = await createOffer(deal.id, buyer, {
+      amount: '110000',
+      currency: 'EUR',
+    });
+    await respondToOffer(deal.id, proposal.id, seller, 'accept');
+    await act(deal.id, buyer, 'propose', 0, { amount: '110000' });
+    await act(deal.id, seller, 'agree', 1);
+    await confirm(deal.id, buyer, 1, false);
+    await confirm(deal.id, seller, 1, false);
+
+    const data = await getSellerAnalytics(seller, 'all', [id], since);
+    expect(data.totals).toMatchObject({
+      inquiries: 2,
+      offers: 1,
+      accepted: 1,
+      completed: 1,
+    });
+    expect(data.offerAcceptanceRate).toBe(100);
+    expect(data.statusCounts).toMatchObject({
+      listings: { sold: 1 },
+      offers: { accepted: 1 },
+      deals: { completed: 1 },
+    });
+    expect(data.inquiriesByListing).toEqual([
+      expect.objectContaining({ id, count: 2 }),
+    ]);
+    expect(data.listings[0]).toMatchObject({
+      status: 'sold',
+      completedAt: expect.any(String),
+    });
+    expect(data.window.interval).toBe('month');
+    const counterListing = await listing();
+    await accepted(counterListing);
+    const counter = await getSellerAnalytics(
+      seller,
+      'all',
+      [counterListing],
+      since
+    );
+    expect(counter.totals).toMatchObject({
+      offers: 1,
+      accepted: 1,
+      completed: 0,
+    });
+    expect(counter.offerAcceptanceRate).toBe(0);
+  });
+
+  it('only shows view insights for a covered window with a sufficient sample', async () => {
+    const { getSellerAnalytics } = await import('#services/seller-analytics.service.js');
+    const id = await listing();
+    await engine.query(
+      `INSERT INTO listing_view_events (listing_id, viewed_on)
+       SELECT $1, '2026-03-08'::date FROM generate_series(1, 99)`,
+      [id]
+    );
+    const now = new Date('2026-03-08T18:00:00Z');
+    const since = '2026-03-01T15:00:00Z';
+    expect((await getSellerAnalytics(seller, '7', [id], since, now)).insights).toEqual([]);
+    await engine.query(
+      'INSERT INTO listing_view_events (listing_id, viewed_on) VALUES ($1, \'2026-03-08\')',
+      [id]
+    );
+    expect((await getSellerAnalytics(seller, '7', [id], since, now)).insights).toEqual([
+      expect.objectContaining({ id, views: 100, inquiries: 0, rule: 'few_inquiries' })
+    ]);
+    expect((await getSellerAnalytics(seller, '30', [id], since, now)).insights).toEqual([]);
+  });
+
+  it('protects tracking and seller endpoints with sessions, CSRF, browser metadata and ownership', async () => {
+    const id = await listing();
+    const {
+      rows: [other],
+    } = await engine.query(
+      'INSERT INTO users (id,name,email,password,role,email_verified) VALUES (1000,\'Other Seller\',\'analytics-isolation@example.test\',\'fixture\',\'seller\',true) RETURNING id'
+    );
+    const {
+      rows: [foreign],
+    } = await engine.query(
+      'INSERT INTO business_listings (seller_id,title,description,status) VALUES ($1,\'Other business\',\'Isolation fixture\',\'draft\') RETURNING id',
+      [other.id]
+    );
+    const password = 'Seller-analytics-fixture-pass';
+    await engine.query('UPDATE users SET password = $1 WHERE id IN (1, 2, 5)', [
+      await hashPassword(password),
+    ]);
+    const session = async name =>
+      createSession(
+        await authenticateUser({ email: `${name}@example.test`, password })
+      );
+    const owner = await session('seller');
+    const visitor = await session('buyer');
+    const admin = await session('admin');
+    const cookie = current => `token=${current.accessToken}`;
+    const overview = '/api/seller/analytics/overview';
+    expect((await request(app).get(overview)).status).toBe(401);
+    for (const current of [visitor, admin])
+      expect(
+        (await request(app).get(overview).set('Cookie', cookie(current))).status
+      ).toBe(403);
+    expect(
+      (
+        await request(app)
+          .get(overview + '?range=31')
+          .set('Cookie', cookie(owner))
+      ).status
+    ).toBe(400);
+    const detail = '/api/seller/analytics/listings/';
+    expect(
+      (
+        await request(app)
+          .get(detail + foreign.id)
+          .set('Cookie', cookie(owner))
+      ).status
+    ).toBe(404);
+    expect(
+      (
+        await request(app)
+          .get(`/api/seller/analytics/comparison?ids=${id},${foreign.id}`)
+          .set('Cookie', cookie(owner))
+      ).status
+    ).toBe(404);
+    const own = await request(app)
+      .get(detail + id)
+      .set('Cookie', cookie(owner));
+    expect(own.status).toBe(200);
+    expect(own.headers['cache-control']).toContain('no-store');
+    expect(JSON.stringify(own.body)).not.toMatch(
+      /viewer.key|buyer.id|closing.amount/
+    );
+
+    const path = `/api/listings/${id}/views`;
+    const post = () => request(app).post(path).send({ consent: true });
+    expect((await post()).status).toBe(401);
+    expect((await post().set('Cookie', cookie(visitor))).status).toBe(403);
+    const csrf = () =>
+      post()
+        .set('Cookie', cookie(visitor))
+        .set('X-CSRF-Token', visitor.csrfToken);
+    expect((await csrf()).status).toBe(403);
+
+    vi.stubEnv('LISTING_VIEW_TRACKING_SINCE', '2025-01-01T00:00:00Z');
+    try {
+      const browserPost = () =>
+        csrf()
+          .set(
+            'Origin',
+            (process.env.CORS_ORIGINS ?? 'http://localhost:5173')
+              .split(',')[0]
+              .trim()
+          )
+          .set('Sec-Fetch-Mode', 'cors')
+          .set('Sec-Fetch-Dest', 'empty');
+      expect((await browserPost().set('Sec-GPC', '1')).status).toBe(204);
+      expect((await request(app).get(`/api/listings/${id}`)).status).toBe(200);
+      expect(
+        (
+          await engine.query(
+            'SELECT * FROM listing_view_events WHERE listing_id = $1',
+            [id]
+          )
+        ).rows
+      ).toHaveLength(0);
+      expect((await browserPost()).status).toBe(204);
+      expect((await browserPost()).status).toBe(204);
+      expect(
+        (
+          await engine.query(
+            'SELECT * FROM listing_view_events WHERE listing_id = $1',
+            [id]
+          )
+        ).rows
+      ).toHaveLength(1);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+});

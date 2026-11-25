@@ -301,6 +301,7 @@ const router = createBrowserRouter([
       { path: "notifications", element: lazyPage(<BuyerNotificationsPage />) },
       { path: "documents", element: lazyPage(<SellerDocumentsPage />) },
       { path: "analytics", element: lazyPage(<SellerAnalyticsPage />) },
+      { path: "analytics/listings/:id", element: lazyPage(<SellerAnalyticsPage />) },
     ],
   },
   {

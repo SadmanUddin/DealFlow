@@ -3,6 +3,8 @@ import { getEnvironment } from '#config/env.js';
 import logger from '#config/logger.js';
 import { processOutboxBatch } from '#services/outbox.service.js';
 
+import { clearExpiredListingViewKeys } from '#services/listing-view.service.js';
+
 const environment = getEnvironment();
 const shutdown = new globalThis.AbortController();
 for (const signal of ['SIGINT', 'SIGTERM']) {
@@ -13,8 +15,21 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
 }
 
 logger.info('Outbox worker started');
+let nextViewCleanup = 0;
 let lastPulse = Date.now();
 while (!shutdown.signal.aborted) {
+  if (
+    environment.LISTING_VIEW_TRACKING_SINCE &&
+    Date.now() >= nextViewCleanup
+  ) {
+    try {
+      await clearExpiredListingViewKeys();
+      nextViewCleanup = Date.now() + 3_600_000;
+    } catch {
+      nextViewCleanup = Date.now() + 60_000;
+      logger.error('Listing view key cleanup failed');
+    }
+  }
   let processed = 0;
   try {
     processed = await processOutboxBatch(environment.OUTBOX_BATCH_SIZE);

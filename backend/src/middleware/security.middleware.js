@@ -126,6 +126,24 @@ export function getRateLimitPolicy(request) {
   };
   if (req.method === 'OPTIONS') return { name: 'cors-preflight', limits: [] };
 
+  if (
+    req.method === 'POST' &&
+    /^\/api\/listings\/[^/]+\/views$/.test(req.path)
+  )
+    return {
+      name: 'listing-view',
+      limits: req.user
+        ? authenticatedLimits('listing-view', 20, 100)
+        : [ipLimit('listing-view-guest-ip', '1m', 20)],
+    };
+  if (req.path.startsWith('/api/seller/analytics/'))
+    return {
+      name: 'seller-analytics',
+      limits: req.user
+        ? authenticatedLimits('seller-analytics', 60, 300)
+        : [ipLimit('seller-analytics-guest-ip', '1m', 30)],
+    };
+
   if (req.method === 'POST' && req.path === '/api/auth/sign-in') {
     const key = emailKey(req);
     return {
@@ -341,9 +359,10 @@ const securityMiddleware = async (req, res, next) => {
   if (path !== '/api' && !path.startsWith('/api/')) return next();
 
   const policy = getRateLimitPolicy(req);
-  const essentialMfaProtection =
+  const requireSecurityDecision =
     mode === 'LIVE' &&
-    (policy.name === 'administrator-mfa' ||
+    (policy.name === 'listing-view' ||
+      policy.name === 'administrator-mfa' ||
       (policy.name === 'authentication-sign-in' &&
         typeof req.body?.mfaCode === 'string'));
   const unavailable = () =>
@@ -415,7 +434,7 @@ const securityMiddleware = async (req, res, next) => {
     }
 
     if (decision.conclusion === 'ERROR') {
-      if (essentialMfaProtection) return next(unavailable());
+      if (requireSecurityDecision) return next(unavailable());
       logger.warn('Arcjet decision returned an error; request allowed', {
         requestId: req.requestId,
         method: req.method,
@@ -427,7 +446,7 @@ const securityMiddleware = async (req, res, next) => {
     }
     return next();
   } catch (error) {
-    if (essentialMfaProtection) return next(unavailable());
+    if (requireSecurityDecision) return next(unavailable());
     // Arcjet's SDK is designed to fail open when its cloud decision service is
     // unavailable. Keep that availability behavior and record a safe diagnostic.
     logger.error('Arcjet protection threw unexpectedly; request allowed', {

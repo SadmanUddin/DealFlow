@@ -352,6 +352,9 @@ function ListingRow({
               </Link>
             </Button>
           ) : null}
+          <Button asChild size="sm" variant="outline">
+            <Link to={`/seller/analytics/listings/${listing.id}`}>Analytics<span className="sr-only"> for {listing.title}</span></Link>
+          </Button>
           {listing.status === "published" ? (
             <Button
               disabled={busy}

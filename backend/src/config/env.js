@@ -51,6 +51,7 @@ const environmentSchema = z
     DATABASE_URL: postgresUrl.optional(),
     TEST_DATABASE_URL: postgresUrl.optional(),
     JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
+    LISTING_VIEW_TRACKING_SINCE: z.iso.datetime().optional(),
     ARCJET_KEY: z.string().min(1, 'ARCJET_KEY is required'),
     ARCJET_TRUSTED_PROXIES: trustedProxyList,
     CORS_ORIGINS: z

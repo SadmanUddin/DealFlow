@@ -20,6 +20,7 @@ import { toApiError } from "@/lib/api-error";
 import { useAuth } from "@/features/auth/useAuth";
 import { startListingConversation } from "@/features/buyer/api";
 import { SoldListingDetail } from "./SoldListingPresentation";
+import { ListingViewPreference } from "./ListingViewPreference";
 import { ListingMedia } from "./ListingMedia";
 import { listingImageSrc } from "./listing-image-url";
 import { financialDisclosure, formatListingMoney } from "./marketplace-format";
@@ -200,13 +201,21 @@ export function ListingDetailsPage() {
 
   const listing = listingQuery.data;
   const imageFailed = failedImageUrl === listing.imageUrl;
+  const viewPreference =
+    import.meta.env.VITE_LISTING_VIEW_TRACKING === "true" &&
+    user?.emailVerified && user.role !== "admin" ? (
+      <ListingViewPreference key={user.id} accountId={user.id} listingId={id} />
+    ) : null;
   if (listing.status === "sold") {
     return (
-      <SoldListingDetail
-        listing={listing}
-        imageUrl={imageFailed ? null : (listing.imageUrl ?? null)}
-        onImageError={() => setFailedImageUrl(listing.imageUrl ?? null)}
-      />
+      <>
+        <SoldListingDetail
+          listing={listing}
+          imageUrl={imageFailed ? null : (listing.imageUrl ?? null)}
+          onImageError={() => setFailedImageUrl(listing.imageUrl ?? null)}
+        />
+        {viewPreference}
+      </>
     );
   }
   const publishedDate = listing.publishedAt
@@ -594,6 +603,7 @@ export function ListingDetailsPage() {
           )}
         </section>
       </div>
+      {viewPreference}
     </article>
   );
 }

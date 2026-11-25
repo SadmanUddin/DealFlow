@@ -169,6 +169,13 @@
       "when": 1795463683657,
       "tag": "0023_buyer_saved_searches",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1795565293416,
+      "tag": "0024_seller_analytics",
+      "breakpoints": true
     }
   ]
 }
