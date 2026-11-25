@@ -1,0 +1,10 @@
+{
+  "name": "dealflow-workspace",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently --kill-others --names BACKEND,FRONTEND --prefix-colors cyan,magenta \"npm --prefix backend run dev\" \"npm --prefix frontend run dev\""
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.7"
+  }
+}
