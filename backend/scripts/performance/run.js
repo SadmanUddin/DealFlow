@@ -6,8 +6,8 @@ import { monitorEventLoopDelay, performance } from 'node:perf_hooks';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 
-const databaseUrl =
-  'postgresql://dealflow_perf:dealflow_perf@127.0.0.1:55432/dealflow_perf';
+import { databaseUrl, password } from './fixture-config.js';
+
 if (
   process.env.DEALFLOW_PERF_DATABASE_URL !== databaseUrl ||
   process.env.NODE_ENV === 'production'
@@ -46,7 +46,6 @@ const { db, pool, metrics, explainObservedQueries } =
   await import('./database.js');
 const { hashPassword } = await import('#services/auth.service.js');
 
-const password = 'Synthetic benchmark account 123!';
 const origin = 'http://localhost:5173';
 process.env.CORS_ORIGINS = origin;
 let server;
@@ -154,6 +153,18 @@ try {
     if (process.argv[2] === 'reliability') {
       const { verifyReliability } = await import('./reliability.js');
       await verifyReliability(pool, app);
+    } else if (process.argv[2] === 'k6-api') {
+      const { startBenchmarkApi } = await import('./k6/api.js');
+      server = await startBenchmarkApi(app, pool, instance);
+      const shutdown = new globalThis.AbortController();
+      for (const event of ['SIGINT', 'SIGTERM', 'disconnect']) {
+        process.once(event, () => shutdown.abort());
+      }
+      if (process.connected && !shutdown.signal.aborted) {
+        await once(shutdown.signal, 'abort');
+      }
+      server.closeAllConnections();
+      if (process.connected) process.disconnect();
     } else if (process.argv[2] === 'browser-api') {
       server = app.listen(3000, '127.0.0.1');
       await once(server, 'listening');

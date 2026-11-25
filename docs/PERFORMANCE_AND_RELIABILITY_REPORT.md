@@ -202,3 +202,98 @@ Build revision `8c0da7f` with the same Vite settings and manifest flag for front
 ## Remaining work for Phase 13
 
 Repeat these scenarios with a dedicated generator, a production-like Neon test branch, deployed Arcjet settings, a representative data distribution and separately measured worker resources. Verify Neon HTTP latency, proxy and database interruption, storage transfer, active-request shutdown, provider timeouts and long-duration worker backlog under that configuration. These loopback results do not establish production capacity.
+
+## Phase 12.1 — Grafana k6 Integration
+
+### Prerequisites and reproducibility
+
+Use Node 24, the repository dependencies, Docker Desktop and the open-source k6 CLI. The verified binary was **k6 v2.4.0** on Darwin ARM64. If k6 is missing on macOS, run `brew install k6` and confirm the binary with `k6 version`.
+
+Start the disposable PostgreSQL 17 container using the original [reproduction commands](#reproduce), then export the documented `DEALFLOW_PERF_DATABASE_URL` and run `npm run perf:seed` once against its fresh schema. The launcher verifies the named `dealflow-phase12-pg` container, its exact loopback port mapping, and that its database server identifier matches the one the child API sees. The synthetic roster and minimum fixture counts are checked before the child listens. Custom API targets, alternate database URLs and production mode are rejected.
+
+Each command launches its own API on an ephemeral loopback port through the existing Phase 12 mock harness. The launcher and k6 both verify the API's identity. The API requires a random per-run challenge on every request. Requests disable redirect following, and k6 starts with a fresh configuration and a restricted environment. Child processes are stopped on normal exit or interruption. Stop the disposable container separately when you finish testing.
+
+Arcjet, email and document storage use the existing mocks. Synthetic admin sign-in uses the benchmark-only MFA setting. The smoke test checks real HTTP-only cookies, role authorization and the CSRF requirement on sign-out. Other scenarios provision independent synthetic sessions per VU and role using the existing auth service, warm each workload route, and use separate cookie jars. Longer soaks renew sessions through actual sign-in before JWT expiry. Setup and refresh are tagged separately. Both k6 and the Node runner use the same disposable database and fixtures. The Node runner retains SQL timing, execution plans, transaction and worker testing, browser automation and bundle analysis.
+
+### Commands
+
+Start with this sequence from the repository root. Seed only once for each fresh disposable container.
+
+```sh
+docker run --detach --rm --name dealflow-phase12-pg \
+  -e POSTGRES_USER=dealflow_perf -e POSTGRES_PASSWORD=dealflow_perf \
+  -e POSTGRES_DB=dealflow_perf -p 127.0.0.1:55432:5432 postgres:17-alpine
+docker exec dealflow-phase12-pg pg_isready -U dealflow_perf -d dealflow_perf
+export DEALFLOW_PERF_DATABASE_URL=postgresql://dealflow_perf:dealflow_perf@127.0.0.1:55432/dealflow_perf
+npm run perf:seed
+npm run perf:k6:smoke
+npm run perf:k6:recovery
+# View the live dashboard during a run and the printed HTML path afterward.
+docker stop dealflow-phase12-pg
+```
+
+| Command | Workload |
+| --- | --- |
+| `npm run perf:k6:smoke` | One VU checks response content and the auth and CSRF boundaries |
+| `npm run perf:k6:marketplace` | Four VUs for 20 seconds with 500 ms browsing pauses |
+| `npm run perf:k6:auth-detail` | Four VUs for 12 seconds on signed-in detail without pacing |
+| `npm run perf:k6:analytics` | Four VUs for 20 seconds with 300 ms pauses, including owned listing comparison and 7- and 30-day ranges |
+| `npm run perf:k6:mixed` | Four VUs for 12 seconds across the original 15 routes without pacing |
+| `npm run perf:k6:browsing` | Ten VUs for 25 seconds with 250 ms pauses and a broader browser mix |
+| `npm run perf:k6:load` | 30 seconds, up to 20 VUs |
+| `npm run perf:k6:higher` | 30 seconds, up to 100 VUs |
+| `npm run perf:k6:stress` | 50 seconds, holds at 10, 25, 50 and 100 VUs before ramping down |
+| `npm run perf:k6:recovery` | 30 seconds with low traffic, a burst at 100 VUs and a return to 4 VUs |
+| `npm run perf:k6:soak` | 20 VUs with 250 ms pauses, five minutes by default |
+
+Run from the repository root. Set `DEALFLOW_K6_SOAK_MINUTES` to `5`, `15`, `30` or `60` for the soak command. The other schedules have fixed bounds. The stress, higher and recovery scenarios abort on sustained severe latency or failures using k6 thresholds. Each run checks HTTP failure rate below 1% and measured application checks at or above 99%. The configured p95 limits are 300 ms for listing details, 500 ms for marketplace search and 800 ms for seller analytics.
+
+### Dashboard and reports
+
+Open **http://127.0.0.1:5665** during a run. The launcher prints the dashboard and artifact paths. Set `DEALFLOW_K6_DASHBOARD_PORT` to a free port to avoid a conflict. Set it to `-1` for report-only runs. The live dashboard binds to loopback. Close its browser tab after the test if the open connection holds k6. The launcher also enforces a bounded cleanup deadline. [Grafana k6 web dashboard](https://grafana.com/docs/k6/latest/results-output/web-dashboard/)
+
+Each successful run writes `report.html` and `summary.json` under `logs/performance/k6/<scenario>-<timestamp>-<suffix>/`. Open the HTML file directly in a browser. The JSON includes the fixture counts, tool version, workload, wall duration, native HTTP metrics and threshold outcomes. The dashboard samples every two seconds. The smoke run includes a brief observation window so k6 exports an HTML file, but its chart represents a correctness pass with a short burst. Generated reports are Git-ignored.
+
+### Executed results
+
+| Scenario | Peak VUs | Wall seconds | Requests | Requests/s | Mean | p95 | p99 | Thresholds | HTML |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |
+| smoke | 1 | 8.79 | 22 | 2.5 | 3.08 ms | 5.32 ms | 5.79 ms | Pass | [Report](../logs/performance/k6/smoke-2026-11-25T15-17-10-462Z-WLKxQk/report.html) |
+| marketplace | 4 | 20.44 | 160 | 7.8 | 9.02 ms | 14.05 ms | 30.18 ms | Pass | [Report](../logs/performance/k6/marketplace-2026-11-25T15-07-03-276Z-QjdGAy/report.html) |
+| auth-detail | 4 | 12.28 | 24,250 | 1975.2 | 1.91 ms | 2.54 ms | 3.32 ms | Pass | [Report](../logs/performance/k6/auth-detail-2026-11-25T15-07-24-883Z-KABpjz/report.html) |
+| analytics | 4 | 20.54 | 256 | 12.5 | 14.90 ms | 20.36 ms | 22.84 ms | Pass | [Report](../logs/performance/k6/analytics-2026-11-25T15-07-38-264Z-gdynVg/report.html) |
+| mixed | 4 | 12.90 | 16,793 | 1302.0 | 2.71 ms | 5.16 ms | 6.42 ms | Pass | [Report](../logs/performance/k6/mixed-2026-11-25T15-07-59-914Z-Og2t1y/report.html) |
+| browsing | 10 | 26.03 | 950 | 36.5 | 13.27 ms | 22.78 ms | 26.35 ms | Pass | [Report](../logs/performance/k6/browsing-2026-11-25T15-08-13-907Z-EOYsZ6/report.html) |
+| load | 20 | 31.02 | 3,348 | 107.9 | 8.95 ms | 17.27 ms | 21.45 ms | Pass | [Report](../logs/performance/k6/load-2026-11-25T15-08-41-053Z-s3DTEq/report.html) |
+| higher | 100 | 31.16 | 14,415 | 462.7 | 4.90 ms | 11.86 ms | 19.60 ms | Pass | [Report](../logs/performance/k6/higher-2026-11-25T15-09-13-256Z-DF5Qs0/report.html) |
+| stress | 100 | 51.06 | 40,795 | 798.9 | 7.12 ms | 18.31 ms | 32.29 ms | Pass | [Report](../logs/performance/k6/stress-2026-11-25T15-09-45-574Z-mGm1AJ/report.html) |
+| recovery | 100 | 31.08 | 23,366 | 751.8 | 29.05 ms | 58.14 ms | 79.35 ms | Pass | [Report](../logs/performance/k6/recovery-2026-11-25T15-10-37-881Z-lfs21E/report.html) |
+| soak | 20 | 301.17 | 22,720 | 75.4 | 13.58 ms | 23.28 ms | 28.33 ms | Pass | [Report](../logs/performance/k6/soak-2026-11-25T15-11-10-203Z-bx6qLT/report.html) |
+
+All runs had **0% unexpected HTTP failures and 100% measured functional checks**. Smoke recorded four expected HTTP 403 responses separately. The table uses native k6 HTTP timings for measured routes. The requests-per-second column divides measured requests by the observed wall duration, which includes setup. Closed-model VU runs have no arrival-rate dropped-iteration metric.
+
+The 100-VU stress run completed the configured ramp and holds without reaching the abort limits or establishing saturation. In the recovery run, end-to-end p95 was **11 ms at low traffic, 64 ms during the 100-VU burst, and 11 ms after the return to four VUs**. The 20-VU soak ran its full **300-second workload** and completed **22,720 measured requests**. Its wall time includes setup and graceful stop.
+
+### Comparison with the Node runner
+
+| Workload and runner | Requests | Requests/s | Mean | p95 | p99 | Error rate |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| mixed, Node.js | 15,478 | 1,289.2 | 3.10 ms | 5.58 ms | 7.28 ms | 0.0% |
+| mixed, k6 | 16,742 | 1,395.2 | 2.83 ms | 5.00 ms | 6.59 ms | 0.0% |
+| auth-detail, Node.js | 22,412 | 1,867.5 | 2.14 ms | 3.07 ms | 3.99 ms | 0.0% |
+| auth-detail, k6 | 23,989 | 1,999.1 | 1.98 ms | 3.00 ms | 4.00 ms | 0.0% |
+
+Each pair used four unpaced clients for 12 seconds on the same warmed, disposable PostgreSQL fixture, with the same read routes and mock services. Node reports its actual workload elapsed time. The k6 comparison divides measured requests by the 12-second scheduled window and uses a custom wall clock around request and response validation. That clock has millisecond resolution. The native k6 HTTP latency values in the previous table exclude application response parsing and connection setup.
+
+Node runs the generator and API on the same process and event loop. k6 uses a separate Go process, its own connection reuse strategy and independent VU sessions. The Node runner reuses one session per role. Both tools warmed each route and excluded auth setup from their reported endpoint latency. The comparison measures the two test setups and does not imply an application speedup.
+
+### Verification and limits
+
+The k6 code lives in `backend/scripts/performance/k6/`, with shared fixture settings in `backend/scripts/performance/fixture-config.js`. The existing benchmark database and runner use those settings, and the runner has a benchmark-only API startup mode. The root package supplies the commands, and `backend/tests/k6-launcher.test.js` covers safety, report paths and child cleanup.
+
+- All **217 backend tests** and **133 frontend tests** passed. Backend and frontend lint, TypeScript, the production build and Drizzle consistency passed.
+- The original seed, smoke, paired baseline, bundle and PostgreSQL reliability commands ran successfully. The unchanged root `npm run dev` served the frontend and the backend liveness endpoint over loopback.
+- An actual SIGINT stopped both children of a running k6 launcher and released its dashboard port. Launcher tests also cover unsafe targets, production mode, invalid settings, missing binaries, failed identity verification and isolated report paths.
+- Headless Chrome rendered the standalone stress report and the live dashboard, including VU, request rate, latency and failure charts. The exported reports passed a scan for fixture passwords, connection strings and the challenge header.
+
+These results apply to a local API, the small synthetic fixture set, PostgreSQL over TCP and mocked external services. The 5-minute soak covers that window. Longer durations are configurable, and timed session renewal was outside the five-minute verification window. Phase 13 should repeat the scenarios from a separate generator, measure backend and generator resources separately, test several seeded corpus sizes, and verify the workload against an isolated staging deployment with production-like integrations and rate limits.

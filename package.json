@@ -14,7 +14,18 @@
     "perf:reliability": "node backend/scripts/performance/run.js reliability",
     "perf:browser-api": "node backend/scripts/performance/run.js browser-api",
     "perf:browser": "node backend/scripts/performance/browser.js",
-    "perf:bundle": "node backend/scripts/performance/bundle.js"
+    "perf:bundle": "node backend/scripts/performance/bundle.js",
+    "perf:k6:smoke": "node backend/scripts/performance/k6/launcher.js smoke",
+    "perf:k6:marketplace": "node backend/scripts/performance/k6/launcher.js marketplace",
+    "perf:k6:auth-detail": "node backend/scripts/performance/k6/launcher.js auth-detail",
+    "perf:k6:analytics": "node backend/scripts/performance/k6/launcher.js analytics",
+    "perf:k6:mixed": "node backend/scripts/performance/k6/launcher.js mixed",
+    "perf:k6:browsing": "node backend/scripts/performance/k6/launcher.js browsing",
+    "perf:k6:load": "node backend/scripts/performance/k6/launcher.js load",
+    "perf:k6:higher": "node backend/scripts/performance/k6/launcher.js higher",
+    "perf:k6:stress": "node backend/scripts/performance/k6/launcher.js stress",
+    "perf:k6:recovery": "node backend/scripts/performance/k6/launcher.js recovery",
+    "perf:k6:soak": "node backend/scripts/performance/k6/launcher.js soak"
   },
   "devDependencies": {
     "concurrently": "^10.0.7"

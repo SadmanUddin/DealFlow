@@ -2,18 +2,17 @@ import { performance } from 'node:perf_hooks';
 import pg from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 
-const expectedUrl =
-  'postgresql://dealflow_perf:dealflow_perf@127.0.0.1:55432/dealflow_perf';
+import { databaseUrl } from './fixture-config.js';
 
 if (
   process.env.NODE_ENV !== 'test' ||
-  process.env.DEALFLOW_PERF_DATABASE_URL !== expectedUrl
+  process.env.DEALFLOW_PERF_DATABASE_URL !== databaseUrl
 ) {
   throw new Error('The disposable localhost Phase 12 database is required.');
 }
 
 export const pool = new pg.Pool({
-  connectionString: expectedUrl,
+  connectionString: databaseUrl,
   max: 10,
   connectionTimeoutMillis: 1500,
   statement_timeout: 5000,
