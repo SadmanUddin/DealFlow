@@ -19,7 +19,11 @@ export const privateCacheMiddleware = (req, res, next) => {
 
   // Conditional GETs still reach Arcjet before Express can return 304. Private
   // representations must always be fetched through the authenticated API.
-  if (['GET', 'HEAD'].includes(req.method)) {
+  // Image GETs check the current listing visibility before evaluating validators.
+  if (
+    ['GET', 'HEAD'].includes(req.method) &&
+    !/^\/api\/listings\/[1-9]\d*\/image$/.test(path)
+  ) {
     delete req.headers['if-none-match'];
     delete req.headers['if-modified-since'];
   }

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { performance } from 'node:perf_hooks';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '#config/database.js';
 import {
@@ -372,6 +373,7 @@ export const createOutboxLeaseGuard = (refreshLease, onLost = () => {}) => {
 };
 
 export const processClaimedEvent = async event => {
+  const startedAt = performance.now();
   const abortController = new globalThis.AbortController();
   const lease = createOutboxLeaseGuard(
     () => renewOutboxLease(event),
@@ -404,8 +406,9 @@ export const processClaimedEvent = async event => {
       return;
     }
     logger.info('Outbox event processed', {
-      eventId: event.id,
       eventType: event.type,
+      attempts: event.attempts,
+      durationMs: Math.round(performance.now() - startedAt),
     });
   } catch (error) {
     clearInterval(heartbeat);
@@ -434,6 +437,8 @@ export const processOutboxBatch = async (limit = 20) => {
       }
     }
   );
-  await Promise.all(workers);
+  const outcomes = await Promise.allSettled(workers);
+  const failure = outcomes.find(outcome => outcome.status === 'rejected');
+  if (failure) throw failure.reason;
   return events.length;
 };

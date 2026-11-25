@@ -311,11 +311,8 @@ export const createOffer = async (dealId, userId, input) => {
       SELECT deal_guard.id, ${input.parentOfferId ?? null}, ${userId}, ${input.amount}, ${input.currency}, ${input.message ?? null}
       FROM deal_guard
       WHERE (${input.parentOfferId ?? null}::integer IS NULL OR EXISTS (SELECT 1 FROM countered))
-        AND (${input.parentOfferId ?? null}::integer IS NOT NULL OR NOT EXISTS (
-          SELECT 1 FROM deal_offers AS pending_offer
-          WHERE pending_offer.deal_id = deal_guard.id AND pending_offer.created_by = ${userId}
-            AND pending_offer.status = 'pending'
-        ))
+        AND (${input.parentOfferId ?? null}::integer IS NOT NULL
+          OR NOT public.has_pending_deal_offer(deal_guard.id, ${userId}::integer))
       RETURNING inserted_offer.*
     ), deal_progress AS (
       UPDATE deals AS current_deal SET status = 'negotiating', updated_at = now()

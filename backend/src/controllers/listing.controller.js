@@ -38,19 +38,33 @@ export const removeListingImageController = async (req, res) => {
 };
 
 export const getListingImageController = async (req, res) => {
-  const { stream, mimeType, isPublic } = await getListingImage(
+  const { loadStream, mimeType, isPublic, etag } = await getListingImage(
     listingId(req),
     req.user?.id
   );
-  res.set({
+  const headers = {
     'Content-Type': mimeType,
-    'Cache-Control': isPublic ? 'public, max-age=300' : 'private, no-store',
+    'Cache-Control': isPublic ? 'public, no-cache' : 'private, no-store',
     'Cross-Origin-Resource-Policy': 'cross-origin',
     'X-Content-Type-Options': 'nosniff',
-  });
-  stream.on('error', error => {
-    if (!res.headersSent) res.status(502).end();
-    else res.destroy(error);
+  };
+  if (etag) {
+    res.set('ETag', etag);
+    if (req.fresh) {
+      res.set(headers).status(304).end();
+      return;
+    }
+    // Keep the validator off error responses if the object fetch fails.
+    res.removeHeader('ETag');
+  }
+  const stream = await loadStream();
+  res.set(headers);
+  if (etag) res.set('ETag', etag);
+  stream.on('error', () => {
+    if (!res.headersSent) {
+      res.removeHeader('ETag');
+      res.set('Cache-Control', 'private, no-store').status(502).end();
+    } else res.destroy();
   });
   stream.pipe(res);
 };

@@ -356,7 +356,7 @@ describe('Phase 8 deal service writes', () => {
     await expect(
       createOffer(31, 4, { amount: '90000', currency: 'EUR' })
     ).rejects.toMatchObject({ status: 409, code: 'DUPLICATE_PENDING_OFFER' });
-    expect(executed[0].query).toContain('pending_offer.created_by');
+    expect(executed[0].query).toContain('public.has_pending_deal_offer');
   });
 
   it('conditions offer response and withdrawal on pending state and participant identity', async () => {

@@ -2,7 +2,19 @@
   "name": "dealflow-workspace",
   "private": true,
   "scripts": {
-    "dev": "concurrently --kill-others --names BACKEND,FRONTEND --prefix-colors cyan,magenta \"npm --prefix backend run dev\" \"npm --prefix frontend run dev\""
+    "dev": "concurrently --kill-others --names BACKEND,FRONTEND --prefix-colors cyan,magenta \"npm --prefix backend run dev\" \"npm --prefix frontend run dev\"",
+    "perf:seed": "node backend/scripts/performance/run.js seed",
+    "perf:smoke": "node backend/scripts/performance/run.js smoke",
+    "perf:baseline": "node backend/scripts/performance/run.js baseline",
+    "perf:load": "node backend/scripts/performance/run.js load",
+    "perf:higher": "node backend/scripts/performance/run.js higher",
+    "perf:stress": "node backend/scripts/performance/run.js stress",
+    "perf:recovery": "node backend/scripts/performance/run.js recovery",
+    "perf:soak": "node backend/scripts/performance/run.js soak",
+    "perf:reliability": "node backend/scripts/performance/run.js reliability",
+    "perf:browser-api": "node backend/scripts/performance/run.js browser-api",
+    "perf:browser": "node backend/scripts/performance/browser.js",
+    "perf:bundle": "node backend/scripts/performance/bundle.js"
   },
   "devDependencies": {
     "concurrently": "^10.0.7"

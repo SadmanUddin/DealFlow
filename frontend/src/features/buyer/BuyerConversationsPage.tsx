@@ -88,14 +88,19 @@ function ConversationInboxPage({ role }: { role: "buyer" | "seller" }) {
   useEffect(() => {
     if (!activeId) return;
     void markConversationRead(activeId)
-      .then(() =>
-        Promise.all([
-          client.invalidateQueries({
+      .then(({ readCount }) => {
+        const cached = client.getQueryData<
+          Awaited<ReturnType<typeof listConversations>>
+        >(["workspace", "conversations", role, 1, 100]);
+        const cachedUnread = cached?.conversations.some(
+          (item) => item.id === activeId && item.unreadCount > 0,
+        );
+        if (readCount > 0 || cachedUnread) {
+          return client.invalidateQueries({
             queryKey: ["workspace", "conversations", role],
-          }),
-          client.invalidateQueries({ queryKey: ["buyer", "notifications"] }),
-        ]),
-      )
+          });
+        }
+      })
       .catch((reason) => setError(toApiError(reason).message));
   }, [activeId, client, role]);
   const submit = (event: FormEvent) => {

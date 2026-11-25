@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import request from 'supertest';
+import logger from '#config/logger.js';
 
 const probe = vi.hoisted(() => vi.fn());
 vi.mock('#config/database.js', () => ({ db: {}, checkDatabase: probe }));
@@ -46,4 +47,24 @@ it('reports database readiness without leaking provider diagnostics', async () =
   expect(response.status).toBe(503);
   expect(response.body).toEqual({ status: 'unavailable' });
   expect(response.headers['cache-control']).toBe('no-store');
+});
+
+it('assigns request IDs to parser failures and logs only normalized routes', async () => {
+  const health = await request(app).get('/health?query=fixture-private');
+  expect(logger.info).toHaveBeenCalledWith(
+    'HTTP request completed',
+    expect.objectContaining({
+      requestId: health.headers['x-request-id'],
+      route: '/health',
+      status: 200,
+      durationMs: expect.any(Number),
+    })
+  );
+
+  const invalid = await request(app)
+    .post('/api/auth/sign-in')
+    .set('Content-Type', 'application/json')
+    .send('{"private-fixture"');
+  expect(invalid.status).toBe(400);
+  expect(invalid.headers['x-request-id']).toMatch(/^[0-9a-f-]{36}$/);
 });

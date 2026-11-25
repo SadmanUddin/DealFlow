@@ -1,3 +1,4 @@
+import { unreadNotificationCountKey } from "@/features/buyer/notification-query-keys";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
@@ -120,7 +121,7 @@ export function BuyerNotificationsPage() {
     Promise.all([
       client.invalidateQueries({ queryKey: ["buyer", "notifications"] }),
       client.invalidateQueries({ queryKey: ["buyer", "overview"] }),
-      client.invalidateQueries({ queryKey: ["notifications", "unread-count"] }),
+      client.invalidateQueries({ queryKey: unreadNotificationCountKey }),
     ]);
   const markOne = useMutation({
     mutationFn: (id: number) => markNotificationRead(id),

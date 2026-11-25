@@ -138,9 +138,13 @@ function parseApiResponse<T>(schema: z.ZodType<T>, data: unknown): T {
   return result.data;
 }
 
-export async function getPublicListings(filters: MarketplaceFilters) {
+export async function getPublicListings(
+  filters: MarketplaceFilters,
+  signal?: AbortSignal,
+) {
   const { data } = await apiClient.get<unknown>("/listings", {
     params: filters,
+    signal,
   });
   return parseApiResponse(listingPageSchema, data);
 }

@@ -1,4 +1,7 @@
 import { Readable } from 'node:stream';
+import express from 'express';
+import request from 'supertest';
+import privateCacheMiddleware from '#middleware/private-cache.middleware.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { db, uploadObject, removeObject, downloadObject } = vi.hoisted(() => ({
@@ -190,11 +193,14 @@ describe('listing image lifecycle with mocked database and storage', () => {
     const { getListingImage } =
       await import('../src/services/listing-image.service.js');
 
-    await expect(getListingImage(12, null)).resolves.toEqual({
-      stream,
+    const image = await getListingImage(12, null);
+    expect(image).toMatchObject({
+      etag: expect.stringMatching(/^"[a-f0-9]{64}"$/),
       mimeType: 'image/png',
       isPublic: true,
     });
+    expect(downloadObject).not.toHaveBeenCalled();
+    await expect(image.loadStream()).resolves.toBe(stream);
     expect(downloadObject).toHaveBeenCalledWith('listing-images/4/private-key');
   });
 
@@ -210,7 +216,12 @@ describe('listing image lifecycle with mocked database and storage', () => {
     downloadObject.mockResolvedValue(stream);
     const { getListingImageController } =
       await import('../src/controllers/listing.controller.js');
-    const response = { set: vi.fn(), destroy: vi.fn(), headersSent: false };
+    const response = {
+      set: vi.fn(),
+      removeHeader: vi.fn(),
+      destroy: vi.fn(),
+      headersSent: false,
+    };
 
     await getListingImageController(
       { params: { id: '12' }, user: undefined },
@@ -219,11 +230,42 @@ describe('listing image lifecycle with mocked database and storage', () => {
 
     expect(response.set).toHaveBeenCalledWith(
       expect.objectContaining({
-        'Cache-Control': 'public, max-age=300',
+        'Cache-Control': 'public, no-cache',
         'Cross-Origin-Resource-Policy': 'cross-origin',
         'Content-Type': 'image/png',
       })
     );
     expect(stream.pipe).toHaveBeenCalledWith(response);
+  });
+  it('revalidates a public image without storage access and denies it after withdrawal', async () => {
+    const { getListingImageController } =
+      await import('../src/controllers/listing.controller.js');
+    const app = express();
+    app.use(privateCacheMiddleware);
+    app.get('/api/listings/:id/image', getListingImageController);
+    app.use((error, _req, res, _next) => res.status(error.status ?? 500).end());
+
+    const image = {
+      imageKey: 'listing-images/4/private-key',
+      mimeType: 'image/png',
+      status: 'published',
+    };
+    db.selectResults.push([image], [image], []);
+    downloadObject.mockResolvedValueOnce(Readable.from([png]));
+    const path = '/api/listings/12/image';
+    const original = await request(app).get(path).expect(200);
+    expect(original.headers.etag).toMatch(/^"[a-f0-9]{64}"$/);
+    expect(original.headers['cache-control']).toBe('public, no-cache');
+
+    await request(app)
+      .get(path)
+      .set('If-None-Match', original.headers.etag)
+      .expect(304);
+    const withdrawn = await request(app)
+      .get(path)
+      .set('If-None-Match', original.headers.etag)
+      .expect(404);
+    expect(withdrawn.headers['cache-control']).toContain('no-store');
+    expect(downloadObject).toHaveBeenCalledTimes(1);
   });
 });

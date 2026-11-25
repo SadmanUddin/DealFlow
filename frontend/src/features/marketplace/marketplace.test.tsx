@@ -143,6 +143,26 @@ beforeEach(() => {
 });
 
 describe("public marketplace", () => {
+  it("cancels the previous listing request when the search changes", async () => {
+    apiMocks.getPublicListings.mockImplementationOnce(
+      () => new Promise(() => {}),
+    );
+    const user = userEvent.setup();
+    renderMarketplace();
+    await waitFor(() => expect(apiMocks.getPublicListings).toHaveBeenCalled());
+    const signal = apiMocks.getPublicListings.mock.calls[0][1] as AbortSignal;
+    expect(signal.aborted).toBe(false);
+    await user.type(
+      screen.getByRole("searchbox", { name: "Search businesses" }),
+      "bakery",
+    );
+    await user.click(screen.getByRole("button", { name: /^Search$/ }));
+    await waitFor(() => expect(signal.aborted).toBe(true));
+    await screen.findByRole("link", {
+      name: /view independent neighborhood bakery/i,
+    });
+  });
+
   it("loads a versioned public image for a listing card", async () => {
     const imageListing = {
       ...listing,
@@ -202,6 +222,7 @@ describe("public marketplace", () => {
     await waitFor(() => {
       expect(apiMocks.getPublicListings).toHaveBeenLastCalledWith(
         expect.objectContaining({ industry: "Food", page: 1 }),
+        expect.any(AbortSignal),
       );
     });
     await user.click(chip);
@@ -232,6 +253,7 @@ describe("public marketplace", () => {
           sort: "price_desc",
           industry: "Retail",
         }),
+        expect.any(AbortSignal),
       );
     });
     await user.type(
@@ -242,6 +264,7 @@ describe("public marketplace", () => {
     await waitFor(() => {
       expect(apiMocks.getPublicListings).toHaveBeenLastCalledWith(
         expect.objectContaining({ q: "bakery", page: 1, industry: "Retail" }),
+        expect.any(AbortSignal),
       );
       expect(screen.getByTestId("location-search")).toHaveTextContent(
         "q=bakery",
@@ -270,6 +293,7 @@ describe("public marketplace", () => {
           q: "bakery",
           page: 1,
         }),
+        expect.any(AbortSignal),
       );
     });
     expect(screen.getByTestId("location-search")).toHaveTextContent(
@@ -318,6 +342,7 @@ describe("public marketplace", () => {
     await waitFor(() =>
       expect(apiMocks.getPublicListings).toHaveBeenLastCalledWith(
         expect.objectContaining({ minPrice: "100000", maxPrice: "900000" }),
+        expect.any(AbortSignal),
       ),
     );
     expect(screen.getByTestId("location-search")).toHaveTextContent(
@@ -342,6 +367,7 @@ describe("public marketplace", () => {
           sort: "price_asc",
           page: 1,
         }),
+        expect.any(AbortSignal),
       ),
     );
     await user.click(screen.getByRole("button", { name: "Next" }));
@@ -352,6 +378,7 @@ describe("public marketplace", () => {
           sort: "price_asc",
           page: 2,
         }),
+        expect.any(AbortSignal),
       ),
     );
     expect(screen.getByTestId("location-search")).toHaveTextContent("page=2");
@@ -638,6 +665,7 @@ describe("sold businesses", () => {
     expect(screen.queryByText("Business opportunity")).not.toBeInTheDocument();
     expect(apiMocks.getPublicListings).toHaveBeenLastCalledWith(
       expect.objectContaining({ availability: "sold", page: 1 }),
+      expect.any(AbortSignal),
     );
     expect(screen.getByTestId("location-search")).toHaveTextContent(
       "availability=sold",

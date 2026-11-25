@@ -16,7 +16,6 @@ import {
 } from '#controllers/listing.controller.js';
 import {
   authorizeRoles,
-  optionalAuthentication,
   requireAuthentication,
   requireCsrf,
 } from '#middleware/auth.middleware.js';
@@ -58,7 +57,7 @@ router.delete(
   removeListingImageController
 );
 router.post('/:id/views', requireAuthentication, requireCsrf, trackListingView);
-router.get('/:id', optionalAuthentication, getPublishedListing);
+router.get('/:id', getPublishedListing);
 router.patch(
   '/:id',
   requireAuthentication,

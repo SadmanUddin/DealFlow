@@ -1,3 +1,4 @@
+import { unreadNotificationCountKey } from "@/features/buyer/notification-query-keys";
 import {
   Activity,
   Bell,
@@ -73,7 +74,7 @@ const roleLabel: Record<UserRole, string> = {
 
 export function WorkspaceLayout({ role }: { role: UserRole }) {
   const unreadQuery = useQuery({
-    queryKey: ["notifications", "unread-count"],
+    queryKey: unreadNotificationCountKey,
     queryFn: () => listNotifications(1, 1, true),
     enabled: role !== "admin",
     staleTime: 15_000,

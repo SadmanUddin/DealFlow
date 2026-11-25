@@ -11,18 +11,21 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { toApiError } from "@/lib/api-error";
-import { authQueryKeys, getProfile, updateProfile } from "@/features/auth/api";
+import {
+  authQueryKeys,
+  deactivateAccount,
+  getProfile,
+  updateProfile,
+} from "@/features/auth/api";
 import { profileSchema, type ProfileValues } from "@/features/auth/schemas";
 import { useAuth } from "@/features/auth/useAuth";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { clearPrivateQueryCache } from "@/app/providers/query-cache";
 import {
-  deactivateAccount,
   getEmailPreferences,
   updateEmailPreferences,
   type EmailPreferences,
-} from "@/features/auth/api";
-
+} from "./email-preferences-api";
 import { AdminMfaPanel } from "./AdminMfaPanel";
 
 export function AccountPage() {

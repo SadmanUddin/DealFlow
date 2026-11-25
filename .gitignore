@@ -5,7 +5,8 @@
 node_modules/
 **/dist/
 backend/docs
-/docs/
+/docs/*
+!/docs/PERFORMANCE_AND_RELIABILITY_REPORT.md
 .env
 
 /frontend/ASSET_ATTRIBUTION.md

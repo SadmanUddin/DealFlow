@@ -39,6 +39,11 @@ vi.mock("./api", async (importOriginal) => {
   return { ...actual, ...apiMocks };
 });
 
+vi.mock("@/features/account/email-preferences-api", () => ({
+  getEmailPreferences: apiMocks.getEmailPreferences,
+  updateEmailPreferences: apiMocks.updateEmailPreferences,
+}));
+
 const buyer: AuthUser = {
   id: 21,
   name: "Alex Buyer",

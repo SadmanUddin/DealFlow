@@ -1,3 +1,4 @@
+import { unreadNotificationCountKey } from "@/features/buyer/notification-query-keys";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
@@ -51,7 +52,7 @@ export function BuyerOverviewPage() {
     queryFn: () => listDeals(1, 1, "completed"),
   });
   const notificationQuery = useQuery({
-    queryKey: ["buyer", "notifications", "unread", 1],
+    queryKey: unreadNotificationCountKey,
     queryFn: () => listNotifications(1, 1, true),
     staleTime: 15_000,
   });

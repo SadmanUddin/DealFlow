@@ -213,7 +213,7 @@ export function MarketplacePage() {
 
   const listingsQuery = useQuery({
     queryKey: ["marketplace", filters],
-    queryFn: () => getPublicListings(filters),
+    queryFn: ({ signal }) => getPublicListings(filters, signal),
     retry: retryQuery,
     staleTime: 0,
     refetchOnWindowFocus: true,

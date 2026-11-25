@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import Busboy from 'busboy';
 import { and, eq, inArray, isNull, or } from 'drizzle-orm';
 import { db } from '#config/database.js';
@@ -244,10 +244,13 @@ export const getListingImage = async (listingId, viewerId) => {
     .limit(1);
   if (!listing?.imageKey)
     throw fail(404, 'LISTING_IMAGE_NOT_FOUND', 'Listing image was not found');
-  const stream = await downloadObject(listing.imageKey);
+  const isPublic = ['published', 'sold'].includes(listing.status);
   return {
-    stream,
+    loadStream: () => downloadObject(listing.imageKey),
+    etag: isPublic
+      ? `"${createHash('sha256').update(listing.imageKey).digest('hex')}"`
+      : undefined,
     mimeType: listing.mimeType,
-    isPublic: ['published', 'sold'].includes(listing.status),
+    isPublic,
   };
 };

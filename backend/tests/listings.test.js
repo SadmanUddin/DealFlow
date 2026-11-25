@@ -232,9 +232,18 @@ describe('public listing visibility', () => {
     await signed(request(app).post(`/api/favorites/${listingId}`), buyer).send(
       {}
     );
-    const savedResponse = await request(app)
-      .get(`/api/listings/${listingId}`)
-      .set('Cookie', buyer.cookie);
+    const select = vi.spyOn(mock.db, 'select');
+    let savedResponse;
+    try {
+      savedResponse = await request(app)
+        .get(`/api/listings/${listingId}`)
+        .set('Cookie', buyer.cookie);
+      expect(
+        select.mock.calls.filter(([fields]) => fields?.csrfTokenHash)
+      ).toHaveLength(1);
+    } finally {
+      select.mockRestore();
+    }
     expect(savedResponse.body.listing.isFavorite).toBe(true);
     expect(savedResponse.headers['cache-control']).toBe('private, no-store');
     expect(savedResponse.headers.vary).toContain('Cookie');

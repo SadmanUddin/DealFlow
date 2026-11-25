@@ -43,6 +43,42 @@ const trustedProxies = getEnvironment()
 // The default is a direct connection; arbitrary X-Forwarded-For values are ignored.
 app.set('trust proxy', trustedProxies.length ? trustedProxies : false);
 
+app.use((req, res, next) => {
+  const candidate = req.get('x-request-id');
+  req.requestId =
+    candidate &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      candidate
+    )
+      ? candidate
+      : randomUUID();
+  res.set('X-Request-Id', req.requestId);
+  next();
+});
+app.use(
+  morgan((tokens, req, res) => {
+    const durationMs = Number(tokens['total-time'](req, res)) || undefined;
+    const template = req.route?.path;
+    const route =
+      typeof template === 'string'
+        ? (
+          req.baseUrl.replace(
+            /^(\/api\/conversations)\/[^/]+(\/documents)$/i,
+            '$1/:conversationId$2'
+          ) + template
+        ).replace(/\/$/, '') || '/'
+        : 'unmatched';
+    logger[durationMs >= 1000 ? 'warn' : 'info']('HTTP request completed', {
+      requestId: req.requestId,
+      method: req.method,
+      status: Number(tokens.status(req, res)) || undefined,
+      route,
+      durationMs,
+    });
+    return undefined;
+  })
+);
+
 app.use(helmet());
 app.use(
   cors({
@@ -65,29 +101,6 @@ app.use(
 app.use(express.json({ limit: '32kb' }));
 app.use(express.urlencoded({ extended: true, limit: '32kb' }));
 app.use(cookieParser());
-app.use((req, res, next) => {
-  const candidate = req.get('x-request-id');
-  req.requestId =
-    candidate &&
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-      candidate
-    )
-      ? candidate
-      : randomUUID();
-  res.set('X-Request-Id', req.requestId);
-  next();
-});
-app.use(
-  morgan((tokens, req, res) => {
-    logger.info('HTTP request completed', {
-      requestId: req.requestId,
-      method: req.method,
-      status: Number(tokens.status(req, res)) || undefined,
-      durationMs: Number(tokens['response-time'](req, res)) || undefined,
-    });
-    return undefined;
-  })
-);
 
 app.get('/', (req, res) => {
   logger.info('Hello from DealFlow');
