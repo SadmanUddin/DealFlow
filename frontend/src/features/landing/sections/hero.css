@@ -1,0 +1,432 @@
+.dealflow-hero {
+  position: relative;
+  isolation: isolate;
+  margin-top: -5rem;
+  padding-top: 5rem;
+  overflow: hidden;
+  border-radius: 0 0 clamp(1.35rem, 3vw, 2.75rem) clamp(1.35rem, 3vw, 2.75rem);
+  background:
+    radial-gradient(ellipse at 92% 76%, #e7ebdc, transparent 68%), #f8f5ea;
+  color: #0b1f36;
+}
+
+.dealflow-hero-layout {
+  position: relative;
+  display: grid;
+  grid-template-areas: "copy" "preview" "map";
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  align-items: center;
+  padding-block: 2.8rem 1.25rem;
+}
+
+.dealflow-hero-copy {
+  grid-area: copy;
+  container-type: inline-size;
+  z-index: 1;
+  align-self: center;
+  padding-bottom: 1rem;
+}
+
+.dealflow-hero-title {
+  font-family: var(--font-display);
+  font-size: clamp(1rem, 12.1cqi, 5.9rem);
+  font-weight: 525;
+  letter-spacing: -0.057em;
+  line-height: 0.96;
+}
+
+.dealflow-hero-phrase {
+  color: #0c6b50;
+}
+
+.dealflow-hero-phrase > span {
+  display: inline-block;
+  animation: dealflow-word-in 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both;
+}
+
+.dealflow-hero-phrase > span:nth-child(2) {
+  animation-delay: 0.17s;
+}
+.dealflow-hero-phrase > span:nth-child(3) {
+  animation-delay: 0.26s;
+}
+
+@keyframes dealflow-word-in {
+  from {
+    opacity: 0.15;
+    transform: translateY(0.32em);
+    filter: blur(8px);
+  }
+}
+
+.dealflow-hero-description {
+  max-width: 43ch;
+  margin-top: 1.4rem;
+  color: #42544f;
+  font-size: clamp(1rem, 1.4vw, 1.125rem);
+  line-height: 1.65;
+}
+
+.dealflow-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+  margin-top: 1.6rem;
+}
+
+.dealflow-secondary {
+  display: inline-flex;
+  min-height: 3.5rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  padding-inline: 1rem;
+  border: 1px solid #0b1f362b;
+  border-radius: 0.875rem;
+  background: #fffdf7b8;
+  font-size: 0.9375rem;
+  font-weight: 650;
+  transition:
+    background 0.22s,
+    border-color 0.22s,
+    transform 0.22s;
+}
+
+.dealflow-secondary:is(:hover, :focus-visible) {
+  transform: translateY(-2px);
+  border-color: #2c755c;
+  background: #fffdf8;
+}
+
+.dealflow-map {
+  grid-area: map;
+}
+
+.dealflow-map-art {
+  position: absolute;
+  z-index: -1;
+  inset: 16% calc((100% - 100vw) / 2) 0;
+  overflow: hidden;
+  pointer-events: none;
+  mask-image: linear-gradient(transparent, #000 48%);
+}
+
+.dealflow-map-drawing {
+  width: 100%;
+  height: 100%;
+  transform-origin: 65% 58%;
+  transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: dealflow-map-in 1.25s ease-out both;
+}
+
+.dealflow-map-drawing[data-zoom="1"] {
+  transform: scale(1.22);
+}
+.dealflow-map-drawing[data-zoom="2"] {
+  transform: scale(1.48);
+}
+
+@keyframes dealflow-map-in {
+  from {
+    opacity: 0.25;
+  }
+}
+
+.dealflow-map-route {
+  animation: dealflow-route-in 2s ease-out;
+}
+
+@keyframes dealflow-route-in {
+  from {
+    opacity: 0;
+    stroke-dashoffset: 55;
+  }
+}
+
+.dealflow-map-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.dealflow-map-controls > span,
+.dealflow-map-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid #193c3020;
+  border-radius: 0.75rem;
+  background: #fcfaf3;
+  box-shadow: 0 8px 18px -12px #0b1f3670;
+}
+
+.dealflow-map-controls > span {
+  min-height: 2.75rem;
+  padding-inline: 0.7rem;
+  color: #29483d;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.dealflow-map-zoom {
+  gap: 0;
+}
+
+.dealflow-map-zoom button {
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  cursor: pointer;
+  place-items: center;
+  border-radius: 0.65rem;
+}
+
+.dealflow-map-zoom button + button {
+  border-inline-start: 1px solid #193c3020;
+}
+.dealflow-map-zoom button:hover {
+  background: #e8f1e4;
+}
+.dealflow-map-zoom button[aria-disabled="true"] {
+  color: #647970;
+  cursor: default;
+  background: transparent;
+}
+
+.dealflow-preview {
+  grid-area: preview;
+  min-width: 0;
+  border: 1px solid #233f3429;
+  border-radius: 1.35rem;
+  background: #fdfbf6;
+  box-shadow:
+    0 0 0 0.375rem #fff9,
+    0 28px 55px -27px #17372a80,
+    0 8px 16px -12px #142c2f66;
+  animation: dealflow-preview-in 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes dealflow-preview-in {
+  from {
+    opacity: 0.4;
+    transform: translateY(1rem) rotate(1deg);
+  }
+}
+
+.dealflow-preview-bar {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-height: 3.25rem;
+  align-items: center;
+  gap: 0.5rem;
+  padding-inline: 0.875rem;
+  border-bottom: 1px solid #e3e8dd;
+  border-radius: 1.35rem 1.35rem 0 0;
+  background: #f4f4ea;
+  color: #39544c;
+  font-size: 0.8125rem;
+  font-weight: 650;
+  text-align: center;
+}
+
+.dealflow-window-dots {
+  display: flex;
+  gap: 0.25rem;
+}
+.dealflow-window-dots i {
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 50%;
+  background: #bdcbbd;
+}
+.dealflow-window-dots i:first-child {
+  background: #59a789;
+}
+
+.dealflow-preview-open {
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  place-items: center;
+  border-radius: 0.625rem;
+  color: #166248;
+}
+.dealflow-preview-open:hover {
+  background: #e5eee1;
+}
+
+.dealflow-preview-content {
+  padding: clamp(0.875rem, 2vw, 1.4rem);
+}
+.dealflow-preview-content h2 {
+  font: 540 clamp(1.65rem, 3vw, 2.25rem) / 1 var(--font-display);
+  letter-spacing: -0.045em;
+}
+
+.dealflow-preview-search {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-block: 0.75rem 1rem;
+  padding: 0.25rem 0.25rem 0.25rem 0.65rem;
+  border: 1px solid #d9e0d8;
+  border-radius: 0.75rem;
+  background: white;
+  color: #51695e;
+}
+
+.dealflow-preview-search input {
+  min-width: 0;
+  flex: 1;
+  padding: 0.4rem 0;
+  font-size: 1rem;
+  color: #0b1f36;
+}
+.dealflow-preview-search input:focus-visible {
+  border-radius: 0.25rem;
+  outline-offset: 1px;
+}
+
+.dealflow-preview-search button {
+  padding: 0.65rem 0.7rem;
+  border-radius: 0.5rem;
+  background: #e5f0e8;
+  color: #15563e;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 650;
+}
+.dealflow-preview-search button:hover {
+  background: #c9e7d7;
+}
+
+.dealflow-listings {
+  display: grid;
+  gap: 0.625rem;
+}
+.dealflow-listing {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 0.75rem;
+  border: 1px solid #dbdfd5;
+  border-radius: 0.875rem;
+  background: #fff;
+  transition:
+    border-color 0.22s,
+    box-shadow 0.22s,
+    transform 0.22s;
+}
+.dealflow-listing:is(:hover, :focus-visible) {
+  transform: translateY(-2px);
+  border-color: #67a78f;
+  box-shadow: 0 7px 15px -10px #1d5d48a8;
+}
+.dealflow-listing-icon {
+  display: grid;
+  width: 2.4rem;
+  height: 2.4rem;
+  flex: none;
+  place-items: center;
+  border-radius: 0.625rem;
+  background: #e7f2e8;
+  color: #166248;
+}
+.dealflow-listing-financials {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.65rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 0.55rem;
+  background: #f4f7f0;
+}
+.dealflow-listing-financials dt {
+  color: #495e57;
+  font-size: 0.75rem;
+}
+.dealflow-listing-financials dd {
+  overflow-wrap: anywhere;
+  font-size: 0.875rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.dealflow-preview-empty {
+  display: grid;
+  min-height: 11rem;
+  align-content: center;
+  justify-items: center;
+  gap: 0.65rem;
+  padding: 0.75rem;
+  border: 1px dashed #c6d4c8;
+  border-radius: 0.875rem;
+  background: #f4f6ee;
+  color: #42544f;
+  text-align: center;
+  font-size: 0.875rem;
+}
+
+@media (max-width: 479px) {
+  .dealflow-hero-title {
+    font-size: 13.1cqi;
+  }
+  .dealflow-hero-actions > a {
+    width: 100%;
+  }
+}
+
+@media (min-width: 640px) and (max-width: 859px) {
+  .dealflow-hero-layout {
+    max-width: 41rem;
+  }
+}
+
+@media (min-width: 860px) {
+  .dealflow-hero-layout {
+    min-height: clamp(33rem, 77vh, 45rem);
+    grid-template-areas: "copy preview" "map map";
+    grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr);
+    grid-template-rows: 1fr auto;
+    column-gap: clamp(1.7rem, 5vw, 6rem);
+    padding-block: 3.75rem 1.75rem;
+  }
+
+  .dealflow-map-art {
+    inset: -5rem calc((100% - 100vw) / 2) 0 15%;
+    mask-image: linear-gradient(100deg, transparent 4%, #000 58%);
+  }
+
+  .dealflow-preview {
+    margin-inline-end: 0.5rem;
+  }
+}
+
+@media (640px <= width < 860px), (width >= 1120px) {
+  .dealflow-listings {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dealflow-hero-phrase > span,
+  .dealflow-map-drawing,
+  .dealflow-map-route,
+  .dealflow-preview {
+    animation: none;
+  }
+
+  .dealflow-map-drawing,
+  .dealflow-secondary,
+  .dealflow-listing {
+    transition: none;
+  }
+  .dealflow-secondary:is(:hover, :focus-visible),
+  .dealflow-listing:is(:hover, :focus-visible) {
+    transform: none;
+  }
+}

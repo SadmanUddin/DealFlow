@@ -11,7 +11,7 @@ export function MarketingLayout() {
       >
         Skip to content
       </a>
-      <SiteHeader />
+      <SiteHeader floating />
       <main id="main-content" tabIndex={-1} className="min-w-0">
         <Outlet />
       </main>

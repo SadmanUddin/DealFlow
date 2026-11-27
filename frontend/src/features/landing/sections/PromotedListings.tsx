@@ -1,21 +1,14 @@
-import { useQuery } from "@tanstack/react-query";
 import { Building2 } from "lucide-react";
 import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
 import { ListingCard } from "@/features/marketplace/ListingCard";
 import { ListingCardSkeleton } from "@/features/marketplace/ListingCardSkeleton";
-import { getPublicListings } from "@/features/marketplace/marketplace-api";
+import { usePromotedListings } from "./usePromotedListings";
 
 import { selectPromotedListings } from "./promoted-listings";
 
 export function PromotedListings({ sold = false }: { sold?: boolean }) {
-  const availability = sold ? "sold" : "available";
-  const query = useQuery({
-    queryKey: ["marketplace", "promotion", availability],
-    queryFn: () =>
-      getPublicListings({ page: 1, limit: 12, availability, sort: "newest" }),
-    staleTime: 30_000,
-  });
+  const query = usePromotedListings(sold);
   const listings = selectPromotedListings(query.data?.listings ?? [], sold);
   if (sold && !listings.length) return null;
   const id = sold ? "recently-sold" : "featured-businesses";

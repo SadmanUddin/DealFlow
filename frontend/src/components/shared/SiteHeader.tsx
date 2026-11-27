@@ -1,9 +1,10 @@
-import { useState } from "react";
-import { Menu, X } from "lucide-react";
+import { useRef, useState } from "react";
+import { ArrowUpRight, Menu, X } from "lucide-react";
 import { Link, NavLink, useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { useAuth } from "@/features/auth/useAuth";
+import "./public-navigation.css";
 
 const navigation = [
   { label: "Marketplace", href: "/marketplace" },
@@ -12,11 +13,27 @@ const navigation = [
   { label: "How it works", href: "/#how-it-works" },
 ];
 
-function NavigationLinks({ onNavigate }: { onNavigate?: () => void }) {
+const publicNavigation = [
+  navigation[0],
+  navigation[3],
+  { label: "Why DealFlow", href: "/#benefits" },
+];
+
+function NavigationLinks({
+  floating,
+  onNavigate,
+}: {
+  floating: boolean;
+  onNavigate?: () => void;
+}) {
   const base =
     "inline-flex min-h-11 items-center rounded-lg px-2.5 text-sm font-medium text-ink-soft transition hover:bg-mist hover:text-ink [&.active]:bg-mist [&.active]:font-semibold [&.active]:text-forest";
-  return navigation.map(({ label, href }) =>
-    href.includes("#") ? (
+  return (floating ? publicNavigation : navigation).map(({ label, href }) =>
+    href.includes("#") && floating ? (
+      <Link className={base} key={href} to={href} onClick={onNavigate}>
+        {label}
+      </Link>
+    ) : href.includes("#") ? (
       <a className={base} key={href} href={href} onClick={onNavigate}>
         {label}
       </a>
@@ -28,11 +45,12 @@ function NavigationLinks({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-export function SiteHeader() {
+export function SiteHeader({ floating = false }: { floating?: boolean }) {
   const { user, isLoading, isSigningOut, logout } = useAuth();
   const navigate = useNavigate();
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [logoutError, setLogoutError] = useState("");
+  const menuButton = useRef<HTMLButtonElement>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const handleLogout = async () => {
@@ -51,11 +69,30 @@ export function SiteHeader() {
 
   return (
     <>
-      <header className="sticky top-0 z-30 border-b border-line bg-ivory/95 backdrop-blur-xl">
-        <div className="page-container flex h-16 items-center justify-between gap-3 lg:h-[4.75rem]">
+      <header
+        className={
+          floating
+            ? "public-header sticky z-30"
+            : "sticky top-0 z-30 border-b border-line bg-ivory/95 backdrop-blur-xl"
+        }
+        onKeyDown={(event) => {
+          if (event.key === "Escape" && mobileOpen) {
+            setMobileOpen(false);
+            menuButton.current?.focus();
+          }
+        }}
+      >
+        <div
+          className={
+            floating
+              ? "public-header-bar"
+              : "page-container flex h-16 items-center justify-between gap-3 lg:h-[4.75rem]"
+          }
+        >
           <Link
             aria-label="DealFlow home"
             className="brand-lockup shrink-0"
+            onClick={() => setMobileOpen(false)}
             to="/"
           >
             <img
@@ -76,7 +113,7 @@ export function SiteHeader() {
             aria-label="Main navigation"
             className="hidden items-center gap-2 lg:flex"
           >
-            <NavigationLinks />
+            <NavigationLinks floating={floating} />
           </nav>
 
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
@@ -110,20 +147,36 @@ export function SiteHeader() {
             ) : (
               <>
                 <NavLink
-                  className="rounded-lg px-2 py-2 text-sm font-medium text-ink-soft transition hover:text-navy-950 sm:px-3"
+                  className={`rounded-lg px-2 py-2 text-sm font-medium text-ink-soft transition hover:text-navy-950 sm:px-3 ${floating ? "hidden sm:inline-flex" : ""}`}
                   to="/login"
                 >
                   Sign in
                 </NavLink>
-                <Button asChild size="sm">
-                  <Link className="px-2.5 sm:px-3.5" to="/register">
-                    <span className="sm:hidden">Join</span>
-                    <span className="hidden sm:inline">Create account</span>
+                {floating ? (
+                  <Link
+                    className="dealflow-cta dealflow-cta-small hidden sm:inline-flex"
+                    to="/register"
+                  >
+                    <span className="dealflow-cta-label">
+                      <span>Create account</span>
+                      <span aria-hidden="true">Create account</span>
+                    </span>
+                    <span className="dealflow-cta-icon">
+                      <ArrowUpRight size={16} aria-hidden="true" />
+                    </span>
                   </Link>
-                </Button>
+                ) : (
+                  <Button asChild size="sm">
+                    <Link className="px-2.5 sm:px-3.5" to="/register">
+                      <span className="sm:hidden">Join</span>
+                      <span className="hidden sm:inline">Create account</span>
+                    </Link>
+                  </Button>
+                )}
               </>
             )}
             <button
+              ref={menuButton}
               aria-expanded={mobileOpen}
               aria-label={
                 mobileOpen ? "Close navigation menu" : "Open navigation menu"
@@ -131,7 +184,9 @@ export function SiteHeader() {
               className="grid size-11 place-items-center rounded-lg text-navy-950 transition hover:bg-mist focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-700/20 lg:hidden"
               onClick={() => setMobileOpen((open) => !open)}
               type="button"
-              aria-controls="public-mobile-navigation"
+              aria-controls={
+                mobileOpen ? "public-mobile-navigation" : undefined
+              }
             >
               {mobileOpen ? (
                 <X aria-hidden="true" size={20} />
@@ -145,10 +200,17 @@ export function SiteHeader() {
           <nav
             aria-label="Mobile navigation"
             id="public-mobile-navigation"
-            className="border-t border-line bg-white px-5 py-3 lg:hidden"
+            className={
+              floating
+                ? "public-header-menu lg:hidden"
+                : "border-t border-line bg-white px-5 py-3 lg:hidden"
+            }
           >
             <div className="page-container flex flex-col items-start gap-1">
-              <NavigationLinks onNavigate={() => setMobileOpen(false)} />
+              <NavigationLinks
+                floating={floating}
+                onNavigate={() => setMobileOpen(false)}
+              />
               {user ? (
                 <NavLink
                   className="rounded-md py-2 text-sm font-medium text-ink-soft"
@@ -157,6 +219,19 @@ export function SiteHeader() {
                 >
                   My workspace
                 </NavLink>
+              ) : floating && !isLoading ? (
+                <div className="mt-2 flex w-full flex-wrap gap-2 border-t border-line pt-3 sm:hidden">
+                  <Button asChild variant="outline">
+                    <Link to="/login" onClick={() => setMobileOpen(false)}>
+                      Sign in
+                    </Link>
+                  </Button>
+                  <Button asChild>
+                    <Link to="/register" onClick={() => setMobileOpen(false)}>
+                      Create account
+                    </Link>
+                  </Button>
+                </div>
               ) : null}
             </div>
           </nav>
